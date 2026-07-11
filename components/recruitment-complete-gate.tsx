@@ -5,38 +5,28 @@ import {
   RecruitmentCompleteDialog,
   wasRecruitmentCompleteDismissed,
 } from '@/components/recruitment-complete-dialog';
+import { useTeamNav } from '@/components/team-nav-provider';
 
 /**
  * Mounts the celebration dialog for team-portal users once every team’s
  * final selection has been locked by admin.
  */
 export function RecruitmentCompleteGate() {
+  const { nav } = useTeamNav();
   const [open, setOpen] = useState(false);
   const [cycleLabel, setCycleLabel] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
-    fetch('/api/team/nav', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled || !json) return;
-        if (!json.finalSelectionComplete) return;
-        const label =
-          typeof json.recruitmentCycleShortLabel === 'string' &&
-          json.recruitmentCycleShortLabel
-            ? json.recruitmentCycleShortLabel
-            : typeof json.recruitmentCycleLabel === 'string' && json.recruitmentCycleLabel
-              ? json.recruitmentCycleLabel.replace(/\s+Recruitment Cycle$/i, '')
-              : 'complete';
-        if (wasRecruitmentCompleteDismissed(label)) return;
-        setCycleLabel(label);
-        setOpen(true);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!nav?.finalSelectionComplete) return;
+    const label =
+      nav.recruitmentCycleShortLabel ||
+      (nav.recruitmentCycleLabel
+        ? nav.recruitmentCycleLabel.replace(/\s+Recruitment Cycle$/i, '')
+        : 'complete');
+    if (wasRecruitmentCompleteDismissed(label)) return;
+    setCycleLabel(label);
+    setOpen(true);
+  }, [nav]);
 
   if (!cycleLabel) return null;
 

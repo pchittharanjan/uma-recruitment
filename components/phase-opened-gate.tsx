@@ -1,46 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   isAnnounceablePhase,
   PhaseOpenedDialog,
   wasPhaseOpenedDismissed,
 } from '@/components/phase-opened-dialog';
+import { useTeamNav, type TeamNavTeam } from '@/components/team-nav-provider';
 import type { RoundStatus } from '@/lib/db';
-import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import {
   statusIndex,
   teamPhaseHref,
   unlockKeyForStatus,
-  type UnlockableStage,
 } from '@/lib/stages';
 
-interface NavTeam {
-  id: number;
-  name: string;
-  round: { status: RoundStatus } | null;
-  grantedStages: UnlockableStage[] | 'all';
-  unlockedStages: UnlockableStage[];
-}
-
-function cycleLabelFromNav(json: {
+function cycleLabelFromNav(nav: {
   recruitmentCycleShortLabel?: string;
   recruitmentCycleLabel?: string;
 }): string {
-  if (
-    typeof json.recruitmentCycleShortLabel === 'string' &&
-    json.recruitmentCycleShortLabel
-  ) {
-    return json.recruitmentCycleShortLabel;
-  }
-  if (typeof json.recruitmentCycleLabel === 'string' && json.recruitmentCycleLabel) {
-    return json.recruitmentCycleLabel.replace(/\s+Recruitment Cycle$/i, '');
+  if (nav.recruitmentCycleShortLabel) return nav.recruitmentCycleShortLabel;
+  if (nav.recruitmentCycleLabel) {
+    return nav.recruitmentCycleLabel.replace(/\s+Recruitment Cycle$/i, '');
   }
   return 'cycle';
 }
 
-function phaseAccessible(phase: RoundStatus, team: NavTeam): boolean {
+function phaseAccessible(phase: RoundStatus, team: TeamNavTeam): boolean {
   if (!team.round) return false;
   if (statusIndex(team.round.status) < statusIndex(phase)) return false;
 
@@ -52,7 +37,7 @@ function phaseAccessible(phase: RoundStatus, team: NavTeam): boolean {
   return team.grantedStages.includes(unlockKey);
 }
 
-function resolvePhaseHref(status: RoundStatus, teams: NavTeam[]): string | null {
+function resolvePhaseHref(status: RoundStatus, teams: TeamNavTeam[]): string | null {
   for (const team of teams) {
     if (!phaseAccessible(status, team)) continue;
     const href = teamPhaseHref(team.id, status);
@@ -66,61 +51,43 @@ function resolvePhaseHref(status: RoundStatus, teams: NavTeam[]): string | null 
  * into a new work phase. Mounted in the team portal shell.
  */
 export function PhaseOpenedGate() {
-  const pathname = usePathname();
+  const { nav } = useTeamNav();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<RoundStatus | null>(null);
   const [cycleLabel, setCycleLabel] = useState('');
   const [href, setHref] = useState('');
 
-  const evaluate = useCallback(async () => {
-    try {
-      const res = await fetch('/api/team/nav', { cache: 'no-store' });
-      if (!res.ok) return;
-      const json = await res.json();
+  useEffect(() => {
+    if (!nav) return;
 
-      // Final-selection celebration owns the closed / offers moment.
-      if (json.finalSelectionComplete || json.status === 'closed') {
-        setOpen(false);
-        return;
-      }
-
-      const nextStatus = json.status as RoundStatus | null;
-      if (!nextStatus || !isAnnounceablePhase(nextStatus)) {
-        setOpen(false);
-        return;
-      }
-
-      const teams = (json.teams ?? []) as NavTeam[];
-      const destination = resolvePhaseHref(nextStatus, teams);
-      if (!destination) {
-        setOpen(false);
-        return;
-      }
-
-      const label = cycleLabelFromNav(json);
-      if (wasPhaseOpenedDismissed(label, nextStatus)) {
-        setOpen(false);
-        return;
-      }
-
-      setStatus(nextStatus);
-      setCycleLabel(label);
-      setHref(destination);
-      setOpen(true);
-    } catch {
-      // Gate stays quiet on network errors.
+    if (nav.finalSelectionComplete || nav.status === 'closed') {
+      setOpen(false);
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    void evaluate();
-  }, [evaluate, pathname]);
+    const nextStatus = nav.status;
+    if (!nextStatus || !isAnnounceablePhase(nextStatus)) {
+      setOpen(false);
+      return;
+    }
 
-  useEffect(() => {
-    const onChange = () => void evaluate();
-    window.addEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-  }, [evaluate]);
+    const destination = resolvePhaseHref(nextStatus, nav.teams);
+    if (!destination) {
+      setOpen(false);
+      return;
+    }
+
+    const label = cycleLabelFromNav(nav);
+    if (wasPhaseOpenedDismissed(label, nextStatus)) {
+      setOpen(false);
+      return;
+    }
+
+    setStatus(nextStatus);
+    setCycleLabel(label);
+    setHref(destination);
+    setOpen(true);
+  }, [nav]);
 
   if (!status || !cycleLabel || !href) return null;
 

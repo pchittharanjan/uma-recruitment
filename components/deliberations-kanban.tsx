@@ -446,6 +446,7 @@ export function DeliberationsKanban({
   saveUrl,
   finalizeUrl,
   resolveDetailUrl,
+  resolveBatchDetailsUrl,
   onFinalized,
 }: {
   teamId: number;
@@ -467,6 +468,8 @@ export function DeliberationsKanban({
   finalizeUrl?: string;
   /** Candidate detail GET URL builder. */
   resolveDetailUrl?: (applicationId: number) => string;
+  /** Batch details GET URL builder for compare. */
+  resolveBatchDetailsUrl?: (applicationIds: number[]) => string;
   /** Called after a successful finalize so the parent can refresh. */
   onFinalized?: () => void;
 }) {
@@ -477,6 +480,10 @@ export function DeliberationsKanban({
     resolveDetailUrl ??
     ((applicationId: number) =>
       `/api/admin/teams/${teamId}/deliberations/${applicationId}`);
+  const batchDetailsUrl =
+    resolveBatchDetailsUrl ??
+    ((applicationIds: number[]) =>
+      `/api/admin/teams/${teamId}/deliberations/details?ids=${applicationIds.join(',')}`);
   const [columns, setColumns] =
     useState<Record<DeliberationsColumnId, DeliberationsCandidate[]>>(initialColumns);
   // Baseline for dirty checks: last DB layout, or the applied columns on first load.
@@ -938,6 +945,7 @@ export function DeliberationsKanban({
         teamName={teamName}
         candidates={compareCandidates}
         resolveDetailUrl={detailUrl}
+        resolveBatchDetailsUrl={batchDetailsUrl}
         onToggleRejected={toggleRejected}
         onRemove={(candidateId) => {
           setCompareIds((prev) => {

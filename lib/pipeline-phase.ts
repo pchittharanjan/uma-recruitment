@@ -1,7 +1,5 @@
-import { getDb, getTeams, type Round, type RoundStatus } from '@/lib/db';
-import { getActiveRoundForTeam } from '@/lib/rounds';
+import { getDb, getTeams, rowToRound, type Round, type RoundStatus } from '@/lib/db';
 import {
-  getRoundStageUnlocks,
   lockRoundStage,
   unlockRoundStage,
 } from '@/lib/stage-access';
@@ -31,15 +29,68 @@ export interface GlobalPipelineState {
   unlockDrift: boolean;
 }
 
+/** One round per team — same preference rules as getActiveRoundForTeam, batched. */
 export async function getActiveRoundsByTeam(): Promise<TeamPipelineRound[]> {
   const teams = await getTeams();
-  return Promise.all(
-    teams.map(async (team) => ({
-      teamId: team.id,
-      teamName: team.name,
-      round: await getActiveRoundForTeam(team.id),
-    })),
+  if (teams.length === 0) return [];
+
+  const db = getDb();
+  const result = await db.execute(
+    `SELECT * FROM (
+       SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY team_id
+           ORDER BY
+             CASE WHEN status = 'closed' THEN 0 ELSE 1 END DESC,
+             CASE status
+               WHEN 'deliberations' THEN 6
+               WHEN 'final_round' THEN 5
+               WHEN 'first_round' THEN 4
+               WHEN 'application' THEN 3
+               WHEN 'pre_application' THEN 2
+               WHEN 'setup' THEN 1
+               ELSE 0
+             END DESC,
+             created_at DESC
+         ) AS rn
+       FROM rounds
+     ) WHERE rn = 1`,
   );
+
+  const roundByTeam = new Map<number, Round>();
+  for (const row of result.rows) {
+    const round = rowToRound(row);
+    roundByTeam.set(round.team_id, round);
+  }
+
+  return teams.map((team) => ({
+    teamId: team.id,
+    teamName: team.name,
+    round: roundByTeam.get(team.id) ?? null,
+  }));
+}
+
+async function loadUnlocksByRoundIds(
+  roundIds: number[],
+): Promise<Map<number, UnlockableStage[]>> {
+  const byRound = new Map<number, UnlockableStage[]>();
+  if (roundIds.length === 0) return byRound;
+
+  const db = getDb();
+  const placeholders = roundIds.map(() => '?').join(',');
+  const result = await db.execute({
+    sql: `SELECT round_id, stage FROM round_stage_unlocks WHERE round_id IN (${placeholders})`,
+    args: roundIds,
+  });
+
+  for (const row of result.rows) {
+    const roundId = row.round_id as number;
+    const stage = row.stage as UnlockableStage;
+    const list = byRound.get(roundId) ?? [];
+    list.push(stage);
+    byRound.set(roundId, list);
+  }
+  return byRound;
 }
 
 function canonicalStatus(rounds: Round[]): RoundStatus | null {
@@ -98,9 +149,8 @@ export async function getGlobalPipelineState(): Promise<GlobalPipelineState> {
       status: t.round.status,
     }));
 
-  const unlockSets = await Promise.all(
-    rounds.map((round) => getRoundStageUnlocks(round.id).then((u) => u.map((x) => x.stage))),
-  );
+  const unlocksByRound = await loadUnlocksByRoundIds(rounds.map((r) => r.id));
+  const unlockSets = rounds.map((round) => unlocksByRound.get(round.id) ?? []);
   // When closed, treat every unlockable stage as open for viewing (mutations are blocked separately).
   const unlockedStages =
     status === 'closed' ? [...UNLOCKABLE_STAGES] : (unlockSets[0] ?? []);

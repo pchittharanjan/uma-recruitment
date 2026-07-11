@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -13,6 +13,7 @@ import {
   UserCheckIcon,
   ArrowUpCircleIcon,
 } from 'lucide-react';
+import { useTeamNav, type TeamNavTeam } from '@/components/team-nav-provider';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -27,13 +28,11 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { RoundStatus } from '@/lib/db';
-import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import {
   isTeamPhaseNavActive,
   PIPELINE_PHASES,
   statusIndex,
   teamPhaseHref,
-  type UnlockableStage,
 } from '@/lib/stages';
 
 const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: string }>>> = {
@@ -44,17 +43,9 @@ const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: strin
   deliberations: LayoutGridIcon,
 };
 
-interface NavTeam {
-  id: number;
-  name: string;
-  round: { status: RoundStatus } | null;
-  grantedStages: UnlockableStage[] | 'all';
-  unlockedStages: UnlockableStage[];
-}
-
 function phaseAccessible(
   phase: RoundStatus,
-  team: NavTeam,
+  team: TeamNavTeam,
   globalStatus: RoundStatus | null,
 ): boolean {
   if (!globalStatus || !team.round) return false;
@@ -109,36 +100,17 @@ function DisabledPhaseItem({
 
 export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: string }[] }) {
   const pathname = usePathname();
+  const { nav } = useTeamNav();
   const [mounted, setMounted] = useState(false);
-  const [navTeams, setNavTeams] = useState<NavTeam[]>([]);
-  const [globalStatus, setGlobalStatus] = useState<RoundStatus | null>(null);
-  const [finalSelectionComplete, setFinalSelectionComplete] = useState(false);
-  const [isExec, setIsExec] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/team/nav');
-      const json = await res.json();
-      if (!res.ok) return;
-      setGlobalStatus(json.status ?? null);
-      setNavTeams(json.teams ?? []);
-      setIsExec(Boolean(json.isExec));
-      setFinalSelectionComplete(Boolean(json.finalSelectionComplete));
-    } catch {
-      // Sidebar stays usable without phase data.
-    }
-  }, []);
 
   useEffect(() => {
     setMounted(true);
-    load();
-  }, [load, pathname]);
+  }, []);
 
-  useEffect(() => {
-    const onChange = () => load();
-    window.addEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-  }, [load]);
+  const navTeams = nav?.teams ?? [];
+  const globalStatus = nav?.status ?? null;
+  const finalSelectionComplete = Boolean(nav?.finalSelectionComplete);
+  const isExec = Boolean(nav?.isExec);
 
   const pathTeamId = extractTeamId(pathname);
   const activeTeam =

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Columns2Icon, XIcon } from 'lucide-react'
 import ToggleGroupVertical, {
   type CompareLayoutMode,
@@ -14,8 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { displayApplicantId } from '@/lib/applicant-id'
-import type { DeliberationsCandidate } from '@/lib/deliberations-types'
+import type {
+  DeliberationsCandidate,
+  DeliberationsCandidateDetail,
+} from '@/lib/deliberations-types'
 import { cn } from '@/lib/utils'
 
 const LAYOUT_CAP: Record<CompareLayoutMode, number> = {
@@ -40,6 +44,7 @@ export function ApplicantCompareDialog({
   onToggleRejected,
   onRemove,
   resolveDetailUrl,
+  resolveBatchDetailsUrl,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -49,15 +54,79 @@ export function ApplicantCompareDialog({
   onToggleRejected: (candidateId: string) => void
   onRemove: (candidateId: string) => void
   resolveDetailUrl?: (applicationId: number) => string
+  /** Batch GET URL for visible application ids (admin or team). */
+  resolveBatchDetailsUrl?: (applicationIds: number[]) => string
 }) {
   const [layout, setLayout] = useState<CompareLayoutMode>('col')
   const cap = LAYOUT_CAP[layout]
   const visible = candidates.slice(0, cap)
   const hiddenCount = Math.max(0, candidates.length - visible.length)
+
+  const visibleIdsKey = useMemo(
+    () =>
+      candidates
+        .slice(0, cap)
+        .map((c) => c.applicationId)
+        .join(','),
+    [candidates, cap],
+  )
+  const visibleIds = useMemo(() => {
+    if (!visibleIdsKey) return [] as number[]
+    return visibleIdsKey.split(',').map((id) => Number.parseInt(id, 10))
+  }, [visibleIdsKey])
+
   const detailUrlFor =
     resolveDetailUrl ??
     ((applicationId: number) =>
       `/api/admin/teams/${teamId}/deliberations/${applicationId}`)
+
+  const batchUrl = useMemo(() => {
+    if (visibleIds.length === 0) return null
+    if (resolveBatchDetailsUrl) return resolveBatchDetailsUrl(visibleIds)
+    return `/api/admin/teams/${teamId}/deliberations/details?ids=${visibleIdsKey}`
+  }, [visibleIds, visibleIdsKey, teamId, resolveBatchDetailsUrl])
+
+  const [detailsById, setDetailsById] = useState<
+    Record<number, DeliberationsCandidateDetail>
+  >({})
+  const [loadedBatchUrl, setLoadedBatchUrl] = useState<string | null>(null)
+  const [batchError, setBatchError] = useState('')
+  // Prefer loading over a previous error when the request key changes.
+  const batchLoading = Boolean(open && batchUrl && loadedBatchUrl !== batchUrl)
+
+  useEffect(() => {
+    if (!open || !batchUrl) return
+    let cancelled = false
+    fetch(batchUrl, { cache: 'no-store' })
+      .then(async (res) => {
+        const json = (await res.json()) as {
+          details?: DeliberationsCandidateDetail[]
+          error?: string
+        }
+        if (cancelled) return
+        if (!res.ok || !json.details) {
+          setBatchError(json.error ?? 'Failed to load applicants.')
+          setLoadedBatchUrl(batchUrl)
+          return
+        }
+        const next: Record<number, DeliberationsCandidateDetail> = {}
+        for (const detail of json.details) {
+          next[detail.applicationId] = detail
+        }
+        setDetailsById(next)
+        setBatchError('')
+        setLoadedBatchUrl(batchUrl)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBatchError('Failed to load applicants.')
+          setLoadedBatchUrl(batchUrl)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, batchUrl])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,6 +153,31 @@ export function ApplicantCompareDialog({
               <p className="px-1 py-6 text-sm text-muted-foreground">
                 Add applicants from the board menu to compare them here.
               </p>
+            ) : batchLoading ? (
+              <div className={cn('grid gap-3', layoutGridClass(layout, visible.length))}>
+                {visible.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                  >
+                    <div className="border-b border-border px-3 py-2.5">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {candidate.name}
+                      </p>
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        Row {displayApplicantId(candidate.rowIndex)}
+                      </p>
+                    </div>
+                    <div className="space-y-3 px-4 py-3">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-40 w-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : batchError ? (
+              <p className="px-1 py-6 text-sm text-destructive">{batchError}</p>
             ) : (
               <div className={cn('grid gap-3', layoutGridClass(layout, visible.length))}>
                 {visible.map((candidate) => (
@@ -119,6 +213,7 @@ export function ApplicantCompareDialog({
                         rejected={candidate.rejected}
                         onToggleRejected={() => onToggleRejected(candidate.id)}
                         detailUrl={detailUrlFor(candidate.applicationId)}
+                        initialDetail={detailsById[candidate.applicationId]}
                       />
                     </div>
                   </div>
@@ -150,11 +245,11 @@ export function ApplicantCompareBar({
         {count} selected for compare
       </p>
       <div className="ml-auto flex items-center gap-2">
-        <Button type="button" size="sm" onClick={onCompare} disabled={count < 2}>
-          Compare
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onClear}>
+        <Button type="button" variant="ghost" size="sm" onClick={onClear}>
           Clear
+        </Button>
+        <Button type="button" size="sm" onClick={onCompare}>
+          Compare
         </Button>
       </div>
     </div>

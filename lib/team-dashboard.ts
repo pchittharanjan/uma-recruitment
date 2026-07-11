@@ -235,7 +235,7 @@ export async function computeNormalizedRankings(
   const incompleteCount = incomplete.rows[0].count as number;
 
   const allScoresResult = await db.execute({
-    sql: `SELECT s.score, a.user_id
+    sql: `SELECT s.score, a.user_id, a.application_id
           FROM scores s
           JOIN assignments a ON a.id = s.assignment_id
           JOIN applications app ON app.id = a.application_id
@@ -250,10 +250,16 @@ export async function computeNormalizedRankings(
       : 3;
 
   const userScoreBuckets: Record<number, number[]> = {};
+  const scoresByApp = new Map<number, Array<{ score: number; userId: number }>>();
   for (const row of allScoresResult.rows) {
     const uid = row.user_id as number;
+    const appId = row.application_id as number;
+    const score = row.score as number;
     if (!userScoreBuckets[uid]) userScoreBuckets[uid] = [];
-    userScoreBuckets[uid].push(row.score as number);
+    userScoreBuckets[uid].push(score);
+    const bucket = scoresByApp.get(appId) ?? [];
+    bucket.push({ score, userId: uid });
+    scoresByApp.set(appId, bucket);
   }
 
   const userMeans: Record<number, number> = {};
@@ -297,20 +303,12 @@ export async function computeNormalizedRankings(
 
   for (const appRow of appsResult.rows) {
     const appId = appRow.id as number;
-    const scoresResult = await db.execute({
-      sql: `SELECT s.score, a.user_id
-            FROM scores s
-            JOIN assignments a ON a.id = s.assignment_id
-            WHERE a.application_id = ? AND a.stage = 'application'`,
-      args: [appId],
-    });
+    const appScores = scoresByApp.get(appId) ?? [];
 
-    const rawScores = scoresResult.rows.map((row) => row.score as number);
-    const adjustedScores = scoresResult.rows.map((row) => {
-      const raw = row.score as number;
-      const userId = row.user_id as number;
-      const adjustment = globalMean - (userMeans[userId] ?? globalMean);
-      return Math.min(5, Math.max(1, raw + adjustment));
+    const rawScores = appScores.map((row) => row.score);
+    const adjustedScores = appScores.map((row) => {
+      const adjustment = globalMean - (userMeans[row.userId] ?? globalMean);
+      return Math.min(5, Math.max(1, row.score + adjustment));
     });
 
     // Mean of leniency-adjusted field scores (1–5); denominator = this app's actual score count

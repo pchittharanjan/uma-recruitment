@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTeams, initDb } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
-import { getActiveRoundForTeam, getTeamRoundStats } from '@/lib/rounds';
+import { getTeamRoundStats } from '@/lib/rounds';
 import { DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import {
@@ -19,10 +19,13 @@ export async function GET(req: NextRequest) {
     const teams = await getTeams();
     const globalState = await getGlobalPipelineState();
     const pipelineStatus = globalState.status ?? 'pre_application';
+    const roundByTeam = new Map(
+      globalState.teams.map((t) => [t.teamId, t.round] as const),
+    );
 
     const teamsWithRounds = await Promise.all(
       teams.map(async (team) => {
-        const round = await getActiveRoundForTeam(team.id);
+        const round = roundByTeam.get(team.id) ?? null;
         const stats = round
           ? await getTeamRoundStats(team.id, round.id)
           : {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -11,6 +11,7 @@ import {
   MicIcon,
   UserCheckIcon,
 } from 'lucide-react';
+import { useAdminPhase } from '@/components/admin-phase-provider';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -21,7 +22,6 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import type { RoundStatus } from '@/lib/db';
-import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import {
   adminPhaseHref,
   isAdminDashboardPhase,
@@ -29,7 +29,6 @@ import {
   parseDashboardViewPhase,
   PIPELINE_PHASES,
   statusIndex,
-  type UnlockableStage,
 } from '@/lib/stages';
 
 const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: string }>>> = {
@@ -40,49 +39,26 @@ const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: strin
   deliberations: LayoutGridIcon,
 };
 
-interface PhaseNavState {
-  status: RoundStatus | null;
-  unlockedStages: UnlockableStage[];
-}
-
 export function SidebarPhaseNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { phase } = useAdminPhase();
   const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<PhaseNavState | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/phase');
-      const json = await res.json();
-      if (!res.ok) return;
-      setState({
-        status: json.status ?? null,
-        unlockedStages: json.unlockedStages ?? [],
-      });
-    } catch {
-      // Sidebar stays usable without phase data.
-    }
+  // Avoid hydration mismatch for tooltips / isActive without sync setState-in-effect lint.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
-  useEffect(() => {
-    setMounted(true);
-    load();
-  }, [load, pathname]);
+  if (!phase?.status) return null;
 
-  useEffect(() => {
-    const onChange = () => load();
-    window.addEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-  }, [load]);
-
-  if (!state?.status) return null;
-
-  const currentIdx = statusIndex(state.status);
+  const pipelineStatus = phase.status;
+  const currentIdx = statusIndex(pipelineStatus);
   const visiblePhases = PIPELINE_PHASES.filter((p) => p.status !== 'closed');
   const dashboardViewPhase =
     pathname === '/admin/dashboard'
-      ? parseDashboardViewPhase(searchParams.get('view'), state.status)
+      ? parseDashboardViewPhase(searchParams.get('view'), pipelineStatus)
       : null;
 
   return (
@@ -90,25 +66,25 @@ export function SidebarPhaseNav() {
       <SidebarGroupLabel>Phases</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {visiblePhases.map((phase) => {
-            const phaseIdx = statusIndex(phase.status);
-            const isPipelineCurrent = phase.status === state.status;
+          {visiblePhases.map((phaseItem) => {
+            const phaseIdx = statusIndex(phaseItem.status);
+            const isPipelineCurrent = phaseItem.status === pipelineStatus;
             const isPast = phaseIdx < currentIdx;
             const isFuture = phaseIdx > currentIdx;
             const isNavActive =
               mounted &&
-              (pathname === '/admin/dashboard' && isAdminDashboardPhase(phase.status)
-                ? dashboardViewPhase === phase.status
-                : isAdminPhaseNavActive(pathname, phase.status));
-            const Icon = PHASE_ICONS[phase.status];
+              (pathname === '/admin/dashboard' && isAdminDashboardPhase(phaseItem.status)
+                ? dashboardViewPhase === phaseItem.status
+                : isAdminPhaseNavActive(pathname, phaseItem.status));
+            const Icon = PHASE_ICONS[phaseItem.status];
             const tooltip = isFuture
-              ? `${phase.label} — Preview`
+              ? `${phaseItem.label} — Preview`
               : isPast && !isPipelineCurrent
-                ? `${phase.label} — Completed`
-                : phase.label;
+                ? `${phaseItem.label} — Completed`
+                : phaseItem.label;
 
             return (
-              <SidebarMenuItem key={phase.status}>
+              <SidebarMenuItem key={phaseItem.status}>
                 <SidebarMenuButton
                   isActive={isNavActive}
                   tooltip={mounted ? tooltip : undefined}
@@ -116,7 +92,7 @@ export function SidebarPhaseNav() {
                     isPast && !isPipelineCurrent && !isNavActive && 'text-muted-foreground',
                     isFuture && !isNavActive && 'text-muted-foreground/80',
                   )}
-                  render={<Link href={adminPhaseHref(phase.status)} />}
+                  render={<Link href={adminPhaseHref(phaseItem.status)} />}
                 >
                   {isPast && !isPipelineCurrent && !isNavActive ? (
                     <CheckIcon className="size-4 shrink-0 text-green-600" />
@@ -141,7 +117,7 @@ export function SidebarPhaseNav() {
                       isFuture && !isNavActive && 'text-muted-foreground/80',
                     )}
                   >
-                    {phase.label}
+                    {phaseItem.label}
                   </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>

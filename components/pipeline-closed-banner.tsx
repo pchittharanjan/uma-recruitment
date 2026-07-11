@@ -1,54 +1,45 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import StatusBanner from '@/components/status-banner';
-import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
+import { useAdminPhase } from '@/components/admin-phase-provider';
+import { useTeamNav } from '@/components/team-nav-provider';
 
 /**
  * Persistent notice when the recruitment cycle is closed.
  * Admin: informational only (writes still allowed).
  * Team: archive / view-only.
+ *
+ * Reads from the shared shell provider — no extra fetch.
  */
 export function PipelineClosedBanner({
   statusUrl,
 }: {
   statusUrl: '/api/admin/phase' | '/api/team/nav';
 }) {
-  const [closed, setClosed] = useState(false);
   const isAdmin = statusUrl === '/api/admin/phase';
+  return isAdmin ? <AdminClosedBanner /> : <TeamClosedBanner />;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      fetch(statusUrl, { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json) => {
-          if (cancelled || !json) return;
-          setClosed(json.status === 'closed' || Boolean(json.pipelineClosed));
-        })
-        .catch(() => {});
-    };
-    load();
-    const onChange = () => load();
-    window.addEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
-    };
-  }, [statusUrl]);
+function AdminClosedBanner() {
+  const { phase } = useAdminPhase();
+  if (!phase?.pipelineClosed) return null;
+  return (
+    <ClosedBannerMessage message="This recruitment cycle is closed. Team members are view-only — you can still send outcome emails and make admin changes." />
+  );
+}
 
-  if (!closed) return null;
+function TeamClosedBanner() {
+  const { nav } = useTeamNav();
+  if (!nav?.pipelineClosed) return null;
+  return (
+    <ClosedBannerMessage message="This recruitment cycle is closed. Everything is view-only — no scores, notes, schedules, or decisions can be changed." />
+  );
+}
 
+function ClosedBannerMessage({ message }: { message: string }) {
   return (
     <div className="border-b border-border/60 px-5 py-2 sm:px-8">
-      <StatusBanner
-        type="info"
-        message={
-          isAdmin
-            ? 'This recruitment cycle is closed. Team members are view-only — you can still send outcome emails and make admin changes.'
-            : 'This recruitment cycle is closed. Everything is view-only — no scores, notes, schedules, or decisions can be changed.'
-        }
-      />
+      <StatusBanner type="info" message={message} />
     </div>
   );
 }

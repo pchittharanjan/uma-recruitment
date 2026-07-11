@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
-  IconChevronDown,
-  IconChevronRight,
-  IconCircleCheckFilled,
-  IconCircleDashed,
-} from '@tabler/icons-react';
+  CheckCircle2Icon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CircleDashedIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -55,16 +55,16 @@ function CircularProgress({ completed, total }: { completed: number; total: numb
 function StepIndicator({ completed }: { completed: boolean }) {
   if (completed) {
     return (
-      <IconCircleCheckFilled
+      <CheckCircle2Icon
         aria-hidden
-        className="mt-0.5 size-4.5 shrink-0 text-primary"
+        className="mt-0.5 size-4.5 shrink-0 fill-primary text-primary"
       />
     );
   }
   return (
-    <IconCircleDashed
+    <CircleDashedIcon
       aria-hidden
-      className="mt-0.5 size-5 shrink-0 stroke-muted-foreground/40"
+      className="mt-0.5 size-5 shrink-0 text-muted-foreground/40"
       strokeWidth={2}
     />
   );
@@ -161,9 +161,9 @@ export function RecruitmentPhaseChecklist({
               </span>
             </div>
             {panelOpen ? (
-              <IconChevronDown aria-hidden className="size-4 text-muted-foreground" />
+              <ChevronDownIcon aria-hidden className="size-4 text-muted-foreground" />
             ) : (
-              <IconChevronRight aria-hidden className="size-4 text-muted-foreground" />
+              <ChevronRightIcon aria-hidden className="size-4 text-muted-foreground" />
             )}
           </div>
         </CollapsibleTrigger>
@@ -225,7 +225,7 @@ export function RecruitmentPhaseChecklist({
                           </div>
                         </div>
                       </div>
-                      <IconChevronDown
+                      <ChevronDownIcon
                         aria-hidden
                         className={cn(
                           'size-4 shrink-0 text-muted-foreground transition-transform duration-200',

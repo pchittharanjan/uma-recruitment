@@ -128,6 +128,7 @@ export function DeliberationsCandidateDetailPanel({
   rejected,
   onToggleRejected,
   detailUrl,
+  initialDetail,
 }: {
   teamId: number;
   teamName: string;
@@ -136,14 +137,25 @@ export function DeliberationsCandidateDetailPanel({
   onToggleRejected: () => void;
   /** Override detail GET URL (team portal uses /api/team/...). */
   detailUrl?: string;
+  /** When provided (e.g. from compare batch), skip the individual fetch. */
+  initialDetail?: DeliberationsCandidateDetail | null;
 }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialDetail);
   const [error, setError] = useState('');
-  const [detail, setDetail] = useState<DeliberationsCandidateDetail | null>(null);
+  const [detail, setDetail] = useState<DeliberationsCandidateDetail | null>(
+    initialDetail ?? null,
+  );
   const url =
     detailUrl ?? `/api/admin/teams/${teamId}/deliberations/${applicationId}`;
 
   useEffect(() => {
+    if (initialDetail) {
+      setDetail(initialDetail);
+      setLoading(false);
+      setError('');
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError('');
@@ -172,7 +184,7 @@ export function DeliberationsCandidateDetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, initialDetail]);
 
   if (loading) {
     return (

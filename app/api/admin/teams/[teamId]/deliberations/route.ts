@@ -35,12 +35,10 @@ export async function GET(
     }
 
     const board = await buildDeliberationsBoard(teamId, round.id);
-    const selectionComplete = await isDeliberationsFinalSelectionComplete(
-      teamId,
-      round.id,
-    );
-    // Admins keep write access after the cycle closes; team portal stays view-only.
-    const pipelineClosed = await isPipelineClosed();
+    const [selectionComplete, pipelineClosed] = await Promise.all([
+      isDeliberationsFinalSelectionComplete(teamId, round.id),
+      isPipelineClosed(),
+    ]);
 
     return NextResponse.json({
       team,

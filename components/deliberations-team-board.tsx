@@ -1,9 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
-import { DeliberationsKanban } from '@/components/deliberations-kanban';
 import StatusBanner from '@/components/status-banner';
 import {
   applyDeliberationsLayout,
@@ -12,6 +12,12 @@ import {
   type DeliberationsCandidate,
   type DeliberationsColumnId,
 } from '@/lib/deliberations-types';
+
+const DeliberationsKanban = dynamic(
+  () =>
+    import('@/components/deliberations-kanban').then((m) => m.DeliberationsKanban),
+  { loading: () => <PageLoading className="min-h-[40vh]" />, ssr: false },
+);
 
 interface DeliberationsResponse {
   team: { id: number; name: string };
@@ -81,6 +87,13 @@ export function DeliberationsTeamBoard({
       return `${detailApiBase}/${applicationId}`;
     }
     return defaultAdminDetailUrl(teamId, applicationId);
+  };
+
+  const resolveBatchDetailsUrl = (applicationIds: number[]) => {
+    if (detailApiBase?.includes('/api/team/')) {
+      return `/api/team/deliberations/details?teamId=${teamId}&ids=${applicationIds.join(',')}`;
+    }
+    return `/api/admin/teams/${teamId}/deliberations/details?ids=${applicationIds.join(',')}`;
   };
 
   const loadBoard = useCallback(() => {
@@ -170,6 +183,7 @@ export function DeliberationsTeamBoard({
         selectionComplete={selectionComplete}
         saveUrl={effectiveCanSave ? boardUrl : undefined}
         resolveDetailUrl={resolveDetailUrl}
+        resolveBatchDetailsUrl={resolveBatchDetailsUrl}
         onFinalized={() => setReloadKey((k) => k + 1)}
       />
     </div>

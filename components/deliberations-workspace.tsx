@@ -47,6 +47,8 @@ export function DeliberationsWorkspace() {
 
   const [openTabIds, setOpenTabIds] = useState<number[]>([]);
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
+  /** Tabs that have been focused at least once — stay mounted so unsaved board state is kept. */
+  const [mountedTabIds, setMountedTabIds] = useState<number[]>([]);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
@@ -74,6 +76,7 @@ export function DeliberationsWorkspace() {
 
     setOpenTabIds(merged);
     setActiveTabId(preferredActive);
+    if (preferredActive != null) setMountedTabIds([preferredActive]);
     writeStoredDeliberationsTabIds(merged);
     setReady(true);
   }, [searchParams]);
@@ -85,6 +88,7 @@ export function DeliberationsWorkspace() {
     if (!Number.isFinite(openId) || openId < 1) return;
     setOpenTabIds((prev) => (prev.includes(openId) ? prev : [...prev, openId]));
     setActiveTabId(openId);
+    setMountedTabIds((prev) => (prev.includes(openId) ? prev : [...prev, openId]));
   }, [ready, searchParams]);
 
   // Keep URL + sessionStorage in sync after hydration (replace, no history spam).
@@ -104,7 +108,7 @@ export function DeliberationsWorkspace() {
   useEffect(() => {
     let cancelled = false;
     setTeamsLoading(true);
-    fetch('/api/admin/dashboard', { cache: 'no-store' })
+    fetch('/api/admin/teams', { cache: 'no-store' })
       .then(async (res) => {
         if (res.status === 401) {
           router.push('/login');
@@ -112,7 +116,7 @@ export function DeliberationsWorkspace() {
         }
         if (!res.ok) throw new Error('Failed to load teams.');
         return res.json() as Promise<{
-          teams: Array<{ id: number; name: string; round: unknown | null }>;
+          teams: Array<{ id: number; name: string; hasRound: boolean }>;
         }>;
       })
       .then((json) => {
@@ -120,7 +124,7 @@ export function DeliberationsWorkspace() {
         const options: TeamOption[] = json.teams.map((team) => ({
           id: team.id,
           name: team.name,
-          hasRound: team.round != null,
+          hasRound: team.hasRound,
         }));
         setTeamOptions(options);
         setTeamNames((prev) => {
@@ -143,6 +147,7 @@ export function DeliberationsWorkspace() {
   const openTeam = useCallback((teamId: number) => {
     setOpenTabIds((prev) => (prev.includes(teamId) ? prev : [...prev, teamId]));
     setActiveTabId(teamId);
+    setMountedTabIds((prev) => (prev.includes(teamId) ? prev : [...prev, teamId]));
   }, []);
 
   const closeTab = useCallback((teamId: number) => {
@@ -155,6 +160,7 @@ export function DeliberationsWorkspace() {
       });
       return next;
     });
+    setMountedTabIds((prev) => prev.filter((id) => id !== teamId));
   }, []);
 
   const handleTeamMeta = useCallback((meta: { id: number; name: string }) => {
@@ -233,7 +239,12 @@ export function DeliberationsWorkspace() {
                       'min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm',
                       isActive && 'font-medium',
                     )}
-                    onClick={() => setActiveTabId(teamId)}
+                    onClick={() => {
+                      setActiveTabId(teamId);
+                      setMountedTabIds((prev) =>
+                        prev.includes(teamId) ? prev : [...prev, teamId],
+                      );
+                    }}
                   >
                     {label}
                   </button>
@@ -290,6 +301,20 @@ export function DeliberationsWorkspace() {
           ) : (
             openTabIds.map((teamId) => {
               const isActive = teamId === activeTabId;
+              const hasMounted = mountedTabIds.includes(teamId);
+              // Lazy-mount on first focus; keep mounted (hidden) so unsaved edits survive tab switches.
+              if (!hasMounted) {
+                return (
+                  <div
+                    key={teamId}
+                    role="tabpanel"
+                    id={`delib-panel-${teamId}`}
+                    aria-labelledby={`delib-tab-${teamId}`}
+                    hidden
+                    className="hidden"
+                  />
+                );
+              }
               return (
                 <div
                   key={teamId}

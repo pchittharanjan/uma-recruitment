@@ -1,7 +1,16 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { use } from 'react';
-import { TeamInterviewScheduleEditor } from '@/components/team-interview-schedule-editor';
+import PageLoading from '@/components/page-loading';
+
+const TeamInterviewScheduleEditor = dynamic(
+  () =>
+    import('@/components/team-interview-schedule-editor').then(
+      (m) => m.TeamInterviewScheduleEditor,
+    ),
+  { loading: () => <PageLoading />, ssr: false },
+);
 
 export default function FirstRoundSchedulePage({
   params,

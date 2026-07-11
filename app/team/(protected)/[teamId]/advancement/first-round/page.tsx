@@ -1,7 +1,14 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { use } from 'react';
-import { TeamAdvancementPanel } from '@/components/team-advancement-panel';
+import PageLoading from '@/components/page-loading';
+
+const TeamAdvancementPanel = dynamic(
+  () =>
+    import('@/components/team-advancement-panel').then((m) => m.TeamAdvancementPanel),
+  { loading: () => <PageLoading />, ssr: false },
+);
 
 export default function TeamFirstRoundAdvancementPage({
   params,

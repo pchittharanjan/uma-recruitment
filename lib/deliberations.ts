@@ -66,26 +66,30 @@ async function loadStageAverages(
   return averages;
 }
 
-async function loadStageReviews(
+async function loadAllStageReviews(
   applicationId: number,
   teamId: number,
-  stage: ScoreStage,
-): Promise<DeliberationsScoreEntry[]> {
+): Promise<Record<ScoreStage, DeliberationsScoreEntry[]>> {
+  const empty: Record<ScoreStage, DeliberationsScoreEntry[]> = {
+    application: [],
+    first_round: [],
+    final_round: [],
+  };
   const db = getDb();
 
   const assignmentsResult = await db.execute({
-    sql: `SELECT a.id AS assignment_id, a.status, a.comment, u.name AS reviewer_name
+    sql: `SELECT a.id AS assignment_id, a.stage, a.status, a.comment, u.name AS reviewer_name
           FROM assignments a
           JOIN applications app ON app.id = a.application_id
           JOIN users u ON u.id = a.user_id
           WHERE a.application_id = ?
             AND app.team_id = ?
-            AND a.stage = ?
+            AND a.stage IN ('application', 'first_round', 'final_round')
           ORDER BY u.name ASC`,
-    args: [applicationId, teamId, stage],
+    args: [applicationId, teamId],
   });
 
-  if (assignmentsResult.rows.length === 0) return [];
+  if (assignmentsResult.rows.length === 0) return empty;
 
   const assignmentIds = assignmentsResult.rows.map((row) => row.assignment_id as number);
   const placeholders = assignmentIds.map(() => '?').join(',');
@@ -103,7 +107,9 @@ async function loadStageReviews(
     scoresByAssignment.get(assignmentId)![row.field_name as string] = row.score as number;
   }
 
-  return assignmentsResult.rows.map((row) => {
+  for (const row of assignmentsResult.rows) {
+    const stage = row.stage as ScoreStage;
+    if (!(stage in empty)) continue;
     const assignmentId = row.assignment_id as number;
     const scores = scoresByAssignment.get(assignmentId) ?? {};
     const values = Object.values(scores);
@@ -112,14 +118,16 @@ async function loadStageReviews(
         ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 1000) /
           1000
         : null;
-    return {
+    empty[stage].push({
       reviewerName: (row.reviewer_name as string) || 'Unknown',
       status: row.status as string,
       scores,
       average,
       comment: (row.comment as string | null) ?? null,
-    };
-  });
+    });
+  }
+
+  return empty;
 }
 
 export async function getDeliberationsBoardLayout(
@@ -372,30 +380,21 @@ export async function buildDeliberationsCandidateDetail(
     fields = {};
   }
 
-  const [
-    applicationAvgs,
-    firstRoundAvgs,
-    finalRoundAvgs,
-    applicationReviews,
-    firstRoundReviews,
-    finalRoundReviews,
-  ] = await Promise.all([
-    loadStageAverages([applicationId], 'application'),
-    loadStageAverages([applicationId], 'first_round'),
-    loadStageAverages([applicationId], 'final_round'),
-    loadStageReviews(applicationId, teamId, 'application'),
-    loadStageReviews(applicationId, teamId, 'first_round'),
-    loadStageReviews(applicationId, teamId, 'final_round'),
-  ]);
-
-  const flagsResult = await db.execute({
-    sql: `SELECT f.color, f.note, f.created_at, u.name AS author_name
-          FROM flags f
-          JOIN users u ON u.id = f.author_id
-          WHERE f.application_id = ?
-          ORDER BY f.created_at DESC`,
-    args: [applicationId],
-  });
+  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, reviewsByStage, flagsResult] =
+    await Promise.all([
+      loadStageAverages([applicationId], 'application'),
+      loadStageAverages([applicationId], 'first_round'),
+      loadStageAverages([applicationId], 'final_round'),
+      loadAllStageReviews(applicationId, teamId),
+      db.execute({
+        sql: `SELECT f.color, f.note, f.created_at, u.name AS author_name
+              FROM flags f
+              JOIN users u ON u.id = f.author_id
+              WHERE f.application_id = ?
+              ORDER BY f.created_at DESC`,
+        args: [applicationId],
+      }),
+    ]);
 
   const flags: DeliberationsFlag[] = flagsResult.rows.map((flagRow) => ({
     color: flagRow.color as 'red' | 'green',
@@ -417,9 +416,24 @@ export async function buildDeliberationsCandidateDetail(
       firstRound: firstRoundAvgs.get(applicationId) ?? null,
       finalRound: finalRoundAvgs.get(applicationId) ?? null,
     },
-    applicationReviews,
-    firstRoundReviews,
-    finalRoundReviews,
+    applicationReviews: reviewsByStage.application,
+    firstRoundReviews: reviewsByStage.first_round,
+    finalRoundReviews: reviewsByStage.final_round,
     flags,
   };
+}
+
+/** Batch load candidate details for compare views — fewer round-trips than N single fetches. */
+export async function buildDeliberationsCandidateDetails(
+  teamId: number,
+  roundId: number,
+  applicationIds: number[],
+): Promise<DeliberationsCandidateDetail[]> {
+  const uniqueIds = [...new Set(applicationIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (uniqueIds.length === 0) return [];
+
+  const details = await Promise.all(
+    uniqueIds.map((id) => buildDeliberationsCandidateDetail(teamId, roundId, id)),
+  );
+  return details.filter((d): d is DeliberationsCandidateDetail => d != null);
 }
