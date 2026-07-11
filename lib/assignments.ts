@@ -1,7 +1,9 @@
 export interface Assignment {
   applicationId: number;
-  graderId: number;
+  userId: number;
 }
+
+export const DEFAULT_GRADERS_PER_APPLICATION = 3;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -12,22 +14,60 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function pickGradersForApp(
+  shuffled: number[],
+  base: number,
+  gradersPerApplication: number,
+  userIds: number[],
+): number[] {
+  const picked: number[] = [];
+
+  for (let k = 0; k < gradersPerApplication; k++) {
+    let graderId = shuffled[base + k];
+
+    if (picked.includes(graderId)) {
+      let swapped = false;
+      for (let j = base + gradersPerApplication; j < shuffled.length; j++) {
+        if (!picked.includes(shuffled[j])) {
+          [shuffled[base + k], shuffled[j]] = [shuffled[j], shuffled[base + k]];
+          graderId = shuffled[base + k];
+          swapped = true;
+          break;
+        }
+      }
+      if (!swapped) {
+        const alt = userIds.find((id) => !picked.includes(id));
+        if (alt !== undefined) graderId = alt;
+      }
+    }
+
+    picked.push(graderId);
+  }
+
+  return picked;
+}
+
 export function assignGraders(
   applicationIds: number[],
-  graderIds: number[]
+  userIds: number[],
+  gradersPerApplication: number = DEFAULT_GRADERS_PER_APPLICATION,
 ): Assignment[] {
-  if (graderIds.length < 2) {
-    throw new Error('At least 2 graders are required for independent scoring.');
+  if (gradersPerApplication < 1) {
+    throw new Error('At least 1 grader per application is required.');
+  }
+  if (userIds.length < gradersPerApplication) {
+    throw new Error(
+      `At least ${gradersPerApplication} graders are required for ${gradersPerApplication}-grader scoring.`,
+    );
   }
 
   const n = applicationIds.length;
-  const g = graderIds.length;
+  const g = userIds.length;
 
-  // Build a pool of (n * 2) grader slots evenly distributed, then shuffle
-  const slotsNeeded = n * 2;
+  const slotsNeeded = n * gradersPerApplication;
   const pool: number[] = [];
   for (let i = 0; i < slotsNeeded; i++) {
-    pool.push(graderIds[i % g]);
+    pool.push(userIds[i % g]);
   }
   const shuffled = shuffle(pool);
 
@@ -35,31 +75,10 @@ export function assignGraders(
 
   for (let i = 0; i < n; i++) {
     const appId = applicationIds[i];
-    const first = shuffled[i * 2];
-    let second = shuffled[i * 2 + 1];
-
-    // Ensure distinct graders for this application
-    if (second === first) {
-      // Find a swap target from remaining pool positions
-      let swapped = false;
-      for (let j = i * 2 + 2; j < shuffled.length; j++) {
-        if (shuffled[j] !== first) {
-          // Swap
-          [shuffled[i * 2 + 1], shuffled[j]] = [shuffled[j], shuffled[i * 2 + 1]];
-          second = shuffled[i * 2 + 1];
-          swapped = true;
-          break;
-        }
-      }
-      if (!swapped) {
-        // Fallback: pick the next different grader in the original list
-        const alt = graderIds.find((id) => id !== first);
-        if (alt !== undefined) second = alt;
-      }
+    const graders = pickGradersForApp(shuffled, i * gradersPerApplication, gradersPerApplication, userIds);
+    for (const userId of graders) {
+      assignments.push({ applicationId: appId, userId });
     }
-
-    assignments.push({ applicationId: appId, graderId: first });
-    assignments.push({ applicationId: appId, graderId: second });
   }
 
   return assignments;

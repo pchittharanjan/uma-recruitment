@@ -1,0 +1,55 @@
+export const runtime = 'nodejs';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { initDb } from '@/lib/db';
+import { forbidden, unauthorized } from '@/lib/auth';
+import { requireTeamPortalUser } from '@/lib/impersonation';
+import { getActiveRoundForTeam } from '@/lib/rounds';
+import { getRoundStageUnlocks, getGrantedStagesForUser, getInterviewOnlyScope } from '@/lib/stage-access';
+import { getGlobalPipelineState } from '@/lib/pipeline-phase';
+import { PIPELINE_PHASES, phaseLabel } from '@/lib/stages';
+import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
+
+export async function GET(req: NextRequest) {
+  try {
+    await initDb();
+    const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
+    if (!user) return unauthorized();
+
+    const teamId = Number.parseInt(req.nextUrl.searchParams.get('teamId') ?? '', 10);
+    if (!Number.isFinite(teamId)) {
+      return NextResponse.json({ error: 'teamId is required.' }, { status: 400 });
+    }
+
+    const round = await getActiveRoundForTeam(teamId);
+    if (!round) {
+      return NextResponse.json({ error: 'No active round.' }, { status: 404 });
+    }
+
+    const unlocks = await getRoundStageUnlocks(round.id);
+    const globalState = await getGlobalPipelineState();
+    const displayStatus = round.status;
+    const granted = await getGrantedStagesForUser(user, teamId);
+    const interviewOnlyStage = await getInterviewOnlyScope(user, teamId);
+    const recruitmentCycleLabel = await getRecruitmentCycleLabel();
+
+    return NextResponse.json({
+      round: {
+        id: round.id,
+        label: recruitmentCycleLabel,
+        status: displayStatus,
+        phaseLabel: phaseLabel(displayStatus),
+      },
+      phases: PIPELINE_PHASES,
+      unlockedStages:
+        globalState.unlockedStages.length > 0
+          ? globalState.unlockedStages
+          : unlocks.map((u) => u.stage),
+      grantedStages: granted === 'all' ? 'all' : granted,
+      interviewOnlyStage,
+    });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

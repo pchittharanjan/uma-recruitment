@@ -1,20 +1,12 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import type { Metadata } from 'next';
+import { absans, mugler } from '@/lib/fonts';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "Recruitment Grader",
-  description: "Application grading platform",
+  title: 'UMA Recruitment Hub',
+  description: 'Application Grading platform',
 };
 
 export default function RootLayout({
@@ -23,11 +15,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${absans.variable} ${mugler.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <TooltipProvider>
+          {children}
+          <Toaster richColors closeButton position="bottom-right" />
+        </TooltipProvider>
+      </body>
     </html>
   );
 }

@@ -1,0 +1,177 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import PageLoading from '@/components/page-loading';
+import { DeliberationsKanban } from '@/components/deliberations-kanban';
+import StatusBanner from '@/components/status-banner';
+import {
+  applyDeliberationsLayout,
+  type DeliberationsBoardData,
+  type DeliberationsBoardLayout,
+  type DeliberationsCandidate,
+  type DeliberationsColumnId,
+} from '@/lib/deliberations-types';
+
+interface DeliberationsResponse {
+  team: { id: number; name: string };
+  round: { id: number; label: string; status: string };
+  board: DeliberationsBoardData;
+  selectionComplete?: boolean;
+  canSave?: boolean;
+  pipelineClosed?: boolean;
+  /** When set, overrides pipelineClosed for board interactivity (admin stays writable). */
+  readOnly?: boolean;
+  error?: string;
+}
+
+function defaultAdminBoardUrl(teamId: number) {
+  return `/api/admin/teams/${teamId}/deliberations`;
+}
+
+function defaultAdminDetailUrl(teamId: number, applicationId: number) {
+  return `/api/admin/teams/${teamId}/deliberations/${applicationId}`;
+}
+
+export function DeliberationsTeamBoard({
+  teamId,
+  onTeamMeta,
+  boardApiBase,
+  detailApiBase,
+  canSave = true,
+}: {
+  teamId: number;
+  /** Called once the board loads so the tab strip can show the real team name. */
+  onTeamMeta?: (meta: { id: number; name: string }) => void;
+  /**
+   * GET (and PUT when canSave) URL for the board.
+   * Admin default: `/api/admin/teams/{id}/deliberations`
+   * Team: `/api/team/deliberations?teamId={id}`
+   */
+  boardApiBase?: string;
+  /**
+   * Base for candidate detail GETs. Append `/{applicationId}` (admin) or
+   * `/{applicationId}?teamId=` (team). When omitted, admin path is used.
+   */
+  detailApiBase?: string;
+  /** Only admins may persist the shared board / advance. Defaults true for admin workspace. */
+  canSave?: boolean;
+}) {
+  const router = useRouter();
+  const onTeamMetaRef = useRef(onTeamMeta);
+  onTeamMetaRef.current = onTeamMeta;
+  const boardUrl = boardApiBase ?? defaultAdminBoardUrl(teamId);
+  const [data, setData] = useState<DeliberationsResponse | null>(null);
+  const [initialColumns, setInitialColumns] = useState<Record<
+    DeliberationsColumnId,
+    DeliberationsCandidate[]
+  > | null>(null);
+  const [savedLayout, setSavedLayout] = useState<DeliberationsBoardLayout | null>(null);
+  const [selectionComplete, setSelectionComplete] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const resolveDetailUrl = (applicationId: number) => {
+    if (detailApiBase) {
+      // Team API: `/api/team/deliberations/{id}?teamId=`
+      if (detailApiBase.includes('/api/team/')) {
+        return `${detailApiBase}/${applicationId}?teamId=${teamId}`;
+      }
+      return `${detailApiBase}/${applicationId}`;
+    }
+    return defaultAdminDetailUrl(teamId, applicationId);
+  };
+
+  const loadBoard = useCallback(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    fetch(boardUrl, { cache: 'no-store' })
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.push('/login');
+          return null;
+        }
+        const json = (await res.json()) as DeliberationsResponse;
+        if (!res.ok) {
+          throw new Error(json.error || 'Failed to load deliberations.');
+        }
+        return json;
+      })
+      .then((json) => {
+        if (cancelled || !json) return;
+        setData(json);
+        setSavedLayout(json.board.layout ?? null);
+        setSelectionComplete(Boolean(json.selectionComplete));
+        setInitialColumns(
+          applyDeliberationsLayout(json.board.candidates, json.board.layout),
+        );
+        onTeamMetaRef.current?.({ id: json.team.id, name: json.team.name });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load deliberations.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [boardUrl, router]);
+
+  useEffect(() => {
+    return loadBoard();
+  }, [loadBoard, reloadKey]);
+
+  if (loading) return <PageLoading />;
+
+  if (error || !data || !initialColumns) {
+    return <StatusBanner type="error" message={error || 'Unable to load board.'} />;
+  }
+
+  const effectiveCanSave = data.canSave ?? canSave;
+  // Prefer explicit readOnly from API (admin stays writable when closed).
+  const readOnly =
+    data.readOnly !== undefined ? Boolean(data.readOnly) : Boolean(data.pipelineClosed);
+
+  return (
+    <div className="space-y-4">
+      {readOnly && (
+        <StatusBanner
+          type="info"
+          message="Recruitment is closed. Deliberations are view-only."
+        />
+      )}
+      <p className="text-sm text-muted-foreground">
+        Drag applicants Pool → Considering → Accept. Accept is capped at the team offer limit.
+        Click a card for details; use ⋯ to reject or add to compare (2 / 4 / list).
+        {readOnly
+          ? ' This cycle is closed — the board is view-only.'
+          : effectiveCanSave
+            ? selectionComplete
+              ? ' Final selection is locked for this team.'
+              : ' Hit save to keep progress, then Complete final selection when Accept is ready.'
+            : ' Rearrange freely — only an admin can save the shared board or lock offers.'}
+      </p>
+      <DeliberationsKanban
+        key={`${data.team.id}-${data.round.id}-${reloadKey}-${data.board.candidates.length}-fr${data.board.candidates.filter((c) => c.firstRoundAverage != null).length}`}
+        teamId={data.team.id}
+        initialColumns={initialColumns}
+        initialSavedLayout={savedLayout}
+        acceptLimit={data.board.acceptLimit}
+        allowOverCap={data.board.allowOverCap}
+        teamName={data.team.name}
+        canSave={effectiveCanSave}
+        readOnly={readOnly}
+        selectionComplete={selectionComplete}
+        saveUrl={effectiveCanSave ? boardUrl : undefined}
+        resolveDetailUrl={resolveDetailUrl}
+        onFinalized={() => setReloadKey((k) => k + 1)}
+      />
+    </div>
+  );
+}

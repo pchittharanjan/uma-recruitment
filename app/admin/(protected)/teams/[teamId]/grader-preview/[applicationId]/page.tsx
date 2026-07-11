@@ -1,0 +1,192 @@
+'use client';
+
+import React, { use, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import PageLoading from '@/components/page-loading';
+import { PageContainer, PageContent } from '@/components/page-shell';
+import { Card } from '@/components/ui/card';
+import LoadingButton from '@/components/loading-button';
+import ScoreSelector from '@/components/ScoreSelector';
+import StatusBanner from '@/components/status-banner';
+import { applicantDisplayId } from '@/lib/blind';
+
+interface PreviewData {
+  applicationId: number;
+  rowIndex: number;
+  fields: Record<string, string>;
+  scoreFields: string[];
+  contextFields: string[];
+  customScoreFields: string[];
+  graderInstructions: string | null;
+}
+
+export default function AdminGraderPreviewPage({
+  params,
+}: {
+  params: Promise<{ teamId: string; applicationId: string }>;
+}) {
+  const { teamId, applicationId } = use(params);
+  const router = useRouter();
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/admin/teams/${teamId}/grader-preview/${applicationId}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) {
+          setError(json.error);
+          return;
+        }
+        setData(json);
+      })
+      .catch(() => setError('Failed to load preview.'));
+  }, [teamId, applicationId]);
+
+  if (error) {
+    return (
+      <PageContainer className="py-8">
+        <StatusBanner message={error} type="error" />
+        <LoadingButton className="mt-4" variant="secondary" onClick={() => router.back()}>
+          ← Back
+        </LoadingButton>
+      </PageContainer>
+    );
+  }
+
+  if (!data) {
+    return <PageLoading />;
+  }
+
+  const renderWithLinks = (text: string) => {
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    const parts: (string | React.ReactElement)[] = [];
+    let lastIndex = 0;
+    let match;
+    while ((match = urlRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+      parts.push(
+        <a
+          key={match.index}
+          href={match[0]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all text-primary underline"
+        >
+          {match[0]}
+        </a>,
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+  };
+
+  return (
+    <div className="pb-8">
+      <div className="sticky top-0 z-10 border-b border-amber-200 bg-amber-50">
+        <PageContainer className="py-3 sm:py-3 lg:py-3">
+          <PageContent
+            width="comfortable"
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-amber-900">Grader preview (read-only)</p>
+              <p className="text-sm text-amber-800">
+                What a grader sees — names and identifying fields are stripped.
+              </p>
+            </div>
+            <LoadingButton
+              variant="secondary"
+              className="shrink-0"
+              onClick={() => router.push(`/admin/teams/${teamId}`)}
+            >
+              ← Back to team
+            </LoadingButton>
+          </PageContent>
+        </PageContainer>
+      </div>
+
+      <PageContainer className="py-6 sm:py-6 lg:py-6">
+        <PageContent width="comfortable" className="space-y-6">
+          <div className="text-center">
+            <span className="text-sm font-medium">{applicantDisplayId(data.rowIndex)}</span>
+          </div>
+
+          {data.graderInstructions && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
+                Instructions
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-amber-900">{data.graderInstructions}</p>
+            </div>
+          )}
+
+          {data.contextFields.length > 0 && (
+            <Card className="p-4 sm:p-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Application context
+              </p>
+              <div className="space-y-3">
+                {data.contextFields.map((field) => {
+                  const val = data.fields[field] || '—';
+                  return (
+                    <div key={field} className="flex min-w-0 gap-3">
+                      <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
+                        {field}
+                      </span>
+                      <span className="min-w-0 break-words text-sm">{val}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {data.scoreFields.map((field) => (
+            <Card key={field} className="p-4 sm:p-5 opacity-90">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                {field}
+              </p>
+              <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
+                {data.fields[field] ? (
+                  renderWithLinks(data.fields[field])
+                ) : (
+                  <span className="italic text-muted-foreground">No response</span>
+                )}
+              </p>
+              <div className="border-t border-border/60 pt-4">
+                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
+                <ScoreSelector value={null} onChange={() => {}} disabled />
+              </div>
+            </Card>
+          ))}
+
+          {data.customScoreFields.map((field) => (
+            <Card key={`custom:${field}`} className="p-4 sm:p-5 opacity-90">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
+                {field}
+              </p>
+              <div className="border-t border-border/60 pt-4">
+                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
+                <ScoreSelector value={null} onChange={() => {}} disabled />
+              </div>
+            </Card>
+          ))}
+
+          <Card className="p-4 sm:p-5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Comments
+            </p>
+            <textarea
+              disabled
+              placeholder="Any comments or flags for this application"
+              rows={3}
+              className="field-textarea text-muted-foreground"
+            />
+          </Card>
+        </PageContent>
+      </PageContainer>
+    </div>
+  );
+}

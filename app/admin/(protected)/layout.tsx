@@ -1,13 +1,22 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-
-async function getAdminToken() {
-  const cookieStore = await cookies();
-  return cookieStore.get('admin_token')?.value ?? null;
-}
+import { getSessionUser } from '@/lib/auth';
+import { AdminShell } from '@/components/admin-shell';
+import { initDb } from '@/lib/db';
+import { getImpersonateTarget } from '@/lib/impersonation';
+import { anyTeamHasActivePipeline } from '@/lib/rounds';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const token = await getAdminToken();
-  if (!token) redirect('/admin/login');
-  return <>{children}</>;
+  await initDb();
+  const user = await getSessionUser();
+  if (!user) redirect('/login');
+  if (user.role !== 'admin') redirect('/login');
+  if (await getImpersonateTarget()) redirect('/team');
+
+  const hasActivePipeline = await anyTeamHasActivePipeline();
+
+  return (
+    <AdminShell user={user} showApplicationsNav={hasActivePipeline}>
+      {children}
+    </AdminShell>
+  );
 }

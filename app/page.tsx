@@ -1,17 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { redirect } from 'next/navigation';
-import { initDb, getConfig } from '@/lib/db';
+import { initDb } from '@/lib/db';
 
 export default async function RootPage() {
   try {
     await initDb();
-    const config = await getConfig();
-    if (config && config.status !== 'setup') {
-      redirect('/admin/login');
-    }
   } catch {
-    // DB not configured yet — fall through to setup
+    // DB not configured — login will surface the error
   }
-  redirect('/setup');
+  redirect('/login');
 }
