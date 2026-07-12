@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getDb } from '@/lib/db';
+import { cachedPerRequest } from '@/lib/request-cache';
 import {
   formatRecruitmentCycleLabel,
   formatRecruitmentCycleShort,
@@ -12,6 +13,10 @@ import {
 } from '@/lib/org-recruitment-cycle';
 
 export async function getOrgRecruitmentCycle(): Promise<OrgRecruitmentCycle> {
+  return cachedPerRequest('orgRecruitmentCycle', getOrgRecruitmentCycleUncached);
+}
+
+async function getOrgRecruitmentCycleUncached(): Promise<OrgRecruitmentCycle> {
   const db = getDb();
   const result = await db.execute('SELECT semester, year FROM org_recruitment_cycle WHERE id = 1');
   const row = result.rows[0];

@@ -10,8 +10,13 @@ import {
   getTeamInterviewRoundStats,
   type TeamInterviewRoundStats,
 } from '@/lib/interview-slots';
+import { runWithRequestCache } from '@/lib/request-cache';
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     if (!(await requireAuth(req, { roles: ['admin'] }))) return unauthorized();

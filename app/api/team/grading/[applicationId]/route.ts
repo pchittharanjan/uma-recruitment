@@ -5,6 +5,7 @@ import { getDb, initDb } from '@/lib/db';
 import { forbidden, notFound, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { runWithRequestCache } from '@/lib/request-cache';
 import { resolveContextFields } from '@/lib/blind';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { getRoundSettings } from '@/lib/rounds';
@@ -16,6 +17,13 @@ import {
 } from '@/lib/team-dashboard';
 
 export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ applicationId: string }> },
+) {
+  return runWithRequestCache(() => handleGet(req, ctx));
+}
+
+async function handleGet(
   req: NextRequest,
   { params }: { params: Promise<{ applicationId: string }> },
 ) {
@@ -45,31 +53,32 @@ export async function GET(
       return forbidden('This assignment is not part of application grading.');
     }
 
-    const settings = await getRoundSettings(assignment.roundId);
+    const db = getDb();
+    const [settings, scoresResult, progressResult, gradingEditLock] = await Promise.all([
+      getRoundSettings(assignment.roundId),
+      db.execute({
+        sql: 'SELECT field_name, score FROM scores WHERE assignment_id = ?',
+        args: [assignment.assignmentId],
+      }),
+      db.execute({
+        sql: `SELECT COUNT(*) as total,
+                     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+              FROM assignments a
+              JOIN applications app ON app.id = a.application_id
+              WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?`,
+        args: [user.id, teamId, assignment.stage],
+      }),
+      getGradingEditLock(teamId, assignment.roundId),
+    ]);
     if (!settings) return notFound('Round not configured');
 
-    const db = getDb();
-    const scoresResult = await db.execute({
-      sql: 'SELECT field_name, score FROM scores WHERE assignment_id = ?',
-      args: [assignment.assignmentId],
-    });
     const existingScores: Record<string, number> = {};
     for (const row of scoresResult.rows) {
       existingScores[row.field_name as string] = row.score as number;
     }
 
-    const progressResult = await db.execute({
-      sql: `SELECT COUNT(*) as total,
-                   SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-            FROM assignments a
-            JOIN applications app ON app.id = a.application_id
-            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?`,
-      args: [user.id, teamId, assignment.stage],
-    });
-
     const blind = userSeesBlindApplications(user);
     const contextFields = graderContextFieldsForSettings(settings);
-    const gradingEditLock = await getGradingEditLock(teamId, assignment.roundId);
 
     return NextResponse.json({
       applicationId: assignment.applicationId,

@@ -10,6 +10,7 @@ import {
 } from '@/lib/interview-results';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { pipelineClosedEditLock } from '@/lib/pipeline-writable';
+import { cachedPerRequest } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { statusIndex } from '@/lib/stages';
 import {
@@ -346,6 +347,16 @@ export async function getGradingEditLock(
 }
 
 export async function listAdvancementSubmissionHistory(
+  teamId: number,
+  roundId: number,
+  fromStage?: AdvancementFromStage,
+): Promise<AdvancementSubmission[]> {
+  return cachedPerRequest(`advSubHistory:${teamId}:${roundId}:${fromStage ?? 'all'}`, () =>
+    listAdvancementSubmissionHistoryUncached(teamId, roundId, fromStage),
+  );
+}
+
+async function listAdvancementSubmissionHistoryUncached(
   teamId: number,
   roundId: number,
   fromStage?: AdvancementFromStage,

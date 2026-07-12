@@ -1,6 +1,8 @@
+import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { createClient, type Client, type ResultSet, type Row } from '@libsql/client';
+import { cachedPerRequest } from '@/lib/request-cache';
 import { normalizeUserRole, type UserRole } from '@/lib/roles';
 
 export type { UserRole } from '@/lib/roles';
@@ -63,8 +65,51 @@ export function initDb(): Promise<void> {
   return dbInitPromise;
 }
 
+/**
+ * Bump to force a full re-init when schema work happens outside SCHEMA.sql and
+ * the MIGRATIONS list (e.g. editing a backfill function's logic).
+ */
+const INIT_REVISION = 1;
+
+/** Fingerprint of everything initDbOnce runs; changes whenever schema work changes. */
+function computeSchemaFingerprint(): string {
+  const schema = readFileSync(join(process.cwd(), 'SCHEMA.sql'), 'utf-8');
+  return createHash('sha256')
+    .update(String(INIT_REVISION))
+    .update(schema)
+    .update(MIGRATIONS.join(';'))
+    .digest('hex');
+}
+
+async function isDbUpToDate(db: Client, fingerprint: string): Promise<boolean> {
+  try {
+    const result = await db.execute('SELECT schema_hash FROM db_meta WHERE id = 1');
+    return result.rows[0]?.schema_hash === fingerprint;
+  } catch {
+    return false; // db_meta missing → fresh or pre-fingerprint database
+  }
+}
+
+async function markDbUpToDate(db: Client, fingerprint: string): Promise<void> {
+  await db.execute(`CREATE TABLE IF NOT EXISTS db_meta (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    schema_hash TEXT NOT NULL,
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+  await db.execute({
+    sql: `INSERT INTO db_meta (id, schema_hash, updated_at) VALUES (1, ?, unixepoch())
+          ON CONFLICT(id) DO UPDATE SET schema_hash = excluded.schema_hash, updated_at = unixepoch()`,
+    args: [fingerprint],
+  });
+}
+
 async function initDbOnce(): Promise<void> {
   const db = getDb();
+
+  // Fast path: schema already matches — one query per cold start instead of ~70.
+  const fingerprint = computeSchemaFingerprint();
+  if (await isDbUpToDate(db, fingerprint)) return;
+
   const statements = loadSchemaStatements();
 
   for (let i = 0; i < statements.length; i++) {
@@ -79,10 +124,10 @@ async function initDbOnce(): Promise<void> {
   const { seedDb } = await import('@/lib/seed');
   await seedDb();
   await runMigrations(db);
+  await markDbUpToDate(db, fingerprint);
 }
 
-async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
-  const migrations = [
+const MIGRATIONS = [
     'ALTER TABLE applications ADD COLUMN row_index INTEGER NOT NULL DEFAULT 0',
     "ALTER TABLE round_settings ADD COLUMN context_fields TEXT NOT NULL DEFAULT '[]'",
     'ALTER TABLE round_settings ADD COLUMN graders_per_application INTEGER NOT NULL DEFAULT 3',
@@ -240,8 +285,10 @@ async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
       updated_by INTEGER REFERENCES users(id),
       PRIMARY KEY (team_id, round_id)
     )`,
-  ];
-  for (const sql of migrations) {
+];
+
+async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
+  for (const sql of MIGRATIONS) {
     try {
       await db.execute(sql);
     } catch {
@@ -706,9 +753,11 @@ export function rowToFlag(row: Row): Flag {
 // ── query helpers ───────────────────────────────────────────────────────────
 
 export async function getTeams(): Promise<Team[]> {
-  const db = getDb();
-  const result = await db.execute('SELECT * FROM teams ORDER BY id');
-  return result.rows.map(rowToTeam);
+  return cachedPerRequest('teams', async () => {
+    const db = getDb();
+    const result = await db.execute('SELECT * FROM teams ORDER BY id');
+    return result.rows.map(rowToTeam);
+  });
 }
 
 export async function getTeamById(id: number): Promise<Team | null> {
@@ -732,13 +781,15 @@ export async function getTeamByName(name: TeamName): Promise<Team | null> {
 }
 
 export async function getUserById(id: number): Promise<User | null> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT * FROM users WHERE id = ?',
-    args: [id],
+  return cachedPerRequest(`user:${id}`, async () => {
+    const db = getDb();
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE id = ?',
+      args: [id],
+    });
+    if (result.rows.length === 0) return null;
+    return rowToUser(result.rows[0]);
   });
-  if (result.rows.length === 0) return null;
-  return rowToUser(result.rows[0]);
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
@@ -781,12 +832,14 @@ export async function getApplicationById(id: number): Promise<Application | null
 }
 
 export async function getActiveAccessGrantsForUser(userId: number): Promise<AccessGrant[]> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT * FROM access_grants WHERE user_id = ? AND revoked_at IS NULL',
-    args: [userId],
+  return cachedPerRequest(`grants:${userId}`, async () => {
+    const db = getDb();
+    const result = await db.execute({
+      sql: 'SELECT * FROM access_grants WHERE user_id = ? AND revoked_at IS NULL',
+      args: [userId],
+    });
+    return result.rows.map(rowToAccessGrant);
   });
-  return result.rows.map(rowToAccessGrant);
 }
 
 export type { ResultSet };

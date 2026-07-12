@@ -1,69 +1,51 @@
-'use client';
-
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import LoadingButton from '@/components/loading-button';
-import PageLoading from '@/components/page-loading';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import StatusBanner from '@/components/status-banner';
 import {
   TeamPersonalDashboard,
   type TeamOverviewData,
 } from '@/components/team-personal-dashboard';
 import { PageContainer } from '@/components/page-shell';
+import { buttonVariants } from '@/components/ui/button';
+import { getUserById } from '@/lib/db';
+import { runWithRequestCache } from '@/lib/request-cache';
+import { buildTeamOverview } from '@/lib/team-overview';
+import { getTeamPortalContext } from '@/lib/team-portal-context';
 
-export default function TeamHomePage({ params }: { params: Promise<{ teamId: string }> }) {
-  const { teamId } = use(params);
-  const router = useRouter();
-  const [data, setData] = useState<TeamOverviewData | null>(null);
-  const [hasMultipleTeams, setHasMultipleTeams] = useState(false);
-  const [accessError, setAccessError] = useState('');
+export const dynamic = 'force-dynamic';
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then((me) => {
-        const teams = me.teams ?? [];
-        setHasMultipleTeams(teams.length > 1);
-      });
+export default async function TeamHomePage({ params }: { params: Promise<{ teamId: string }> }) {
+  const { teamId } = await params;
 
-    fetch(`/api/team/overview?teamId=${teamId}`)
-      .then((r) => {
-        if (r.status === 401) {
-          router.push('/login');
-          return null;
-        }
-        return r.json();
-      })
-      .then((json) => {
-        if (!json) return;
-        if (json.error) {
-          setAccessError(json.error);
-          return;
-        }
-        setData(json);
-      });
-  }, [router, teamId]);
+  return runWithRequestCache(async () => {
+    const ctx = await getTeamPortalContext();
+    if (!ctx) redirect('/login');
 
-  if (accessError && !data) {
+    const user = await getUserById(ctx.portalUser.id);
+    if (!user) redirect('/login');
+
+    const hasMultipleTeams = ctx.teams.length > 1;
+    const result = await buildTeamOverview(user, Number.parseInt(teamId, 10));
+
+    if (!result.ok) {
+      return (
+        <PageContainer className="space-y-4">
+          <StatusBanner message={result.error} type="error" />
+          {hasMultipleTeams && (
+            <Link href="/team" className={buttonVariants({ variant: 'secondary' })}>
+              ← Teams
+            </Link>
+          )}
+        </PageContainer>
+      );
+    }
+
     return (
-      <PageContainer className="space-y-4">
-        <StatusBanner message={accessError} type="error" />
-        {hasMultipleTeams && (
-          <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
-            ← Teams
-          </LoadingButton>
-        )}
-      </PageContainer>
+      <TeamPersonalDashboard
+        data={result.data as unknown as TeamOverviewData}
+        teamId={teamId}
+        hasMultipleTeams={hasMultipleTeams}
+      />
     );
-  }
-
-  if (!data) return <PageLoading />;
-
-  return (
-    <TeamPersonalDashboard
-      data={data}
-      teamId={teamId}
-      hasMultipleTeams={hasMultipleTeams}
-    />
-  );
+  });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { use, useEffect, useState } from 'react';
+import React, { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageContent } from '@/components/page-shell';
@@ -11,22 +11,13 @@ import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { applicantDisplayId } from '@/lib/blind';
 import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
-import type { GradingEditLock } from '@/lib/advancement-submissions-types';
-
-interface AppData {
-  applicationId: number;
-  assignmentId: number;
-  rowIndex: number;
-  fields: Record<string, string>;
-  existingScores: Record<string, number>;
-  existingComment: string;
-  graderProgress: { total: number; completed: number };
-  scoreFields: string[];
-  contextFields: string[];
-  customScoreFields: string[];
-  graderInstructions: string | null;
-  gradingEditLock: GradingEditLock;
-}
+import {
+  invalidateGradeData,
+  loadGradeData,
+  prefetchNextPendingGradeData,
+  type GradeAppData,
+} from '@/lib/grading-client';
+import { cn } from '@/lib/utils';
 
 export default function TeamGradingScorePage({
   params,
@@ -34,7 +25,7 @@ export default function TeamGradingScorePage({
   params: Promise<{ teamId: string; applicationId: string }>;
 }) {
   const { teamId, applicationId } = use(params);
-  const [appData, setAppData] = useState<AppData | null>(null);
+  const [appData, setAppData] = useState<GradeAppData | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
@@ -43,22 +34,37 @@ export default function TeamGradingScorePage({
   const router = useRouter();
 
   useEffect(() => {
-    fetch(`/api/team/grading/${applicationId}?teamId=${teamId}`)
-      .then((r) => r.json())
+    let cancelled = false;
+    setAppData(null);
+    setError('');
+    setSubmitError('');
+
+    loadGradeData(teamId, applicationId)
       .then((d) => {
-        if (d.error) {
-          setError(d.error);
-          return;
-        }
+        if (cancelled) return;
         setAppData(d);
         setScores(d.existingScores ?? {});
         setComment(d.existingComment ?? '');
+        // Warm the cache for the next pending applicant so submit → next is instant.
+        void prefetchNextPendingGradeData(teamId, d.applicationId);
       })
-      .catch(() => setError('Network error'));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message || 'Network error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [teamId, applicationId]);
 
-  const handleSubmit = async () => {
-    if (!appData) return;
+  const gradingLocked = appData?.gradingEditLock?.locked ?? false;
+  const allScoredFields = appData
+    ? [...appData.scoreFields, ...(appData.customScoreFields ?? [])]
+    : [];
+  const activeField = allScoredFields.find((f) => scores[f] === undefined) ?? null;
+
+  const handleSubmit = useCallback(async () => {
+    if (!appData || submitting) return;
     const allFields = [...appData.scoreFields, ...(appData.customScoreFields ?? [])];
     const missing = allFields.filter((f) => scores[f] === undefined);
     if (missing.length > 0) {
@@ -82,6 +88,7 @@ export default function TeamGradingScorePage({
         return;
       }
       toast.success('Score submitted');
+      invalidateGradeData(teamId, applicationId);
       if (data.nextApplicationId) {
         router.push(`/team/${teamId}/grade/${data.nextApplicationId}`);
       } else {
@@ -93,7 +100,60 @@ export default function TeamGradingScorePage({
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [appData, applicationId, comment, router, scores, submitting, teamId]);
+
+  const scoreField = useCallback(
+    (field: string, n: number) => {
+      setScores((prev) => ({ ...prev, [field]: n }));
+    },
+    [],
+  );
+
+  // Keyboard flow: 1–5 scores the first unscored field, ⌘/Ctrl+Enter submits.
+  const activeFieldRef = useRef(activeField);
+  activeFieldRef.current = activeField;
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  useEffect(() => {
+    if (gradingLocked) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inField =
+        target &&
+        (target.tagName === 'TEXTAREA' ||
+          target.tagName === 'INPUT' ||
+          target.isContentEditable);
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        void handleSubmitRef.current();
+        return;
+      }
+
+      if (inField || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key >= '1' && e.key <= '5') {
+        const field = activeFieldRef.current;
+        if (!field) return;
+        e.preventDefault();
+        setScores((prev) => ({ ...prev, [field]: Number(e.key) }));
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [gradingLocked]);
+
+  // Keep the field being scored in view as grading advances (not on first load).
+  useEffect(() => {
+    if (!activeField || !appData) return;
+    if (Object.keys(scores).length === 0) return;
+    const el = document.querySelector(`[data-score-field="${CSS.escape(activeField)}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeField, appData]);
 
   if (error) {
     return (
@@ -138,10 +198,8 @@ export default function TeamGradingScorePage({
   };
 
   const contextFields = appData.contextFields ?? [];
-  const allScoredFields = [...appData.scoreFields, ...(appData.customScoreFields ?? [])];
   const scoredCount = allScoredFields.filter((f) => scores[f] !== undefined).length;
   const totalScored = allScoredFields.length;
-  const gradingLocked = appData.gradingEditLock?.locked ?? false;
   const lockMessage = appData.gradingEditLock?.message ?? '';
 
   return (
@@ -223,7 +281,14 @@ export default function TeamGradingScorePage({
           )}
 
           {appData.scoreFields.map((field) => (
-            <Card key={field} className="p-4 sm:p-5">
+            <Card
+              key={field}
+              data-score-field={field}
+              className={cn(
+                'p-4 transition-shadow sm:p-5',
+                !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
+              )}
+            >
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
               </p>
@@ -238,7 +303,7 @@ export default function TeamGradingScorePage({
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector
                   value={scores[field] ?? null}
-                  onChange={(n) => setScores((prev) => ({ ...prev, [field]: n }))}
+                  onChange={(n) => scoreField(field, n)}
                   disabled={gradingLocked}
                 />
               </div>
@@ -246,7 +311,14 @@ export default function TeamGradingScorePage({
           ))}
 
           {(appData.customScoreFields ?? []).map((field) => (
-            <Card key={`custom:${field}`} className="p-4 sm:p-5">
+            <Card
+              key={`custom:${field}`}
+              data-score-field={field}
+              className={cn(
+                'p-4 transition-shadow sm:p-5',
+                !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
+              )}
+            >
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
               </p>
@@ -254,7 +326,7 @@ export default function TeamGradingScorePage({
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector
                   value={scores[field] ?? null}
-                  onChange={(n) => setScores((prev) => ({ ...prev, [field]: n }))}
+                  onChange={(n) => scoreField(field, n)}
                   disabled={gradingLocked}
                 />
               </div>
@@ -276,6 +348,15 @@ export default function TeamGradingScorePage({
           </Card>
 
           {submitError && <StatusBanner message={submitError} type="error" />}
+
+          {!gradingLocked && (
+            <p className="text-center text-xs text-muted-foreground">
+              Tip: press <kbd className="rounded border px-1">1</kbd>–
+              <kbd className="rounded border px-1">5</kbd> to score the highlighted field ·{' '}
+              <kbd className="rounded border px-1">⌘</kbd>+
+              <kbd className="rounded border px-1">Enter</kbd> to submit
+            </p>
+          )}
 
           <GradingSubmitFooter
             scoredCount={scoredCount}

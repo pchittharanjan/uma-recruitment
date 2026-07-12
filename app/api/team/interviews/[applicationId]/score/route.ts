@@ -44,19 +44,21 @@ async function saveInterviewScore(
   comment: string,
 ): Promise<void> {
   const db = getDb();
-  for (const field of scoreFields) {
-    await db.execute({
-      sql: `INSERT INTO scores (assignment_id, field_name, score) VALUES (?, ?, ?)
-            ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
-      args: [assignmentId, field, scores[field]],
-    });
-  }
-
-  await db.execute({
-    sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
-          WHERE id = ? AND user_id = ?`,
-    args: [comment || null, assignmentId, userId],
-  });
+  await db.batch(
+    [
+      ...scoreFields.map((field) => ({
+        sql: `INSERT INTO scores (assignment_id, field_name, score) VALUES (?, ?, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
+        args: [assignmentId, field, scores[field]],
+      })),
+      {
+        sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
+              WHERE id = ? AND user_id = ?`,
+        args: [comment || null, assignmentId, userId],
+      },
+    ],
+    'write',
+  );
 }
 
 export async function POST(

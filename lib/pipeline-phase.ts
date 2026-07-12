@@ -1,4 +1,5 @@
 import { getDb, getTeams, rowToRound, type Round, type RoundStatus } from '@/lib/db';
+import { cachedPerRequest } from '@/lib/request-cache';
 import {
   lockRoundStage,
   unlockRoundStage,
@@ -107,6 +108,10 @@ function sameUnlockSet(a: UnlockableStage[], b: UnlockableStage[]): boolean {
 }
 
 export async function getGlobalPipelineState(): Promise<GlobalPipelineState> {
+  return cachedPerRequest('globalPipelineState', getGlobalPipelineStateUncached);
+}
+
+async function getGlobalPipelineStateUncached(): Promise<GlobalPipelineState> {
   const teams = await getActiveRoundsByTeam();
   const withRound = teams.filter((t) => t.round !== null) as Array<
     TeamPipelineRound & { round: Round }

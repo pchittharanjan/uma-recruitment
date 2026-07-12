@@ -5,6 +5,7 @@ import {
   type User,
 } from '@/lib/db';
 import { userHasTeamAccess } from '@/lib/access';
+import { cachedPerRequest } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import {
   isRoundAtOrPastStatus,
@@ -19,25 +20,23 @@ export interface RoundStageUnlock {
 }
 
 export async function getRoundStageUnlocks(roundId: number): Promise<RoundStageUnlock[]> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT stage, unlocked_at, unlocked_by FROM round_stage_unlocks WHERE round_id = ?',
-    args: [roundId],
+  return cachedPerRequest(`stageUnlocks:${roundId}`, async () => {
+    const db = getDb();
+    const result = await db.execute({
+      sql: 'SELECT stage, unlocked_at, unlocked_by FROM round_stage_unlocks WHERE round_id = ?',
+      args: [roundId],
+    });
+    return result.rows.map((row) => ({
+      stage: row.stage as UnlockableStage,
+      unlocked_at: row.unlocked_at as number,
+      unlocked_by: row.unlocked_by as number,
+    }));
   });
-  return result.rows.map((row) => ({
-    stage: row.stage as UnlockableStage,
-    unlocked_at: row.unlocked_at as number,
-    unlocked_by: row.unlocked_by as number,
-  }));
 }
 
 export async function isStageUnlocked(roundId: number, stage: UnlockableStage): Promise<boolean> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT 1 FROM round_stage_unlocks WHERE round_id = ? AND stage = ?',
-    args: [roundId, stage],
-  });
-  return result.rows.length > 0;
+  const unlocks = await getRoundStageUnlocks(roundId);
+  return unlocks.some((u) => u.stage === stage);
 }
 
 export async function unlockRoundStage(

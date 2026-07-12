@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { connection } from 'next/server';
 import { getAccessibleTeams } from '@/lib/access';
 import { getSessionUser } from '@/lib/auth';
@@ -12,7 +13,8 @@ export interface TeamPortalContext {
   isImpersonating: boolean;
 }
 
-export async function getTeamPortalContext(
+/** Deduped per request (React cache) so layout + page share one lookup. */
+export const getTeamPortalContext = cache(async function getTeamPortalContext(
   sessionUser?: User | null,
 ): Promise<TeamPortalContext | null> {
   await connection();
@@ -40,4 +42,4 @@ export async function getTeamPortalContext(
     isExec: portalUser.role === 'exec',
     isImpersonating: Boolean(impersonateTarget),
   };
-}
+});

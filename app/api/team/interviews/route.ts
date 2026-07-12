@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb, type AssignmentStage } from '@/lib/db';
 import { forbidden, unauthorized } from '@/lib/auth';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { runWithRequestCache } from '@/lib/request-cache';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { listGraderAssignments } from '@/lib/team-dashboard';
 import { assignmentStageLabel } from '@/lib/stages';
@@ -11,6 +12,10 @@ import { assignmentStageLabel } from '@/lib/stages';
 const ASSIGNMENT_STAGES: AssignmentStage[] = ['application', 'first_round', 'final_round'];
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });

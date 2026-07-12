@@ -11,6 +11,7 @@ import {
   getRoundStageUnlocks,
 } from '@/lib/stage-access';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { runWithRequestCache } from '@/lib/request-cache';
 import { unauthorized } from '@/lib/auth';
 import type { UnlockableStage } from '@/lib/stages';
 import { UNLOCKABLE_STAGES } from '@/lib/stages';
@@ -18,27 +19,33 @@ import { getRecruitmentCycleLabel, getRecruitmentCycleShortLabel } from '@/lib/o
 import { isOrgFinalSelectionComplete } from '@/lib/org-final-selection-status';
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
     if (!user) return unauthorized();
 
-    const teams = await getAccessibleTeams(user);
-    const globalState = await getGlobalPipelineState();
-    const pipelineClosed = globalState.status === 'closed';
-    const [recruitmentCycleLabel, recruitmentCycleShortLabel, finalSelectionComplete] =
+    const [teams, globalState, recruitmentCycleLabel, recruitmentCycleShortLabel, finalSelectionComplete] =
       await Promise.all([
+        getAccessibleTeams(user),
+        getGlobalPipelineState(),
         getRecruitmentCycleLabel(),
         getRecruitmentCycleShortLabel(),
         isOrgFinalSelectionComplete(),
       ]);
+    const pipelineClosed = globalState.status === 'closed';
 
     const teamNav = await Promise.all(
       teams.map(async (team) => {
-        const round = await getActiveRoundForTeam(team.id);
-        const granted = await getGrantedStagesForUser(user, team.id);
+        const [round, granted, interviewOnlyStage] = await Promise.all([
+          getActiveRoundForTeam(team.id),
+          getGrantedStagesForUser(user, team.id),
+          getInterviewOnlyScope(user, team.id),
+        ]);
         const unlocks = round ? await getRoundStageUnlocks(round.id) : [];
-        const interviewOnlyStage = await getInterviewOnlyScope(user, team.id);
         const hasAnyAccess = granted === 'all' || granted.length > 0;
         // Closed archive: everyone with team access can browse all phases (view-only).
         const archiveBrowse = pipelineClosed && hasAnyAccess;

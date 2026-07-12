@@ -9,8 +9,13 @@ import { getRoundStageUnlocks, getGrantedStagesForUser, getInterviewOnlyScope } 
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { PIPELINE_PHASES, phaseLabel, UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
+import { runWithRequestCache } from '@/lib/request-cache';
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
@@ -26,12 +31,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No active round.' }, { status: 404 });
     }
 
-    const unlocks = await getRoundStageUnlocks(round.id);
-    const globalState = await getGlobalPipelineState();
     const displayStatus = round.status;
-    const granted = await getGrantedStagesForUser(user, teamId);
-    const interviewOnlyStage = await getInterviewOnlyScope(user, teamId);
-    const recruitmentCycleLabel = await getRecruitmentCycleLabel();
+    const [unlocks, globalState, granted, interviewOnlyStage, recruitmentCycleLabel] =
+      await Promise.all([
+        getRoundStageUnlocks(round.id),
+        getGlobalPipelineState(),
+        getGrantedStagesForUser(user, teamId),
+        getInterviewOnlyScope(user, teamId),
+        getRecruitmentCycleLabel(),
+      ]);
     const archiveBrowse =
       (globalState.status === 'closed' || displayStatus === 'closed') &&
       (granted === 'all' || granted.length > 0);

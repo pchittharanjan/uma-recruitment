@@ -71,19 +71,21 @@ export async function POST(
     const db = getDb();
     const assignmentId = assignment.assignmentId;
 
-    for (const field of scoreFields) {
-      await db.execute({
-        sql: `INSERT INTO scores (assignment_id, field_name, score) VALUES (?, ?, ?)
-              ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
-        args: [assignmentId, field, scores[field]],
-      });
-    }
-
-    await db.execute({
-      sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
-            WHERE id = ? AND user_id = ?`,
-      args: [comment || null, assignmentId, user.id],
-    });
+    await db.batch(
+      [
+        ...scoreFields.map((field) => ({
+          sql: `INSERT INTO scores (assignment_id, field_name, score) VALUES (?, ?, ?)
+                ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
+          args: [assignmentId, field, scores[field]],
+        })),
+        {
+          sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
+                WHERE id = ? AND user_id = ?`,
+          args: [comment || null, assignmentId, user.id],
+        },
+      ],
+      'write',
+    );
 
     const next = await db.execute({
       sql: `SELECT app.id as application_id

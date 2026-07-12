@@ -15,10 +15,18 @@ import {
 } from '@/lib/interview-sessions';
 import { getGraderAssignmentForUser, listGraderAssignments } from '@/lib/team-dashboard';
 import { pipelineClosedEditLock } from '@/lib/pipeline-writable';
+import { runWithRequestCache } from '@/lib/request-cache';
 
 const INTERVIEW_STAGES: AssignmentStage[] = ['first_round', 'final_round'];
 
 export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ applicationId: string }> },
+) {
+  return runWithRequestCache(() => handleGet(req, ctx));
+}
+
+async function handleGet(
   req: NextRequest,
   { params }: { params: Promise<{ applicationId: string }> },
 ) {

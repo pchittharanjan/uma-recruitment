@@ -5,6 +5,7 @@ import { initDb, type AssignmentStage } from '@/lib/db';
 import { forbidden, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { runWithRequestCache } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { listGraderAssignments } from '@/lib/team-dashboard';
@@ -12,6 +13,10 @@ import { listGraderAssignments } from '@/lib/team-dashboard';
 const ASSIGNMENT_STAGES: AssignmentStage[] = ['application', 'first_round', 'final_round'];
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
@@ -31,10 +36,12 @@ export async function GET(req: NextRequest) {
       return forbidden('This stage is not open for you yet.');
     }
 
-    const assignments = await listGraderAssignments(user.id, teamId, stage);
+    const [assignments, round] = await Promise.all([
+      listGraderAssignments(user.id, teamId, stage),
+      getActiveRoundForTeam(teamId),
+    ]);
     const completed = assignments.filter((a) => a.status === 'completed').length;
 
-    const round = await getActiveRoundForTeam(teamId);
     const gradingEditLock = round
       ? await getGradingEditLock(teamId, round.id)
       : { locked: false, reason: null, message: '' };

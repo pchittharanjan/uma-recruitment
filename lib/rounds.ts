@@ -13,6 +13,7 @@ import { assignGraders, DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignment
 import { extractCandidateFromFields } from '@/lib/candidates';
 import { parseCsv } from '@/lib/csv';
 import { getOrgCoffeeChatDates } from '@/lib/org-coffee-chat-dates';
+import { cachedPerRequest } from '@/lib/request-cache';
 import { getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { getOrgRubric, mergeOrgRubricIntoHeaders } from '@/lib/org-rubric';
 
@@ -87,13 +88,15 @@ export async function updateRoundCoffeeChatDates(
 }
 
 export async function getRoundSettings(roundId: number): Promise<RoundSettings | null> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT * FROM round_settings WHERE round_id = ?',
-    args: [roundId],
+  return cachedPerRequest(`roundSettings:${roundId}`, async () => {
+    const db = getDb();
+    const result = await db.execute({
+      sql: 'SELECT * FROM round_settings WHERE round_id = ?',
+      args: [roundId],
+    });
+    if (result.rows.length === 0) return null;
+    return rowToRoundSettings(result.rows[0]);
   });
-  if (result.rows.length === 0) return null;
-  return rowToRoundSettings(result.rows[0]);
 }
 
 /**
@@ -102,6 +105,10 @@ export async function getRoundSettings(roundId: number): Promise<RoundSettings |
  * closed, falls back to the latest closed round so archive viewing still works.
  */
 export async function getActiveRoundForTeam(teamId: number): Promise<Round | null> {
+  return cachedPerRequest(`activeRound:${teamId}`, () => getActiveRoundForTeamUncached(teamId));
+}
+
+async function getActiveRoundForTeamUncached(teamId: number): Promise<Round | null> {
   const db = getDb();
   const active = await db.execute({
     sql: `SELECT * FROM rounds

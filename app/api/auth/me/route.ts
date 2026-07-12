@@ -5,8 +5,13 @@ import { initDb } from '@/lib/db';
 import { getAccessibleTeams } from '@/lib/access';
 import { getSessionUserFromRequest } from '@/lib/auth';
 import { getImpersonateTargetFromRequest } from '@/lib/impersonation';
+import { runWithRequestCache } from '@/lib/request-cache';
 
 export async function GET(req: NextRequest) {
+  return runWithRequestCache(() => handleGet(req));
+}
+
+async function handleGet(req: NextRequest) {
   try {
     await initDb();
     const sessionUser = await getSessionUserFromRequest(req);
