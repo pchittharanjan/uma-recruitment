@@ -58,8 +58,8 @@ export async function GET(
       });
     }
 
-    // Application Phase: full grading dashboard.
-    if (round.status === 'application') {
+    // Application phase + closed archive: full grading dashboard for admin browse/edit.
+    if (round.status === 'application' || round.status === 'closed') {
       const dashboard = await buildTeamDashboard(teamId, round.id, { blind: false });
       return NextResponse.json({
         team,

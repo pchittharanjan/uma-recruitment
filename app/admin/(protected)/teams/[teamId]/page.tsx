@@ -232,11 +232,14 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   const roundStatus = data.round.status;
   const isApplicationPhase = roundStatus === 'application';
+  const isClosed = roundStatus === 'closed';
+  // After close, keep the full team hub (apps + links) — don't dump admin into a stub.
+  const showApplicationHub = isApplicationPhase || isClosed;
   const isFirstRound = roundStatus === 'first_round';
   const isFinalRound = roundStatus === 'final_round';
   const isInterviewPhase = isFirstRound || isFinalRound;
 
-  if (isApplicationPhase && !data.dashboard) {
+  if (showApplicationHub && !data.dashboard) {
     return (
       <PageContainer className="space-y-6">
         <PageHeader title={data.team.name} description="Application data is not available yet." />
@@ -245,7 +248,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     );
   }
 
-  if (!isApplicationPhase && !isInterviewPhase) {
+  if (!showApplicationHub && !isInterviewPhase) {
     return (
       <PageContainer size="wide" className="space-y-8">
         <PageHeader
@@ -276,18 +279,18 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   const dashboard = data.dashboard;
   const sorted =
-    isApplicationPhase && dashboard
+    showApplicationHub && dashboard
       ? [...dashboard.applications].sort((a, b) =>
           sortBy === 'average' ? (b.average ?? -1) - (a.average ?? -1) : a.rowIndex - b.rowIndex,
         )
       : [];
 
   const contextFields =
-    isApplicationPhase && dashboard
+    showApplicationHub && dashboard
       ? dashboard.csvHeaders.filter((h) => !dashboard.scoreFields.includes(h))
       : [];
   const previewField =
-    isApplicationPhase && dashboard
+    showApplicationHub && dashboard
       ? (dashboard.csvHeaders.find((h) => h === 'Full name') ??
         dashboard.csvHeaders.find((h) => h === 'First name') ??
         dashboard.csvHeaders.find((h) => h === 'Email') ??
@@ -303,20 +306,20 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     : `/admin/teams/${teamId}/schedule/first-round`;
   const resultsPath = `/admin/teams/${teamId}/interview-results`;
   const sampleApplicationId =
-    isApplicationPhase && dashboard ? dashboard.applications[0]?.id ?? null : null;
+    showApplicationHub && dashboard ? dashboard.applications[0]?.id ?? null : null;
 
   return (
     <PageContainer size="wide" className="space-y-8">
       <PageHeader
         title={data.team.name}
         description={
-          isApplicationPhase && dashboard
+          showApplicationHub && dashboard
             ? `${phaseLabel(data.round.status)} · ${dashboard.applications.length} applications`
             : phaseLabel(data.round.status)
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            {isApplicationPhase && (
+            {showApplicationHub && (
               <LoadingButton
                 variant="secondary"
                 onClick={() => router.push(`/admin/teams/${teamId}/assignments`)}
@@ -328,13 +331,16 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
               variant="secondary"
               onClick={() =>
                 router.push(
-                  communicationsHref(outcomeEmailStageFromPipeline(roundStatus), Number(teamId)),
+                  communicationsHref(
+                    outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
+                    Number(teamId),
+                  ),
                 )
               }
             >
               Communications
             </LoadingButton>
-            {isInterviewPhase && (
+            {(isInterviewPhase || isClosed) && (
               <>
                 <LoadingButton
                   variant="secondary"
@@ -344,7 +350,11 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                 </LoadingButton>
                 <LoadingButton
                   variant="secondary"
-                  onClick={() => router.push(schedulePath)}
+                  onClick={() =>
+                    router.push(
+                      isClosed ? `/admin/teams/${teamId}/schedule/first-round` : schedulePath,
+                    )
+                  }
                 >
                   Schedule interviews
                 </LoadingButton>
@@ -356,7 +366,15 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                 </LoadingButton>
               </>
             )}
-            {isApplicationPhase && (
+            {isClosed && (
+              <LoadingButton
+                variant="secondary"
+                onClick={() => router.push(openTeamDeliberationsHref(Number(teamId)))}
+              >
+                Deliberations
+              </LoadingButton>
+            )}
+            {showApplicationHub && (
               <a href={`/api/admin/teams/${teamId}/export`} download>
                 <LoadingButton variant="secondary">Export CSV</LoadingButton>
               </a>
