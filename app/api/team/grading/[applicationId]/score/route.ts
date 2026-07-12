@@ -89,11 +89,11 @@ export async function POST(
       sql: `SELECT app.id as application_id
             FROM assignments a
             JOIN applications app ON app.id = a.application_id
-            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ? AND app.stage = ?
+            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?
               AND a.status = 'pending'
             ORDER BY app.row_index ASC
             LIMIT 1`,
-      args: [user.id, teamId, assignment.stage, assignment.stage],
+      args: [user.id, teamId, assignment.stage],
     });
 
     const nextApplicationId =

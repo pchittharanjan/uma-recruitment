@@ -205,11 +205,11 @@ export async function POST(
             FROM assignments a
             JOIN applications app ON app.id = a.application_id
             LEFT JOIN interview_slots islot ON islot.application_id = app.id AND islot.stage = a.stage
-            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ? AND app.stage = ?
+            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?
               AND a.status = 'pending'
             ORDER BY islot.scheduled_at ASC, app.row_index ASC
             LIMIT 1`,
-      args: [user.id, teamId, stage, stage],
+      args: [user.id, teamId, stage],
     });
 
     const nextApplicationId =

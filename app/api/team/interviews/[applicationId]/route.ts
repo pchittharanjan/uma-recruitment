@@ -68,8 +68,8 @@ export async function GET(
                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
             FROM assignments a
             JOIN applications app ON app.id = a.application_id
-            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ? AND app.stage = ?`,
-      args: [user.id, teamId, stage, stage],
+            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?`,
+      args: [user.id, teamId, stage],
     });
 
     const slot =
