@@ -99,6 +99,11 @@ export async function getInterviewOnlyScope(
   teamId: number,
 ): Promise<AssignmentStage | null> {
   if (user.role !== 'ad_hoc_exec') return null;
+
+  // Archive mode: don't pin the nav to a single interview stage.
+  const round = await getActiveRoundForTeam(teamId);
+  if (round?.status === 'closed') return null;
+
   const grants = (await getActiveAccessGrantsForUser(user.id)).filter((g) => g.team_id === teamId);
   if (grants.length !== 1 || grants[0].stage === null) return null;
   const stage = grants[0].stage;
@@ -113,8 +118,16 @@ export async function canUserAccessTeamStage(
 ): Promise<boolean> {
   if (user.role === 'admin') return true;
 
+  if (!(await userHasTeamAccess(user, teamId))) return false;
+
   const round = await getActiveRoundForTeam(teamId);
   if (!round) return false;
+
+  // Closed cycle = archive: anyone with team access can view every prior stage
+  // (writes stay blocked via assertPipelineWritable / edit locks).
+  if (round.status === 'closed') {
+    return user.role === 'exec' || user.role === 'ad_hoc_exec';
+  }
 
   const statusForStage =
     stage === 'deliberations'
@@ -126,8 +139,7 @@ export async function canUserAccessTeamStage(
           : 'application';
 
   if (!isRoundAtOrPastStatus(round.status, statusForStage)) return false;
-  // Closed cycles are view-only archives: all prior stages stay accessible for reads.
-  if (round.status !== 'closed' && !(await isStageUnlocked(round.id, stage))) return false;
+  if (!(await isStageUnlocked(round.id, stage))) return false;
 
   const granted = await getGrantedStagesForUser(user, teamId);
   if (granted === 'all') {

@@ -22,7 +22,7 @@ import {
   getInterviewOnlyScope,
   getRoundStageUnlocks,
 } from '@/lib/stage-access';
-import { assignmentStageLabel, phaseLabel, statusIndex } from '@/lib/stages';
+import { assignmentStageLabel, phaseLabel, statusIndex, UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 import { getTeamStageProgress, listGraderAssignments } from '@/lib/team-dashboard';
 
@@ -50,10 +50,15 @@ export async function GET(req: NextRequest) {
     const unlocks = await getRoundStageUnlocks(round.id);
     const granted = await getGrantedStagesForUser(user, teamId);
     const interviewOnlyStage = await getInterviewOnlyScope(user, teamId);
-    const unlockedStages =
-      globalState.unlockedStages.length > 0
+    const archiveBrowse =
+      (globalState.status === 'closed' || displayStatus === 'closed') &&
+      (granted === 'all' || granted.length > 0);
+    const unlockedStages = archiveBrowse
+      ? [...UNLOCKABLE_STAGES]
+      : globalState.unlockedStages.length > 0
         ? globalState.unlockedStages
         : unlocks.map((u) => u.stage);
+    const grantedStages = archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted;
 
     const team = await getTeamById(teamId);
     const gradingEditLock = await getGradingEditLock(teamId, round.id, 'application');
@@ -159,8 +164,8 @@ export async function GET(req: NextRequest) {
         status: displayStatus,
         phaseLabel: phaseLabel(displayStatus),
         unlockedStages,
-        grantedStages: granted === 'all' ? 'all' : granted,
-        interviewOnlyStage,
+        grantedStages,
+        interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
       },
       work,
       summary: {

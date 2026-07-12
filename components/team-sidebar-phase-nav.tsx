@@ -51,6 +51,14 @@ function phaseAccessible(
   if (!globalStatus || !team.round) return false;
   const teamStatus = team.round.status;
   const unlockKey = PIPELINE_PHASES.find((p) => p.status === phase)?.unlockKey;
+
+  // Closed archive: any team access unlocks every prior phase for browsing.
+  if (globalStatus === 'closed' || teamStatus === 'closed') {
+    if (team.grantedStages === 'all') return true;
+    if (team.grantedStages.length > 0) return true;
+    return false;
+  }
+
   if (!isRoundAtOrPast(teamStatus, phase)) return false;
   if (unlockKey && !team.unlockedStages.includes(unlockKey)) return false;
   if (team.grantedStages === 'all') return true;

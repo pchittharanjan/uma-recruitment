@@ -407,9 +407,8 @@ export async function getGraderAssignmentForUser(
           FROM assignments a
           JOIN applications app ON app.id = a.application_id
           JOIN candidates c ON c.id = app.candidate_id
-          WHERE a.user_id = ? AND a.application_id = ? AND app.team_id = ? AND a.stage = ?
-            AND app.stage = ?`,
-    args: [userId, applicationId, teamId, stage, stage],
+          WHERE a.user_id = ? AND a.application_id = ? AND app.team_id = ? AND a.stage = ?`,
+    args: [userId, applicationId, teamId, stage],
   });
   if (result.rows.length === 0) return null;
   const row = result.rows[0];
@@ -461,9 +460,9 @@ export async function listGraderAssignments(
           JOIN applications app ON app.id = a.application_id
           JOIN candidates c ON c.id = app.candidate_id
           LEFT JOIN interview_slots islot ON islot.application_id = app.id AND islot.stage = a.stage
-          WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ? AND app.stage = ?
+          WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?
           ORDER BY islot.scheduled_at ASC, app.row_index ASC`,
-    args: [userId, teamId, stage, stage],
+    args: [userId, teamId, stage],
   });
   return result.rows.map((r) => ({
     assignmentId: r.assignment_id as number,

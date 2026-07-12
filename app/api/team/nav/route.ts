@@ -13,6 +13,7 @@ import {
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { unauthorized } from '@/lib/auth';
 import type { UnlockableStage } from '@/lib/stages';
+import { UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel, getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { isOrgFinalSelectionComplete } from '@/lib/org-final-selection-status';
 
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
 
     const teams = await getAccessibleTeams(user);
     const globalState = await getGlobalPipelineState();
+    const pipelineClosed = globalState.status === 'closed';
     const [recruitmentCycleLabel, recruitmentCycleShortLabel, finalSelectionComplete] =
       await Promise.all([
         getRecruitmentCycleLabel(),
@@ -37,6 +39,9 @@ export async function GET(req: NextRequest) {
         const granted = await getGrantedStagesForUser(user, team.id);
         const unlocks = round ? await getRoundStageUnlocks(round.id) : [];
         const interviewOnlyStage = await getInterviewOnlyScope(user, team.id);
+        const hasAnyAccess = granted === 'all' || granted.length > 0;
+        // Closed archive: everyone with team access can browse all phases (view-only).
+        const archiveBrowse = pipelineClosed && hasAnyAccess;
 
         return {
           id: team.id,
@@ -48,21 +53,20 @@ export async function GET(req: NextRequest) {
                 status: round.status,
               }
             : null,
-          grantedStages: granted === 'all' ? ('all' as const) : granted,
-          unlockedStages:
-            globalState.unlockedStages.length > 0
+          grantedStages: archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted,
+          unlockedStages: archiveBrowse
+            ? [...UNLOCKABLE_STAGES]
+            : globalState.unlockedStages.length > 0
               ? globalState.unlockedStages
               : unlocks.map((u) => u.stage),
-          interviewOnlyStage,
+          interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
         };
       }),
     );
 
-    const pipelineClosed = globalState.status === 'closed';
-
     return NextResponse.json({
       status: globalState.status,
-      unlockedStages: globalState.unlockedStages,
+      unlockedStages: pipelineClosed ? [...UNLOCKABLE_STAGES] : globalState.unlockedStages,
       teams: teamNav,
       isExec: user.role === 'exec',
       pipelineClosed,

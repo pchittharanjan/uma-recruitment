@@ -7,7 +7,7 @@ import { requireTeamPortalUser } from '@/lib/impersonation';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { getRoundStageUnlocks, getGrantedStagesForUser, getInterviewOnlyScope } from '@/lib/stage-access';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
-import { PIPELINE_PHASES, phaseLabel } from '@/lib/stages';
+import { PIPELINE_PHASES, phaseLabel, UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 
 export async function GET(req: NextRequest) {
@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
     const granted = await getGrantedStagesForUser(user, teamId);
     const interviewOnlyStage = await getInterviewOnlyScope(user, teamId);
     const recruitmentCycleLabel = await getRecruitmentCycleLabel();
+    const archiveBrowse =
+      (globalState.status === 'closed' || displayStatus === 'closed') &&
+      (granted === 'all' || granted.length > 0);
 
     return NextResponse.json({
       round: {
@@ -41,12 +44,13 @@ export async function GET(req: NextRequest) {
         phaseLabel: phaseLabel(displayStatus),
       },
       phases: PIPELINE_PHASES,
-      unlockedStages:
-        globalState.unlockedStages.length > 0
+      unlockedStages: archiveBrowse
+        ? [...UNLOCKABLE_STAGES]
+        : globalState.unlockedStages.length > 0
           ? globalState.unlockedStages
           : unlocks.map((u) => u.stage),
-      grantedStages: granted === 'all' ? 'all' : granted,
-      interviewOnlyStage,
+      grantedStages: archiveBrowse ? 'all' : granted === 'all' ? 'all' : granted,
+      interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
     });
   } catch (e) {
     console.error(e);
