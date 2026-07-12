@@ -851,8 +851,6 @@ export function TeamInterviewScheduleEditor({
     return <PageLoading />;
   }
 
-  const readOnly = data.round.status === 'closed';
-
   return (
     <PageContainer size="wide" className="space-y-8">
       <PageHeader
@@ -872,10 +870,10 @@ export function TeamInterviewScheduleEditor({
       />
 
       {error && <StatusBanner message={error} type="error" />}
-      {readOnly && (
+      {data.round.status === 'closed' && (
         <StatusBanner
           type="info"
-          message="Recruitment is closed. Schedule is view-only."
+          message="Recruitment is closed. Teams are view-only — you can still edit this schedule."
         />
       )}
 
@@ -894,7 +892,6 @@ export function TeamInterviewScheduleEditor({
                 id="interview-date"
                 type="date"
                 value={dayDate}
-                disabled={readOnly}
                 onChange={(e) => setDayDate(e.target.value)}
               />
             </div>
@@ -904,7 +901,6 @@ export function TeamInterviewScheduleEditor({
                 id="interview-start"
                 type="time"
                 value={dayStartTime}
-                disabled={readOnly}
                 onChange={(e) => setDayStartTime(e.target.value)}
               />
             </div>
@@ -917,7 +913,6 @@ export function TeamInterviewScheduleEditor({
                 max={120}
                 step={5}
                 value={blockMinutes}
-                disabled={readOnly}
                 onChange={(e) =>
                   setBlockMinutes(Number.parseInt(e.target.value, 10) || 30)
                 }
@@ -934,7 +929,7 @@ export function TeamInterviewScheduleEditor({
               size="sm"
               variant={daySettingsDirty ? 'primary' : 'secondary'}
               loading={savingDaySettings}
-              disabled={readOnly || !daySettingsDirty || savingDaySettings}
+              disabled={!daySettingsDirty || savingDaySettings}
               onClick={() => void saveDaySettings()}
             >
               {saveButtonLabel(savingDaySettings, daySettingsDirty, 'Save interview day')}
@@ -972,7 +967,7 @@ export function TeamInterviewScheduleEditor({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={readOnly || saving || simulating}
+                      disabled={saving || simulating}
                     />
                   }
                   triggerLabel="Simulate schedule"
@@ -1154,7 +1149,7 @@ export function TeamInterviewScheduleEditor({
               ref={scheduleBottomRef}
               className="flex flex-wrap items-center justify-end gap-2 border-t border-border/40 px-4 py-3"
             >
-              <Button type="button" variant="outline" size="sm" onClick={addSession} disabled={readOnly}>
+              <Button type="button" variant="outline" size="sm" onClick={addSession}>
                 Add interview slot
               </Button>
               <LoadingButton
@@ -1162,7 +1157,7 @@ export function TeamInterviewScheduleEditor({
                 onClick={handleSave}
                 loading={saving}
                 disabled={
-                  readOnly || !scheduleDirty || saving || scheduleValidation.messages.length > 0
+                  !scheduleDirty || saving || scheduleValidation.messages.length > 0
                 }
               >
                 {saveButtonLabel(saving, scheduleDirty, 'Save schedule')}

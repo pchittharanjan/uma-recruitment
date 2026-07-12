@@ -142,8 +142,15 @@ export function GlobalPhaseControls({
       };
       setState(nextState);
       if (json.status) {
-        onViewingStatusChange(json.status);
-        setViewingChecklist(json.checklist ?? []);
+        // Don't park the admin dashboard on the empty "Closed" overview.
+        const browseStatus =
+          json.status === 'closed' ? ('deliberations' as RoundStatus) : json.status;
+        onViewingStatusChange(browseStatus);
+        if (json.status === 'closed') {
+          void loadChecklistFor(browseStatus, nextState);
+        } else {
+          setViewingChecklist(json.checklist ?? []);
+        }
       }
       if (json.warnings?.length) {
         setNotices(json.warnings);
@@ -279,8 +286,9 @@ export function GlobalPhaseControls({
           Stage Locks (All teams)
         </p>
         <p className="mb-3 text-sm text-muted-foreground">
-          Uncheck a stage to stop graders from editing. This does not change global status — use the
-          button above to move everyone forward.
+          {state.status === 'closed'
+            ? 'Cycle is closed — teams are view-only. All prior phases stay open for you to browse and edit; grader stage locks no longer apply.'
+            : 'Uncheck a stage to stop graders from editing. This does not change global status — use the button above to move everyone forward.'}
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {unlockablePhases.map((phase) => {

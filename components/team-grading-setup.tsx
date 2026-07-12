@@ -19,6 +19,7 @@ interface RubricData {
   contextFields: string[];
   graderVisibleContextFields: string[];
   graderInstructions: string | null;
+  roundStatus?: string;
   readOnly?: boolean;
 }
 
@@ -154,8 +155,11 @@ export function TeamGradingSetup({
     <div className="space-y-4">
       {error && <StatusBanner message={error} type="error" />}
       {success && <StatusBanner message={success} type="success" />}
-      {rubric?.readOnly && (
-        <StatusBanner type="info" message="Recruitment is closed. Grading setup is view-only." />
+      {rubric?.roundStatus === 'closed' && (
+        <StatusBanner
+          type="info"
+          message="Recruitment is closed. Teams are view-only — you can still edit grading setup."
+        />
       )}
 
       {!rubric ? null : (
@@ -183,9 +187,8 @@ export function TeamGradingSetup({
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             rows={4}
-            disabled={Boolean(rubric.readOnly)}
             placeholder="e.g. Score holistically. Flag any concerns in the comments box."
-            className="w-full resize-y rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+            className="w-full resize-y rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </CardContent>
       </Card>
@@ -290,7 +293,7 @@ export function TeamGradingSetup({
       </Card>
 
       <div className="flex justify-end">
-        <LoadingButton onClick={handleSave} loading={saving} disabled={Boolean(rubric.readOnly)}>
+        <LoadingButton onClick={handleSave} loading={saving}>
           Save grading criteria
         </LoadingButton>
       </div>

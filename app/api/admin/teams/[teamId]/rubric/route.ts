@@ -47,7 +47,8 @@ export async function GET(
       roundId: round.id,
       roundLabel: round.label,
       roundStatus: round.status,
-      readOnly: round.status === 'closed',
+      // Admin retains write access after close; teams are view-only separately.
+      readOnly: false,
       csvHeaders: settings.csv_headers,
       scoreFields: orgMerged?.score_fields.length ? orgMerged.score_fields : settings.score_fields,
       customScoreFields: orgMerged?.custom_score_fields.length
@@ -86,10 +87,6 @@ export async function PUT(
     const round = await getActiveRoundForTeam(teamId);
     if (!round) {
       return NextResponse.json({ error: 'No active round for this team.' }, { status: 404 });
-    }
-
-    if (round.status === 'closed') {
-      return NextResponse.json({ error: 'Cannot edit rubric for a closed round.' }, { status: 409 });
     }
 
     const body = (await req.json()) as {

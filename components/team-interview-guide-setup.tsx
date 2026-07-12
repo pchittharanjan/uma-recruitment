@@ -176,7 +176,10 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
       {error && <StatusBanner message={error} type="error" />}
       {success && <StatusBanner message={success} type="success" />}
       {meta?.round.status === 'closed' && (
-        <StatusBanner type="info" message="Recruitment is closed. Interview guides are view-only." />
+        <StatusBanner
+          type="info"
+          message="Recruitment is closed. Teams are view-only — you can still edit interview guides."
+        />
       )}
 
       {!meta ? null : (
@@ -431,11 +434,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
       </Tabs>
 
       <div className="flex justify-end">
-        <LoadingButton
-          onClick={handleSave}
-          loading={saving}
-          disabled={meta?.round.status === 'closed'}
-        >
+        <LoadingButton onClick={handleSave} loading={saving}>
           Save {STAGE_LABELS[stage].toLowerCase()} guide
         </LoadingButton>
       </div>

@@ -289,8 +289,11 @@ export function parseDashboardViewPhase(
   viewParam: string | null,
   fallback: RoundStatus,
 ): RoundStatus {
-  if (!viewParam) return fallback;
-  return parseAdminPhaseSlug(viewParam) ?? fallback;
+  if (!viewParam) {
+    // Closed has no team overview — land admin on deliberations instead of an empty shell.
+    return fallback === 'closed' ? 'deliberations' : fallback;
+  }
+  return parseAdminPhaseSlug(viewParam) ?? (fallback === 'closed' ? 'deliberations' : fallback);
 }
 
 export function parseAdminPhaseSlug(slug: string): RoundStatus | null {

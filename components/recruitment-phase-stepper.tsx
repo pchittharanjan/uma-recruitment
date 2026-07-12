@@ -24,7 +24,12 @@ export function RecruitmentPhaseStepper({
 }: RecruitmentPhaseStepperProps) {
   const currentIdx = statusIndex(currentStatus);
   const activeSelection = selectedStatus ?? currentStatus;
-  const unlockSet = new Set(unlockedStages);
+  // After close, every prior stage stays browsable for admin (locks are grader-only).
+  const unlockSet = new Set(
+    currentStatus === 'closed'
+      ? PIPELINE_PHASES.map((p) => p.unlockKey).filter(Boolean)
+      : unlockedStages,
+  );
   const interactive = mode === 'admin' && Boolean(onSelectPhase);
 
   return (

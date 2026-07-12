@@ -200,8 +200,9 @@ export function AdminPhaseTeamOverview({
     return (
       <div className="rounded-xl border border-border/60 bg-card px-4 py-8 text-center shadow-xs">
         <p className="text-sm text-muted-foreground">
-          This recruitment cycle is closed. Team members are view-only. Admin can still browse prior
-          stages, send outcome emails, and make changes.
+          This recruitment cycle is closed. Team members are view-only. Use the phase stepper or
+          sidebar to browse Application through Deliberations — you can still edit and send outcome
+          emails.
           <br />
           Open Final selection for offers.
         </p>
