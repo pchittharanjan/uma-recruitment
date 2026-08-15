@@ -234,7 +234,8 @@ export function TeamPersonalDashboard({
     : 'Your work';
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={data.round.label}
         title={data.team.name}
@@ -266,7 +267,7 @@ export function TeamPersonalDashboard({
 
       {data.summary.totalAssigned > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card className="bg-linear-to-t from-primary/5 to-card shadow-xs">
+          <Card className="bg-linear-to-t from-primary/5 to-card">
             <CardHeader className="pb-2">
               <CardDescription>{statsCardLabel}</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -274,7 +275,7 @@ export function TeamPersonalDashboard({
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-linear-to-t from-primary/5 to-card shadow-xs">
+          <Card className="bg-linear-to-t from-primary/5 to-card">
             <CardHeader className="pb-2">
               <CardDescription>Completed</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -282,7 +283,7 @@ export function TeamPersonalDashboard({
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-linear-to-t from-primary/5 to-card shadow-xs">
+          <Card className="bg-linear-to-t from-primary/5 to-card">
             <CardHeader className="pb-2">
               <CardDescription>Pending</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -293,7 +294,7 @@ export function TeamPersonalDashboard({
         </div>
       )}
 
-      <PageSection className="space-y-6">
+      <div className="space-y-4">
         {data.work.length > 0 ? (
           data.work.map((area) => {
             const Icon = STAGE_ICONS[area.stage] ?? ClipboardListIcon;
@@ -325,7 +326,7 @@ export function TeamPersonalDashboard({
                 <CardHeader className="gap-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80 ring-1 ring-border/50">
                         <Icon className="size-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
@@ -360,7 +361,7 @@ export function TeamPersonalDashboard({
                     )}
 
                     {area.recentPending.length > 0 && (
-                      <ul className="divide-y divide-border/60 rounded-md border border-border/60">
+                      <ul className="divide-y divide-border/60 rounded-lg border border-border/60">
                         {area.recentPending.map((item) => (
                           <li
                             key={item.applicationId}
@@ -411,9 +412,9 @@ export function TeamPersonalDashboard({
             </CardHeader>
           </Card>
         )}
-      </PageSection>
+      </div>
 
-      <Card className="bg-muted/20">
+      <Card className="bg-muted/25">
         <CardHeader>
           <CardTitle className="text-base">Recruitment phases</CardTitle>
         </CardHeader>
@@ -425,6 +426,7 @@ export function TeamPersonalDashboard({
           />
         </CardContent>
       </Card>
+      </PageSection>
     </PageContainer>
   );
 }

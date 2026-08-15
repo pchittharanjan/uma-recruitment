@@ -116,14 +116,21 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
   };
 
   return (
-    <div className="display-panel px-3 py-2.5">
+    <div className="display-panel px-4 py-3">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <p className="text-sm font-medium">Recruitment cycle</p>
+        <div>
+          <p className="uma-section-label">Recruitment cycle</p>
+          {!open && !loading && (
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {semester === 'fall' ? 'Fall' : 'Spring'} {year}
+            </p>
+          )}
+        </div>
         <ChevronDownIcon
           className={cn(
             'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
@@ -133,7 +140,7 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
       </button>
 
       {open && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-2">
           {loading ? (
             <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
               <div className="w-[7.5rem] space-y-1">

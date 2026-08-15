@@ -12,7 +12,7 @@ const containerSizes: Record<ContainerSize, string> = {
 };
 
 const containerPadding =
-  'w-full px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-10 xl:px-14 2xl:px-16';
+  'w-full px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-9 xl:px-12 2xl:px-14';
 
 export function PageShell({
   children,
@@ -22,7 +22,7 @@ export function PageShell({
   className?: string;
 }) {
   return (
-    <div className={cn('min-h-screen bg-background', className)}>{children}</div>
+    <div className={cn('relative min-h-screen bg-background', className)}>{children}</div>
   );
 }
 
@@ -36,7 +36,14 @@ export function PageContainer({
   size?: ContainerSize;
 }) {
   return (
-    <div className={cn('mx-auto', containerPadding, containerSizes[size], className)}>
+    <div
+      className={cn(
+        'relative mx-auto',
+        containerPadding,
+        containerSizes[size],
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -64,7 +71,7 @@ export function PageContent({
   return <div className={cn(widths[width], className)}>{children}</div>;
 }
 
-/** Flat section surface — no border, no shadow. */
+/** Raised section surface — soft border, no heavy shadow. */
 export function PagePanel({
   children,
   className,
@@ -73,7 +80,12 @@ export function PagePanel({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-lg bg-card px-5 py-6 sm:px-8 sm:py-7', className)}>
+    <div
+      className={cn(
+        'uma-inset-surface rounded-xl px-5 py-5 sm:px-7 sm:py-6',
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -95,15 +107,26 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'flex flex-col gap-5 pb-2 sm:flex-row sm:items-end sm:justify-between',
+        'flex flex-col gap-4 pb-1 sm:flex-row sm:items-end sm:justify-between',
         className,
       )}
     >
       <div className="min-w-0 flex-1">
-        {eyebrow && <p className="text-sm text-muted-foreground">{eyebrow}</p>}
-        <h1 className={cn('text-2xl sm:text-[1.75rem]', eyebrow && 'mt-1')}>{title}</h1>
+        {eyebrow && (
+          <p className="uma-section-label mb-2">{eyebrow}</p>
+        )}
+        <h1
+          className={cn(
+            'font-heading text-[1.65rem] leading-tight tracking-tight sm:text-[1.85rem]',
+            eyebrow && 'mt-0',
+          )}
+        >
+          {title}
+        </h1>
         {description && (
-          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         )}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
@@ -116,7 +139,7 @@ export const PageSection = forwardRef<
   { children: React.ReactNode; className?: string }
 >(function PageSection({ children, className }, ref) {
   return (
-    <section ref={ref} className={cn('space-y-8', className)}>
+    <section ref={ref} className={cn('space-y-6', className)}>
       {children}
     </section>
   );

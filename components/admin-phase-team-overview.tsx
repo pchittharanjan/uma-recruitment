@@ -198,7 +198,7 @@ export function AdminPhaseTeamOverview({
 
   if (viewPhase === 'closed') {
     return (
-      <div className="rounded-xl border border-border/60 bg-card px-4 py-8 text-center shadow-xs">
+      <div className="uma-inset-surface rounded-xl px-4 py-8 text-center">
         <p className="text-sm text-muted-foreground">
           This recruitment cycle is closed. Team members are view-only. Use the phase stepper or
           sidebar to browse Application through Deliberations — you can still edit and send outcome
@@ -213,38 +213,41 @@ export function AdminPhaseTeamOverview({
   return (
     <div id="interview-overview" className="scroll-mt-6 space-y-4">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="uma-section-label">Team overview</p>
+        <h2 className="font-heading text-lg font-medium tracking-tight text-foreground">
+          {title}
+        </h2>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs">
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-[0_1px_0_rgba(26,24,22,0.03)]">
         <Table>
           <TableHeader>
-            <TableRow className="border-border/60 hover:bg-transparent">
-              <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <TableRow className="border-border/50 bg-muted/25 hover:bg-muted/25">
+              <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                 Team
               </TableHead>
               {viewPhase === 'application' && (
-                <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                   Grading
                 </TableHead>
               )}
               {isInterviewView && (
                 <>
-                  <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                     Scheduled
                   </TableHead>
-                  <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                     Interviews scored
                   </TableHead>
                 </>
               )}
               {viewPhase === 'deliberations' && (
-                <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                   Status
                 </TableHead>
               )}
-              <TableHead className="h-11 px-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="h-11 px-4 text-right text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                 {' '}
               </TableHead>
             </TableRow>

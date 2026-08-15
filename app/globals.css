@@ -56,37 +56,37 @@ body {
 }
 
 :root {
-  --background: #faf8f5;
+  --background: #f7f4ef;
   --foreground: #1a1816;
-  --card: #ffffff;
+  --card: #fffcf9;
   --card-foreground: #1a1816;
-  --popover: #ffffff;
+  --popover: #fffcf9;
   --popover-foreground: #1a1816;
   --primary: #ef9251;
   --primary-foreground: #ffffff;
-  --secondary: #f2efe9;
+  --secondary: #f0ebe3;
   --secondary-foreground: #3d3830;
-  --muted: #f5f2ee;
+  --muted: #f2eee8;
   --muted-foreground: #6b6560;
   --accent: #dd6a56;
   --accent-foreground: #ffffff;
   --destructive: #dd6a56;
   --destructive-foreground: #ffffff;
-  --border: rgba(26, 24, 22, 0.08);
-  --input: rgba(26, 24, 22, 0.06);
+  --border: rgba(26, 24, 22, 0.09);
+  --input: rgba(26, 24, 22, 0.07);
   --ring: #ef9251;
   --chart-1: #ef9251;
   --chart-2: #dd6a56;
   --chart-3: #9c5e8d;
   --chart-4: #5c59b6;
   --chart-5: #1a1816;
-  --radius: 0.5rem;
-  --sidebar: #f5f2ee;
+  --radius: 0.625rem;
+  --sidebar: #f3efe8;
   --sidebar-foreground: #1a1816;
   --sidebar-primary: #ef9251;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ede8e0;
-  --sidebar-accent-hover: #e0d9cf;
+  --sidebar-accent: #ebe4da;
+  --sidebar-accent-hover: #e0d7cb;
   --sidebar-accent-foreground: #1a1816;
   --sidebar-border: rgba(26, 24, 22, 0.08);
   --sidebar-ring: #ef9251;
@@ -96,8 +96,13 @@ body {
   --text-ui-xl: 1.5rem;
   --primary-hover: #d97e42;
   --primary-active: #c06f38;
-  --surface-raised: #ffffff;
+  --surface-raised: #fffcf9;
   --surface-hover: #ebe6de;
+  --brand-purple: #5c59b6;
+  --brand-magenta: #9c5e8d;
+  --brand-coral: #dd6a56;
+  --brand-orange: #ef9251;
+  --inset-ring: rgba(26, 24, 22, 0.06);
 }
 
 .dark {
@@ -160,11 +165,11 @@ body {
 
 @layer utilities {
   .display-field {
-    @apply rounded-md border border-border/60 bg-muted/50 p-3 text-sm;
+    @apply rounded-lg border border-border/70 bg-card/80 p-3 text-sm;
   }
 
   .display-panel {
-    @apply rounded-lg border border-border/60 bg-muted/50 p-4;
+    @apply rounded-xl border border-border/70 bg-card p-4 shadow-[0_1px_0_rgba(26,24,22,0.03)];
   }
 
   .field-textarea {
@@ -173,6 +178,29 @@ body {
 
   .surface-flat {
     @apply bg-card;
+  }
+
+  /* Soft brand atmosphere for app chrome — not full login mesh */
+  .uma-app-canvas {
+    background-color: var(--card);
+    background-image:
+      radial-gradient(ellipse 90% 55% at 0% -10%, rgba(92, 89, 182, 0.055), transparent 55%),
+      radial-gradient(ellipse 70% 45% at 100% 0%, rgba(239, 146, 81, 0.065), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 85% 100%, rgba(221, 106, 86, 0.035), transparent 55%);
+    box-shadow:
+      0 0 0 1px var(--inset-ring),
+      0 1px 2px rgba(26, 24, 22, 0.03);
+  }
+
+  .uma-inset-surface {
+    background-color: var(--card);
+    box-shadow:
+      0 0 0 1px var(--inset-ring),
+      0 1px 2px rgba(26, 24, 22, 0.03);
+  }
+
+  .uma-section-label {
+    @apply text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase;
   }
 
   .uma-marketing-gradient {
@@ -184,6 +212,27 @@ body {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* Primary CTA with light brand edge — used sparingly for key advances */
+  .uma-cta-primary {
+    border-color: rgba(221, 106, 86, 0.28) !important;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary) 92%, #dd6a56) 0%,
+      var(--primary) 100%
+    ) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 1px 2px rgba(26, 24, 22, 0.06);
+  }
+
+  .uma-cta-primary:hover:not(:disabled) {
+    background-image: linear-gradient(
+      135deg,
+      var(--primary-hover) 0%,
+      color-mix(in srgb, var(--primary-hover) 85%, #dd6a56) 100%
+    ) !important;
   }
 }
 
@@ -247,43 +296,56 @@ body {
   background-color: #ffffff;
 }
 
+/* Login hero blobs — plain CSS outside @layer so animations always ship. */
 @keyframes uma-blob-purple {
   0%,
   100% {
-    transform: translate3d(-4%, -3%, 0);
+    transform: translate3d(-14%, -10%, 0) scale(1.05);
   }
-  50% {
-    transform: translate3d(5%, 4%, 0);
+  33% {
+    transform: translate3d(12%, 8%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(6%, -14%, 0) scale(1);
   }
 }
 
 @keyframes uma-blob-magenta {
   0%,
   100% {
-    transform: translate3d(4%, -2%, 0);
+    transform: translate3d(12%, -8%, 0) scale(1.08);
   }
-  50% {
-    transform: translate3d(-5%, 5%, 0);
+  33% {
+    transform: translate3d(-14%, 12%, 0) scale(1);
+  }
+  66% {
+    transform: translate3d(-6%, 6%, 0) scale(1.14);
   }
 }
 
 @keyframes uma-blob-coral {
   0%,
   100% {
-    transform: translate3d(-3%, 5%, 0);
+    transform: translate3d(-10%, 14%, 0) scale(1);
   }
-  50% {
-    transform: translate3d(4%, -4%, 0);
+  33% {
+    transform: translate3d(14%, -10%, 0) scale(1.1);
+  }
+  66% {
+    transform: translate3d(-12%, -6%, 0) scale(1.06);
   }
 }
 
 @keyframes uma-blob-orange {
   0%,
   100% {
-    transform: translate3d(5%, 3%, 0);
+    transform: translate3d(14%, 10%, 0) scale(1.1);
   }
-  50% {
-    transform: translate3d(-4%, -5%, 0);
+  33% {
+    transform: translate3d(-10%, -12%, 0) scale(1.04);
+  }
+  66% {
+    transform: translate3d(8%, -8%, 0) scale(1.16);
   }
 }
 
@@ -310,36 +372,353 @@ body {
   grid-row: 2;
   justify-self: start;
   margin: 0 0 0 var(--login-title-offset, 0);
+  /* Centered stroke; paint-order keeps fill on top so the visible edge reads outside */
+  -webkit-text-stroke: 0.3mm #fff;
+  paint-order: stroke fill;
 }
 
 .uma-gradient-blob {
-  opacity: 0.72;
+  opacity: 0.9;
   will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .uma-gradient-blob-purple {
-  background: radial-gradient(ellipse 42% 38% at 22% 28%, #5c59b6 0%, transparent 68%);
-  animation: uma-blob-purple 20s ease-in-out infinite;
+  background: radial-gradient(ellipse 48% 44% at 22% 28%, #5c59b6 0%, #5c59b6 28%, transparent 70%);
+  animation: uma-blob-purple 17s ease-in-out infinite;
 }
 
 .uma-gradient-blob-magenta {
-  background: radial-gradient(ellipse 40% 36% at 58% 24%, #9c5e8d 0%, transparent 66%);
-  animation: uma-blob-magenta 17s ease-in-out infinite;
+  background: radial-gradient(ellipse 46% 42% at 58% 24%, #9c5e8d 0%, #9c5e8d 26%, transparent 68%);
+  animation: uma-blob-magenta 15s ease-in-out infinite;
 }
 
 .uma-gradient-blob-coral {
-  background: radial-gradient(ellipse 38% 40% at 34% 72%, #dd6a56 0%, transparent 68%);
+  background: radial-gradient(ellipse 44% 48% at 34% 72%, #dd6a56 0%, #dd6a56 28%, transparent 70%);
   animation: uma-blob-coral 19s ease-in-out infinite;
 }
 
 .uma-gradient-blob-orange {
-  background: radial-gradient(ellipse 36% 38% at 78% 68%, #ef9251 0%, transparent 66%);
-  animation: uma-blob-orange 15s ease-in-out infinite;
+  background: radial-gradient(ellipse 42% 44% at 78% 68%, #ef9251 0%, #ef9251 26%, transparent 68%);
+  animation: uma-blob-orange 16s ease-in-out infinite;
+}
+
+/* Film grain — login hero panel only */
+.uma-login-hero-grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.72;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='5' stitchTiles='stitch'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.35' intercept='-0.15'/%3E%3CfeFuncG type='linear' slope='1.35' intercept='-0.15'/%3E%3CfeFuncB type='linear' slope='1.35' intercept='-0.15'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+
+/*
+ * Login form errors — no always-on reserved height (that created huge empty gaps).
+ * API banner: only takes layout space when present (post-submit).
+ * Field errors: overlay into the FieldGroup gap so empty state is zero-height
+ * and showing an error doesn't shove the Sign in button (hover wipe stays put).
+ */
+.login-form-header {
+  position: relative;
+}
+
+/* Always one text-sm line (helper or error) — never changes form height. */
+.login-form-error-slot {
+  min-height: 1.25rem;
+}
+
+.login-form-error-banner {
+  margin: 0;
+}
+
+.login-form [data-slot='field'] {
+  position: relative;
+}
+
+.login-form-field-error-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.125rem);
+  z-index: 1;
+  min-height: 0;
+  pointer-events: none;
+  line-height: 1.25;
+}
+
+.login-form-field-error-slot [data-slot='field-error'] {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+/* Login form — inputs + Sign in gradient CTA */
+.login-form-input {
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  border-color: rgba(26, 24, 22, 0.1);
+  background-color: rgba(255, 255, 255, 0.9);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.login-form-input:hover:not(:disabled):not(:focus-visible):not([aria-invalid='true']) {
+  border-color: rgba(239, 146, 81, 0.32);
+  background-color: #fffaf6;
+}
+
+.login-form-input:focus-visible {
+  border-color: rgba(239, 146, 81, 0.55);
+  background-color: #ffffff;
+  box-shadow:
+    0 0 0 3px rgba(239, 146, 81, 0.16),
+    0 0 18px -6px rgba(221, 106, 86, 0.35);
+}
+
+/*
+ * Inline ghost-text autocomplete for @berkeley.edu
+ *
+ * Behind-the-input overlays fail when the native <input> keeps an opaque
+ * paint layer. Mirror typed + muted suffix in an overlay *above* the input
+ * (pointer-events: none) and hide the input's glyphs with transparent fill
+ * so only the caret/selection remain from the real control.
+ */
+.login-email-field {
+  position: relative;
+  isolation: isolate;
+}
+
+.login-form-input--ghosting {
+  position: relative;
+  z-index: 0;
+  /* Hide typed glyphs; overlay mirrors them. Keep caret visible. */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #1a1816;
+}
+
+.login-form-input--ghosting::placeholder {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.login-form-input--ghosting::selection {
+  /* Keep selection visible despite transparent text fill */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-color: rgba(239, 146, 81, 0.28);
+}
+
+.login-email-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  /* Match Input: 1px border + px-2.5, same type metrics */
+  box-sizing: border-box;
+  padding-inline: calc(0.625rem + 1px);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+@media (min-width: 768px) {
+  .login-email-ghost {
+    font-size: 0.875rem;
+  }
+}
+
+.login-email-ghost__typed {
+  color: #1a1816;
+  -webkit-text-fill-color: #1a1816;
+  user-select: none;
+}
+
+.login-email-ghost__suffix {
+  color: rgba(26, 24, 22, 0.38);
+  -webkit-text-fill-color: rgba(26, 24, 22, 0.38);
+  user-select: none;
+}
+
+.login-signin-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(221, 106, 86, 0.38) !important;
+  background-color: #fff8f2 !important;
+  background-image: none !important;
+  color: #1a1816 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(26, 24, 22, 0.04);
+  /* No scale/translate — those move the hit box and restart the wipe. */
+  transition:
+    border-color 0.58s cubic-bezier(0.65, 0, 0.35, 1),
+    box-shadow 0.58s cubic-bezier(0.65, 0, 0.35, 1),
+    color 0.43s cubic-bezier(0.65, 0, 0.35, 1) 0.18s;
+}
+
+/* Full brand gradient overlay — L→R clip wipe + subtle settle */
+.login-signin-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-image: linear-gradient(
+    135deg,
+    #5c59b6 0%,
+    #9c5e8d 35%,
+    #dd6a56 70%,
+    #ef9251 100%
+  );
+  background-size: 145% 145%;
+  background-position: 8% 42%;
+  opacity: 1;
+  /* Fully clipped from the right — cream shows through until wipe */
+  clip-path: inset(0 100% 0 0);
+  transform: scale(1.035);
+  transform-origin: center;
+  pointer-events: none;
+  /* Leave: reverse wipe R→L ~600ms; ease-in-out with snappy mid */
+  transition:
+    clip-path 0.6s cubic-bezier(0.65, 0, 0.35, 1),
+    transform 0.6s cubic-bezier(0.65, 0, 0.35, 1),
+    background-position 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.login-signin-button__label {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 1.5rem;
+}
+
+/* Stack idle + loading copy so label swaps never change button height */
+.login-signin-button__label-state {
+  grid-area: 1 / 1;
+}
+
+.login-signin-button__label-state--loading {
+  pointer-events: none;
+}
+
+.login-signin-button[data-loading='true'] {
+  cursor: wait;
+}
+
+.login-signin-button[data-loading='true']:hover,
+.login-signin-button[data-loading='true']:focus-visible {
+  /* Keep wipe filled while the request is in flight (still :hover-capable). */
+  border-color: transparent !important;
+  color: #ffffff !important;
+}
+
+.login-signin-button:hover:not(:disabled)::before,
+.login-signin-button:focus-visible:not(:disabled)::before {
+  clip-path: inset(0 0 0 0);
+  transform: scale(1);
+  background-position: 92% 58%;
+  /* Hover-in: ~700ms L→R wipe; ease-in-out with snappy mid */
+  transition:
+    clip-path 0.7s cubic-bezier(0.65, 0, 0.35, 1),
+    transform 0.73s cubic-bezier(0.33, 1, 0.68, 1),
+    background-position 0.77s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.login-signin-button:hover:not(:disabled),
+.login-signin-button:focus-visible:not(:disabled) {
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 2px 8px -2px rgba(92, 89, 182, 0.35);
+  /* White as wipe crosses mid-button */
+  transition:
+    border-color 0.68s cubic-bezier(0.65, 0, 0.35, 1),
+    box-shadow 0.68s cubic-bezier(0.65, 0, 0.35, 1),
+    color 0.55s cubic-bezier(0.65, 0, 0.35, 1) 0.18s;
+}
+
+.login-signin-button:active:not(:disabled)::before {
+  clip-path: inset(0 0 0 0);
+  transform: scale(1);
+  background-position: 92% 58%;
+  background-image: linear-gradient(
+    135deg,
+    #4a4799 0%,
+    #854f78 35%,
+    #c45545 70%,
+    #d97e42 100%
+  );
+  /* Press stays snappy */
+  transition:
+    clip-path 0.12s ease,
+    transform 0.12s ease,
+    background-position 0.12s ease;
+}
+
+.login-signin-button:active:not(:disabled) {
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 2px 6px rgba(26, 24, 22, 0.18);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    color 0.1s ease;
+}
+
+.login-signin-button:disabled {
+  border-color: rgba(26, 24, 22, 0.08) !important;
+  background-color: #f7f3ef !important;
+  background-image: none !important;
+  color: #6b6560 !important;
+  box-shadow: none;
+}
+
+.login-signin-button:disabled::before {
+  clip-path: inset(0 100% 0 0);
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .uma-gradient-blob {
+  .uma-gradient-blob-purple,
+  .uma-gradient-blob-magenta,
+  .uma-gradient-blob-coral,
+  .uma-gradient-blob-orange {
     animation: none;
+  }
+
+  .login-signin-button {
+    transition:
+      border-color 0.01s linear,
+      box-shadow 0.01s linear,
+      color 0.01s linear;
+  }
+
+  .login-signin-button::before,
+  .login-signin-button:hover:not(:disabled)::before,
+  .login-signin-button:focus-visible:not(:disabled)::before,
+  .login-signin-button:active:not(:disabled)::before {
+    transform: none;
+    background-position: 50% 50%;
+    transition: clip-path 0.01s linear;
   }
 }
 

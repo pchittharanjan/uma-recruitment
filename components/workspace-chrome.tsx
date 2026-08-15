@@ -199,7 +199,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {split ? (
-        <div className="flex h-12 shrink-0 items-stretch border-b border-border/50">
+        <div className="flex h-12 shrink-0 items-stretch border-b border-border/40 bg-card/40 backdrop-blur-[2px]">
           <div
             className="flex min-w-0 items-stretch pl-2 sm:pl-3"
             style={{ width: `${splitRatio}%` }}
@@ -238,7 +238,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : (
-        <div className="flex h-12 shrink-0 items-stretch border-b border-border/50 px-2 sm:px-3">
+        <div className="flex h-12 shrink-0 items-stretch border-b border-border/40 bg-card/40 px-2 backdrop-blur-[2px] sm:px-3">
           <WorkspaceTabBar
             tabs={tabs}
             activeHref={activeHref}

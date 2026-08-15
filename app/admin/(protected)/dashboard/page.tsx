@@ -139,6 +139,7 @@ function AdminDashboardContent() {
     <PageContainer>
       <PageSection>
         <PageHeader
+          eyebrow="Admin"
           title={firstName ? `Welcome back, ${firstName}` : 'Welcome back'}
           description="Overall status across all teams"
           actions={

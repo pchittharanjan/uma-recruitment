@@ -42,12 +42,12 @@ function TeamShellInner({
         isImpersonating={isImpersonating}
         variant="inset"
       />
-      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
+      <SidebarInset className="uma-app-canvas min-h-0 min-w-0 overflow-hidden bg-transparent md:peer-data-[variant=inset]:shadow-none">
         <ImpersonationBanner />
         <SidebarTrigger
           className={cn(
             'fixed top-3.5 left-3.5 z-20 md:hidden',
-            'size-8 border border-border/60 bg-background/90 shadow-sm backdrop-blur-sm',
+            'size-8 border border-border/50 bg-card/90 shadow-sm backdrop-blur-md',
           )}
         />
         <PipelineClosedBanner statusUrl="/api/team/nav" />

@@ -11,31 +11,36 @@ export default function LoginPage() {
 
       <div className="relative z-10 grid min-h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <section className="relative flex min-h-[28vh] flex-col justify-center overflow-hidden bg-[#9c5e8d] px-6 py-10 text-white sm:min-h-[34vh] sm:px-10 lg:min-h-svh lg:px-12 xl:px-16 2xl:px-20">
-          <div aria-hidden className="uma-marketing-gradient pointer-events-none absolute inset-0" />
+          {/* Soft base only — animated blobs carry the color motion */}
           <div
             aria-hidden
-            className="uma-gradient-blob uma-gradient-blob-purple pointer-events-none absolute -inset-[35%]"
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,#5c59b6_0%,#9c5e8d_40%,#dd6a56_75%,#ef9251_100%)] opacity-55"
           />
           <div
             aria-hidden
-            className="uma-gradient-blob uma-gradient-blob-magenta pointer-events-none absolute -inset-[35%]"
+            className="uma-gradient-blob uma-gradient-blob-purple pointer-events-none absolute -inset-[40%]"
           />
           <div
             aria-hidden
-            className="uma-gradient-blob uma-gradient-blob-coral pointer-events-none absolute -inset-[35%]"
+            className="uma-gradient-blob uma-gradient-blob-magenta pointer-events-none absolute -inset-[40%]"
           />
           <div
             aria-hidden
-            className="uma-gradient-blob uma-gradient-blob-orange pointer-events-none absolute -inset-[35%]"
+            className="uma-gradient-blob uma-gradient-blob-coral pointer-events-none absolute -inset-[40%]"
+          />
+          <div
+            aria-hidden
+            className="uma-gradient-blob uma-gradient-blob-orange pointer-events-none absolute -inset-[40%]"
           />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.1),transparent_45%)]" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(0,0,0,0.1),transparent_50%)]" />
+          <div aria-hidden className="uma-login-hero-grain" />
           {/*
             Hero copy grid — logo column is the rendered logo width at h-7 (28px):
             28 × (730 ÷ 838) ≈ 24.39px. Logo and h1 both start on column line 1.
           */}
           <div
-            className="login-hero-grid relative max-w-2xl"
+            className="login-hero-grid relative z-[2] max-w-2xl"
             style={{
               ['--login-logo-width' as string]: 'calc(1.75rem * 730 / 838)',
               ['--login-col-gap' as string]: '0.625rem',

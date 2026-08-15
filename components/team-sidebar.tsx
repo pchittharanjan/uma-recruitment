@@ -26,13 +26,13 @@ import { ClipboardListIcon } from 'lucide-react';
 
 function BrandLogo() {
   return (
-    <div className="flex size-4 shrink-0 items-center justify-center">
+    <div className="flex size-5 shrink-0 items-center justify-center">
       <Image
         src="/uma-logo.png"
         alt=""
-        width={16}
-        height={16}
-        className="max-h-4 max-w-4 object-contain brightness-0"
+        width={20}
+        height={20}
+        className="max-h-5 max-w-5 object-contain brightness-0"
       />
     </div>
   );
@@ -57,17 +57,17 @@ export function TeamSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="shrink-0 gap-1 p-2">
+      <SidebarHeader className="shrink-0 gap-1 border-b border-sidebar-border/60 p-2 pb-3">
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:hidden">
           <SidebarMenu className="min-w-0 flex-1">
             <SidebarMenuItem>
               <SidebarMenuButton
-                className="h-8 w-full justify-start gap-2 hover:bg-transparent active:bg-transparent"
+                className="h-9 w-full justify-start gap-2.5 hover:bg-transparent active:bg-transparent"
                 tooltip={mounted ? 'Recruitment Hub' : undefined}
                 render={<Link href="/team" />}
               >
                 <BrandLogo />
-                <span className="truncate text-sm font-semibold leading-none tracking-tight">
+                <span className="truncate text-[0.9375rem] font-semibold leading-none tracking-tight">
                   Recruitment Hub
                 </span>
               </SidebarMenuButton>

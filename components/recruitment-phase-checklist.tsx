@@ -134,14 +134,14 @@ export function RecruitmentPhaseChecklist({
 
   return (
     <Collapsible open={panelOpen} onOpenChange={handlePanelOpenChange}>
-      <div className="rounded-lg border border-border/60 bg-background">
+      <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20">
         <CollapsibleTrigger
-          className="flex w-full cursor-pointer items-start justify-between gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full cursor-pointer items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-controls={panelId}
         >
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="font-heading text-sm font-semibold text-foreground">{title}</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {preview
                 ? 'Preview — tasks for this phase before you advance.'
                 : panelOpen
