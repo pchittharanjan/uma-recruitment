@@ -4,7 +4,23 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Label({ className, ...props }: React.ComponentProps<"label">) {
+function RequiredAsterisk({ className }: { className?: string }) {
+  return (
+    <>
+      <span className="sr-only">required</span>
+      <span className={cn("text-destructive", className)} aria-hidden="true">
+        *
+      </span>
+    </>
+  )
+}
+
+function Label({
+  className,
+  children,
+  required = false,
+  ...props
+}: React.ComponentProps<"label"> & { required?: boolean }) {
   return (
     <label
       data-slot="label"
@@ -13,8 +29,17 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
         className
       )}
       {...props}
-    />
+    >
+      {required ? (
+        <span className="inline-flex items-baseline gap-0.5">
+          {children}
+          <RequiredAsterisk />
+        </span>
+      ) : (
+        children
+      )}
+    </label>
   )
 }
 
-export { Label }
+export { Label, RequiredAsterisk }

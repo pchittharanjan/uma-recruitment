@@ -69,7 +69,9 @@ export function LoginForm({
         )}
 
         <Field>
-          <FieldLabel htmlFor="email">Berkeley email</FieldLabel>
+          <FieldLabel htmlFor="email" required>
+            Berkeley email
+          </FieldLabel>
           <Input
             id="email"
             type="email"
@@ -82,7 +84,9 @@ export function LoginForm({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <FieldLabel htmlFor="password" required>
+            Password
+          </FieldLabel>
           <div className="relative">
             <Input
               id="password"

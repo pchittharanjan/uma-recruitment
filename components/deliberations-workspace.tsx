@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PlusIcon, XIcon } from 'lucide-react';
+import { Columns2Icon, PlusIcon, XIcon } from 'lucide-react';
 import { DeliberationsTeamBoard } from '@/components/deliberations-team-board';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader } from '@/components/page-shell';
@@ -49,6 +49,10 @@ export function DeliberationsWorkspace() {
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   /** Tabs that have been focused at least once — stay mounted so unsaved board state is kept. */
   const [mountedTabIds, setMountedTabIds] = useState<number[]>([]);
+  const [split, setSplit] = useState(false);
+  const [splitTabId, setSplitTabId] = useState<number | null>(null);
+  const [splitRatio, setSplitRatio] = useState(50);
+  const splitDragRef = useRef<{ startX: number; startRatio: number } | null>(null);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
@@ -161,6 +165,7 @@ export function DeliberationsWorkspace() {
       return next;
     });
     setMountedTabIds((prev) => prev.filter((id) => id !== teamId));
+    setSplitTabId((current) => (current === teamId ? null : current));
   }, []);
 
   const handleTeamMeta = useCallback((meta: { id: number; name: string }) => {
@@ -181,7 +186,33 @@ export function DeliberationsWorkspace() {
         title="Deliberations"
         description="Open team boards in tabs. Drag people into Accept, save progress, then Complete final selection to lock offers — you’ll email acceptees and rejections next."
         actions={
-          <DropdownMenu>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant={split ? 'secondary' : 'outline'}
+              size="sm"
+              disabled={openTabIds.length < 2}
+              title={openTabIds.length < 2 ? 'Open two teams to split' : 'Split boards'}
+              onClick={() => {
+                setSplit((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    const other = openTabIds.find((id) => id !== activeTabId) ?? openTabIds[0] ?? null;
+                    setSplitTabId(other);
+                    if (other != null) {
+                      setMountedTabIds((mounted) =>
+                        mounted.includes(other) ? mounted : [...mounted, other],
+                      );
+                    }
+                  }
+                  return next;
+                });
+              }}
+            >
+              <Columns2Icon data-icon="inline-start" />
+              Split
+            </Button>
+            <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button type="button" variant="outline" size="sm" disabled={teamsLoading} />
@@ -204,6 +235,7 @@ export function DeliberationsWorkspace() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         }
       />
 
@@ -270,9 +302,9 @@ export function DeliberationsWorkspace() {
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+        <div className={cn('min-h-0 flex-1', split && openTabIds.length > 0 ? 'flex overflow-hidden' : 'overflow-auto p-4 sm:p-5')}>
           {openTabIds.length === 0 ? (
-            <div className="flex flex-col items-start gap-3 py-8">
+            <div className="flex flex-col items-start gap-3 p-4 py-8 sm:p-5">
               <p className="text-sm text-muted-foreground">
                 Open a team board to start deliberations. You can keep several boards open and
                 switch between them like browser tabs.
@@ -298,6 +330,78 @@ export function DeliberationsWorkspace() {
                 </p>
               )}
             </div>
+          ) : split ? (
+            <>
+              <div className="min-h-0 overflow-auto p-4 sm:p-5" style={{ width: `${splitRatio}%` }}>
+                {activeTabId != null && mountedTabIds.includes(activeTabId) && (
+                  <DeliberationsTeamBoard
+                    teamId={activeTabId}
+                    onTeamMeta={handleTeamMeta}
+                    canSave
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Resize split"
+                className="w-1.5 shrink-0 cursor-ew-resize bg-border hover:bg-primary/60"
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.preventDefault();
+                  splitDragRef.current = { startX: event.clientX, startRatio: splitRatio };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  const drag = splitDragRef.current;
+                  if (!drag) return;
+                  const parent = event.currentTarget.parentElement;
+                  if (!parent) return;
+                  const deltaPct = ((event.clientX - drag.startX) / parent.clientWidth) * 100;
+                  setSplitRatio(Math.min(75, Math.max(25, drag.startRatio + deltaPct)));
+                }}
+                onPointerUp={(event) => {
+                  splitDragRef.current = null;
+                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
+                }}
+              />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5">
+                  <p className="text-xs text-muted-foreground">Right</p>
+                  <select
+                    aria-label="Right board"
+                    className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                    value={splitTabId ?? ''}
+                    onChange={(event) => {
+                      const nextId = Number.parseInt(event.target.value, 10);
+                      if (!Number.isFinite(nextId)) return;
+                      setSplitTabId(nextId);
+                      setMountedTabIds((prev) =>
+                        prev.includes(nextId) ? prev : [...prev, nextId],
+                      );
+                    }}
+                  >
+                    {openTabIds
+                      .filter((id) => id !== activeTabId)
+                      .map((id) => (
+                        <option key={id} value={id}>
+                          {teamNames[id] ?? `Team ${id}`}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+                  {splitTabId != null && splitTabId !== activeTabId && (
+                    <DeliberationsTeamBoard
+                      teamId={splitTabId}
+                      onTeamMeta={handleTeamMeta}
+                      canSave
+                    />
+                  )}
+                </div>
+              </div>
+            </>
           ) : (
             openTabIds.map((teamId) => {
               const isActive = teamId === activeTabId;

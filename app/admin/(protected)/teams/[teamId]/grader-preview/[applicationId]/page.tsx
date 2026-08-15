@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import LoadingButton from '@/components/loading-button';
 import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
+import { RequiredAsterisk } from '@/components/ui/label';
 import { applicantDisplayId } from '@/lib/blind';
 
 interface PreviewData {
@@ -147,6 +148,7 @@ export default function AdminGraderPreviewPage({
             <Card key={field} className="p-4 sm:p-5 opacity-90">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
+                <RequiredAsterisk className="ml-0.5" />
               </p>
               <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
                 {data.fields[field] ? (
@@ -166,6 +168,7 @@ export default function AdminGraderPreviewPage({
             <Card key={`custom:${field}`} className="p-4 sm:p-5 opacity-90">
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
+                <RequiredAsterisk className="ml-0.5" />
               </p>
               <div className="border-t border-border/60 pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>

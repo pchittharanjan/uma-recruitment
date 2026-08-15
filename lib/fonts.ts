@@ -6,8 +6,9 @@ export const absans = localFont({
   display: 'swap',
 });
 
-export const mugler = localFont({
-  src: '../public/fonts/Mugler-Regular.otf',
-  variable: '--font-mugler',
+/** Body copy — Futura Std Book. */
+export const futuraStd = localFont({
+  src: '../public/fonts/FuturaStd-Book.otf',
+  variable: '--font-futura-std',
   display: 'swap',
 });

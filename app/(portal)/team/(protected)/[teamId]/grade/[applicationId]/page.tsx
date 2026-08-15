@@ -11,6 +11,7 @@ import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { applicantDisplayId } from '@/lib/blind';
 import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
+import { RequiredAsterisk } from '@/components/ui/label';
 import {
   invalidateGradeData,
   loadGradeData,
@@ -291,6 +292,7 @@ export default function TeamGradingScorePage({
             >
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
+                <RequiredAsterisk className="ml-0.5" />
               </p>
               <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
                 {appData.fields[field] ? (
@@ -321,6 +323,7 @@ export default function TeamGradingScorePage({
             >
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
                 {field}
+                <RequiredAsterisk className="ml-0.5" />
               </p>
               <div className="border-t border-border/60 pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>

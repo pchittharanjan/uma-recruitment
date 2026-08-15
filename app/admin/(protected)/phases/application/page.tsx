@@ -17,8 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { phasePageEyebrow, type UnlockableStage } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
-import type { UnlockableStage } from '@/lib/stages';
 import { cn } from '@/lib/utils';
 
 interface TeamRound {
@@ -124,7 +124,7 @@ export default function ApplicationPhasePage() {
   return (
     <PageContainer className="space-y-8">
       <PageHeader
-        eyebrow="Application phase"
+        eyebrow={phasePageEyebrow('application')}
         title="Grading progress"
         description="Blind application review across teams."
         actions={

@@ -1,20 +1,23 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { CircleArrowRightIcon } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { RoundStatus } from '@/lib/db';
-import { phaseLabel } from '@/lib/stages';
+import {
+  getPhaseTourContent,
+  phaseOpenedCtaLabel,
+  phaseWelcomeHeadline,
+} from '@/lib/phase-tours';
+import { cn } from '@/lib/utils';
 
-const DISMISS_KEY_PREFIX = 'uma-phase-opened-dismissed:';
+const DISMISS_KEY_PREFIX = 'uma-phase-opened-v2:';
 
 function dismissKey(cycleLabel: string, status: RoundStatus) {
   return `${DISMISS_KEY_PREFIX}${cycleLabel}:${status}`;
@@ -33,42 +36,15 @@ export function isAnnounceablePhase(status: RoundStatus): boolean {
   return ANNOUNCEABLE_PHASES.includes(status);
 }
 
-export function phaseOpenedCtaLabel(status: RoundStatus): string {
-  switch (status) {
-    case 'pre_application':
-      return 'View coffee chats';
-    case 'application':
-      return 'Start grading';
-    case 'first_round':
-      return 'Go to First Round';
-    case 'final_round':
-      return 'Go to Final Round';
-    case 'deliberations':
-      return 'Open deliberations';
-    default:
-      return 'Continue';
-  }
-}
+export { phaseOpenedCtaLabel };
 
-function phaseOpenedDescription(status: RoundStatus): string {
-  switch (status) {
-    case 'pre_application':
-      return 'Coffee Chats are open. Log chats and get ready for applications.';
-    case 'application':
-      return 'Application grading is open. Review the apps assigned to you.';
-    case 'first_round':
-      return 'First Round interviews are open. Score your assigned slots.';
-    case 'final_round':
-      return 'Final Round interviews are open. Score your assigned slots.';
-    case 'deliberations':
-      return 'Deliberations are open. Review candidates and explore placements.';
-    default:
-      return 'A new recruitment phase is open. Continue where the team needs you.';
-  }
+function isOnDestination(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  return href !== '/' && pathname.startsWith(`${href}/`);
 }
 
 /**
- * Single-CTA dialog (blocks-so dialog-01 style) when a pipeline phase opens.
+ * Welcome dialog when a pipeline phase opens — greeting, one-line context, single CTA.
  * No confetti — that stays reserved for final selection.
  */
 export function PhaseOpenedDialog({
@@ -76,17 +52,21 @@ export function PhaseOpenedDialog({
   status,
   cycleLabel,
   href,
+  userName,
   onOpenChange,
 }: {
   open: boolean;
   status: RoundStatus;
   cycleLabel: string;
   href: string;
+  userName: string;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const label = phaseLabel(status);
-  const cta = phaseOpenedCtaLabel(status);
+  const pathname = usePathname();
+  const tour = getPhaseTourContent(status);
+  const Icon = tour?.icon;
+  const headline = phaseWelcomeHeadline(userName, status);
 
   const dismiss = () => {
     try {
@@ -99,36 +79,59 @@ export function PhaseOpenedDialog({
 
   const goToPhase = () => {
     dismiss();
-    router.push(href);
+    if (!isOnDestination(pathname, href)) {
+      router.push(href);
+    }
   };
 
   return (
     <Dialog
       open={open}
+      disablePointerDismissal
       onOpenChange={(next) => {
-        if (!next) dismiss();
-        else onOpenChange(true);
+        if (next) onOpenChange(true);
       }}
     >
-      <DialogContent className="flex flex-col items-center sm:max-w-sm">
-        <div className="flex justify-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-100">
-            <CircleArrowRightIcon className="h-6 w-6 text-sky-700" />
-          </div>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-black/40"
+        className="gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-xl"
+      >
+        <div aria-hidden className="uma-marketing-gradient h-1.5 w-full opacity-90" />
+
+        <div className="space-y-4 px-8 pt-8 pb-2">
+          <DialogHeader className="gap-4 text-left">
+            <div className="flex items-start gap-3.5">
+              {Icon && tour ? (
+                <div
+                  className={cn(
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
+                    tour.ringClass,
+                  )}
+                >
+                  <Icon className={cn('h-5 w-5', tour.iconClass)} />
+                </div>
+              ) : null}
+              <div className="min-w-0 pt-0.5">
+                <DialogTitle className="text-balance text-left text-xl leading-snug">
+                  {headline}
+                </DialogTitle>
+              </div>
+            </div>
+
+            {tour ? (
+              <DialogDescription className="text-pretty text-left text-sm leading-relaxed">
+                {tour.message}
+              </DialogDescription>
+            ) : null}
+          </DialogHeader>
         </div>
 
-        <DialogHeader className="gap-0 text-center">
-          <DialogTitle className="text-balance text-center">{label} is open</DialogTitle>
-          <DialogDescription className="mx-auto mt-2 text-pretty text-center sm:max-w-[90%]">
-            {phaseOpenedDescription(status)}
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter className="w-full sm:justify-center">
-          <Button type="button" className="w-full" onClick={goToPhase}>
-            {cta}
+        <div className="flex justify-center px-8 pt-6 pb-8">
+          <Button type="button" className="h-11 px-8 text-base" onClick={goToPhase}>
+            {phaseOpenedCtaLabel(status)}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

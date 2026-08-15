@@ -8,7 +8,8 @@ import StatusBanner from '@/components/status-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label, RequiredAsterisk } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { InterviewGuide, InterviewGuideFormat, InterviewGuideStage } from '@/lib/interview-guide';
@@ -168,7 +169,21 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
   };
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading interview setup…</p>;
+    return (
+      <div className="space-y-6" role="status" aria-label="Loading">
+        <Skeleton className="h-9 w-72" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Interview guide</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -248,7 +263,10 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
             {guides[s].format === 'questions' ? (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <CardTitle className="text-base">Questions</CardTitle>
+                  <CardTitle className="text-base">
+                    Questions
+                    <RequiredAsterisk className="ml-0.5" />
+                  </CardTitle>
                   <Button
                     type="button"
                     variant="outline"
@@ -332,7 +350,9 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`case-prompt-${s}`}>Prompt</Label>
+                    <Label htmlFor={`case-prompt-${s}`} required>
+                      Prompt
+                    </Label>
                     <textarea
                       id={`case-prompt-${s}`}
                       value={guides[s].caseStudy?.prompt ?? ''}

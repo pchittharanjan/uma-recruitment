@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { absans, mugler } from '@/lib/fonts';
+import { absans, futuraStd } from '@/lib/fonts';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${absans.variable} ${mugler.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${absans.variable} ${futuraStd.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <TooltipProvider>
           {children}

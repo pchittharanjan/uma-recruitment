@@ -5,6 +5,8 @@ import Link from 'next/link';
 import StatusBanner from '@/components/status-banner';
 import { CoffeeChatDateSettings } from '@/components/coffee-chat-date-settings';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { Skeleton } from '@/components/ui/skeleton';
+import { phasePageEyebrow } from '@/lib/stages';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -64,9 +66,9 @@ export default function AdminCoffeeChatsPage() {
   return (
     <PageContainer className="space-y-8">
       <PageHeader
-        eyebrow="Coffee Chats"
-        title="Coffee Chats"
-        description="Centralized coffee chat intake submissions across all users."
+        eyebrow={phasePageEyebrow('pre_application')}
+        title="Intake submissions"
+        description="Notes from all members."
         actions={
           <Link
             href="/coffee-chats"
@@ -86,15 +88,46 @@ export default function AdminCoffeeChatsPage() {
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
             <div>
               <CardTitle>Submissions</CardTitle>
-              <CardDescription>{chats.length} Coffee Chat submission(s)</CardDescription>
+              {chats.length > 0 && (
+                <CardDescription>
+                  {chats.length} submission{chats.length === 1 ? '' : 's'}
+                </CardDescription>
+              )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-hidden">
             {error && <StatusBanner type="error" message={error} />}
             {!hasMounted || loading ? (
-              <p className="text-sm text-muted-foreground">Loading submissions…</p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Submitter</TableHead>
+                    <TableHead className="w-[100px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-28" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-12" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : chats.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No coffee chats logged yet.</p>
+              <p className="text-sm text-muted-foreground">Nothing logged yet.</p>
             ) : (
               <Table>
                 <TableHeader>

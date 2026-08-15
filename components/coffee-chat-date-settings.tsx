@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface DateSettingsResponse {
@@ -63,7 +64,7 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
       }
       applyLoadedDates(json);
     } catch {
-      setError('Failed to Load Coffee Chat Dates.');
+      setError('Failed to load dates.');
     } finally {
       setLoading(false);
     }
@@ -102,10 +103,10 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
       setRoundCount(savedRounds);
       setSuccess(
         savedRounds > 0
-          ? `Coffee Chat Dates Saved and applied to ${savedRounds} active round(s).`
-          : 'Coffee chat dates saved and ready for centralized intake.',
+          ? `Saved for all ${savedRounds} teams.`
+          : 'Ready for intake.',
       );
-      toast.success('Coffee chat dates saved.');
+      toast.success('Dates saved.');
       onSaved?.();
     } catch {
       setError('Network error.');
@@ -114,10 +115,6 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading date settings…</p>;
-  }
 
   return (
     <div className="display-panel">
@@ -140,15 +137,30 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
 
       {open && (
         <div className="mt-4 space-y-4">
+          {loading ? (
+            <div className="grid gap-4 sm:grid-cols-2" role="status" aria-label="Loading">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            </div>
+          ) : (
+            <>
           {roundCount === 0 && (
             <p className="text-sm text-muted-foreground">
-              No active rounds yet. Saving dates now will initialize the coffee chat phase.
+              No teams set up yet. Saving will initialize this phase for every team.
             </p>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="coffeeChatStartDate">Coffee Chats open</Label>
+              <Label htmlFor="coffeeChatStartDate" required>
+                Opens
+              </Label>
               <Input
                 id="coffeeChatStartDate"
                 type="date"
@@ -157,7 +169,9 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="applicationDueDate">Coffee Chats close</Label>
+              <Label htmlFor="applicationDueDate" required>
+                Closes
+              </Label>
               <Input
                 id="applicationDueDate"
                 type="date"
@@ -180,6 +194,8 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
 
           {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
+            </>
+          )}
         </div>
       )}
     </div>

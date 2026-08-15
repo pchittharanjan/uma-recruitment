@@ -409,11 +409,12 @@ async function buildDeliberationsChecklist(
   return [
     {
       id: 'delib-unlock',
-      title: 'Unlock Deliberations for exec',
-      description: 'Enable Deliberations access for Exec when teams are ready to review combined scores.',
+      title: 'Turn on Deliberations for execs',
+      description:
+        'Execs cannot open their team boards until Deliberations is checked under Stage access on the dashboard.',
       completed: delibsUnlocked,
-      actionLabel: 'Dashboard controls',
-      href: adminPhaseHref('deliberations'),
+      actionLabel: 'Go to dashboard',
+      href: `${adminPhaseHref('deliberations')}#stage-access`,
     },
     {
       id: 'delib-teams',

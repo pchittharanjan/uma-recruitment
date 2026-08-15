@@ -268,6 +268,5 @@ export function shouldShowBreadcrumbs(pathname: string): boolean {
   if (pathname === '/admin/final-selection' || pathname.startsWith('/admin/final-selection/')) {
     return true;
   }
-  if (pathname.startsWith('/team/')) return true;
   return false;
 }

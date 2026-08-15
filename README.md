@@ -31,7 +31,15 @@ npm install
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) — you'll be redirected to `/login`.
+Dev always binds to **port 3001** (webpack; more stable than Turbopack on this machine). Visit [http://localhost:3001/login](http://localhost:3001/login).
+
+If the server dies or the port is stuck:
+
+```bash
+npm run dev:restart
+```
+
+That only frees port 3001 for this app — it does not kill other projects' `next` processes. Optional Turbopack: `npm run dev:turbo`.
 
 ---
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -136,9 +135,7 @@ export function AdminSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Suspense fallback={null}>
-          <SidebarPhaseNav />
-        </Suspense>
+        <SidebarPhaseNav />
       </SidebarContent>
 
       <SidebarFooter>

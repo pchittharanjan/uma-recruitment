@@ -9,8 +9,9 @@ import LoadingButton from '@/components/loading-button';
 
 const ERASE_DESCRIPTION = (
   <>
-    This removes in-progress rounds, all imported applications and assignments, and
-    simulated <code className="text-xs">.test@berkeley.edu</code> grader accounts.
+    This removes all rounds (including a closed cycle), all imported applications and
+    assignments, coffee chat submissions, and simulated{' '}
+    <code className="text-xs">.test@berkeley.edu</code> grader accounts.
     <br />
     <br />
     This cannot be undone. After erasing, you can import again from the Import flow.

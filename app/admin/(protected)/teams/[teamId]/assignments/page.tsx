@@ -283,7 +283,9 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
             </p>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="newGrader">Assign to</Label>
+              <Label htmlFor="newGrader" required>
+                Assign to
+              </Label>
               <NativeSelect
                 id="newGrader"
                 value={newUserId ?? ''}

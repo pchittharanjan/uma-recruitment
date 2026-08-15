@@ -13,6 +13,7 @@ import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { Button } from '@/components/ui/button';
 import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
+import { RequiredAsterisk } from '@/components/ui/label';
 import { InterviewGuideDisplay } from '@/components/interview-guide-display';
 import type { InterviewGuide } from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
@@ -115,6 +116,7 @@ function ScoreFieldsForm({
         <Card key={field} className="p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
             {field}
+            <RequiredAsterisk className="ml-0.5" />
           </p>
           <div className="border-t border-border/60 pt-3">
             <p className="mb-2 text-sm text-muted-foreground">Score (1 = poor, 5 = excellent)</p>
@@ -130,6 +132,7 @@ function ScoreFieldsForm({
         <Card key={`custom:${field}`} className="p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
             {field}
+            <RequiredAsterisk className="ml-0.5" />
           </p>
           <div className="border-t border-border/60 pt-3">
             <p className="mb-2 text-sm text-muted-foreground">Score (1 = poor, 5 = excellent)</p>

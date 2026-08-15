@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
   SheetContent,
@@ -558,7 +559,11 @@ export default function AdminApplicationsPage() {
       >
         <SheetContent side="right" size="lg" className="overflow-y-auto">
           {!sheetApp ? (
-            <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+            <div className="space-y-4 px-4 py-6" role="status" aria-label="Loading">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-72" />
+              <Skeleton className="h-40 w-full" />
+            </div>
           ) : (
             <>
               <SheetHeader>
@@ -635,7 +640,12 @@ export default function AdminApplicationsPage() {
                     Application fields
                   </p>
                   {detailLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading application fields…</p>
+                    <div className="space-y-2" role="status" aria-label="Loading">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
+                      <Skeleton className="h-4 w-4/6" />
+                      <Skeleton className="h-24 w-full" />
+                    </div>
                   ) : detail ? (
                     <ApplicationFieldsList fields={detail.fields} />
                   ) : detailError ? (

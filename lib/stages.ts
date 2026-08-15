@@ -79,6 +79,12 @@ export function phaseLabel(status: RoundStatus): string {
   return PIPELINE_PHASES.find((p) => p.status === status)?.label ?? status;
 }
 
+/** Small label above page titles on phase-scoped views (e.g. "Application phase"). */
+export function phasePageEyebrow(status: RoundStatus): string {
+  if (status === 'closed') return 'Closed';
+  return `${phaseLabel(status)} phase`;
+}
+
 export function assignmentStageLabel(stage: AssignmentStage): string {
   switch (stage) {
     case 'application':
@@ -250,7 +256,7 @@ export const ADMIN_PHASE_SLUGS: Partial<Record<RoundStatus, string>> = {
 };
 
 const ADMIN_PHASE_PATH_PATTERNS: Partial<Record<RoundStatus, RegExp>> = {
-  pre_application: /^\/admin\/(?:coffee-chats|import)(?:\/|$)/,
+  pre_application: /^\/(?:admin\/coffee-chats|coffee-chats)(?:\/|$)|^\/admin\/import(?:\/|$)/,
   application: /^\/admin\/phases\/application(?:\/|$)/,
   first_round: /^\/admin\/teams\/\d+\/schedule\/first-round(?:\/|$)/,
   deliberations: /^\/admin\/deliberations(?:\/|$)/,

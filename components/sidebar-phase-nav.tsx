@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, type ComponentType } from 'react';
+import { type ComponentType } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useIsClient, useBrowserSearch } from '@/hooks/use-workspace-embed';
 import {
   CheckIcon,
   CoffeeIcon,
@@ -41,24 +42,22 @@ const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: strin
 
 export function SidebarPhaseNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const search = useBrowserSearch();
   const { phase } = useAdminPhase();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsClient();
 
-  // Avoid hydration mismatch for tooltips / isActive without sync setState-in-effect lint.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
+  if (!mounted) return null;
   if (!phase?.status) return null;
 
   const pipelineStatus = phase.status;
   const currentIdx = statusIndex(pipelineStatus);
   const visiblePhases = PIPELINE_PHASES.filter((p) => p.status !== 'closed');
+  const viewParam = new URLSearchParams(
+    search.startsWith('?') ? search.slice(1) : search,
+  ).get('view');
   const dashboardViewPhase =
     pathname === '/admin/dashboard'
-      ? parseDashboardViewPhase(searchParams.get('view'), pipelineStatus)
+      ? parseDashboardViewPhase(viewParam, pipelineStatus)
       : null;
 
   return (
@@ -72,10 +71,9 @@ export function SidebarPhaseNav() {
             const isPast = phaseIdx < currentIdx;
             const isFuture = phaseIdx > currentIdx;
             const isNavActive =
-              mounted &&
-              (pathname === '/admin/dashboard' && isAdminDashboardPhase(phaseItem.status)
+              pathname === '/admin/dashboard' && isAdminDashboardPhase(phaseItem.status)
                 ? dashboardViewPhase === phaseItem.status
-                : isAdminPhaseNavActive(pathname, phaseItem.status));
+                : isAdminPhaseNavActive(pathname, phaseItem.status);
             const Icon = PHASE_ICONS[phaseItem.status];
             const tooltip = isFuture
               ? `${phaseItem.label} — Preview`
@@ -87,7 +85,7 @@ export function SidebarPhaseNav() {
               <SidebarMenuItem key={phaseItem.status}>
                 <SidebarMenuButton
                   isActive={isNavActive}
-                  tooltip={mounted ? tooltip : undefined}
+                  tooltip={tooltip}
                   className={cn(
                     isPast && !isPipelineCurrent && !isNavActive && 'text-muted-foreground',
                     isFuture && !isNavActive && 'text-muted-foreground/80',
@@ -100,7 +98,7 @@ export function SidebarPhaseNav() {
                     <Icon
                       className={cn(
                         'size-4 shrink-0',
-                        (isPipelineCurrent || isNavActive) && 'text-primary',
+                        isPipelineCurrent && 'text-primary',
                       )}
                     />
                   ) : (
@@ -113,7 +111,7 @@ export function SidebarPhaseNav() {
                   )}
                   <span
                     className={cn(
-                      (isPipelineCurrent || isNavActive) && 'font-medium text-primary',
+                      isPipelineCurrent && 'font-medium text-primary',
                       isFuture && !isNavActive && 'text-muted-foreground/80',
                     )}
                   >

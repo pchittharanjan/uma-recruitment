@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PipelineStatusSnapshot } from '@/components/pipeline-status-snapshot';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { RoundStatus } from '@/lib/db';
 import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import type { UnlockableStage } from '@/lib/stages';
@@ -48,7 +49,20 @@ export function TeamStageControls() {
   }, [load]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading global status…</p>;
+    return (
+      <div className="display-panel space-y-4" role="status" aria-label="Loading">
+        <div className="rounded-md border border-border/50 bg-background px-4 pb-4 pt-3">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground">
+            Global status
+          </p>
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-full max-w-md" />
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
   }
 
   if (!state?.status) {

@@ -96,7 +96,9 @@ function UserFormBody({
         <FieldLegend variant="label" className="select-text">Account</FieldLegend>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor={`${idPrefix}-name`} className="select-text">Full name</FieldLabel>
+            <FieldLabel htmlFor={`${idPrefix}-name`} className="select-text" required>
+              Full name
+            </FieldLabel>
             <Input
               id={`${idPrefix}-name`}
               value={name}
@@ -109,7 +111,9 @@ function UserFormBody({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`${idPrefix}-email`} className="select-text">Berkeley email</FieldLabel>
+            <FieldLabel htmlFor={`${idPrefix}-email`} className="select-text" required>
+              Berkeley email
+            </FieldLabel>
             <Input
               id={`${idPrefix}-email`}
               type="email"
@@ -124,7 +128,9 @@ function UserFormBody({
           </Field>
         </div>
         <Field>
-          <FieldLabel htmlFor={`${idPrefix}-role`} className="select-text">Role</FieldLabel>
+          <FieldLabel htmlFor={`${idPrefix}-role`} className="select-text" required>
+            Role
+          </FieldLabel>
           <PickerDropdown
             id={`${idPrefix}-role`}
             value={role}

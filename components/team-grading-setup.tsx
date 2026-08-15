@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { shortHeaderLabel } from '@/lib/rubric';
 
 interface RubricData {
@@ -143,7 +144,28 @@ export function TeamGradingSetup({
   };
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading grading setup…</p>;
+    return (
+      <div className="space-y-4" role="status" aria-label="Loading">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Grader instructions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Scored questions (CSV columns)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const scoredQuestionLabels = [

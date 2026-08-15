@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, Loader2, RotateCcw } from 'lucide-react';
+import { ArrowDown, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import CsvFileUpload, { type CsvParseResult } from '@/components/csv-file-upload';
 import { Button } from '@/components/ui/button';
 import { PageContainer, PageContent, PageHeader, PagePanel, PageSection } from '@/components/page-shell';
+import { phasePageEyebrow } from '@/lib/stages';
 import StatusBanner from '@/components/status-banner';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -635,6 +636,7 @@ export default function UnifiedImportPage() {
   return (
     <PageContainer size="wide" className="space-y-6">
       <PageHeader
+        eyebrow={phasePageEyebrow('application')}
         title="Import applications"
         description="Upload one CSV with every applicant. We split it into Strategy, Events, and Design for you."
         actions={<EraseTestDataButton onSuccess={resetImportWizard} redirectTo="/admin/import" />}
@@ -692,7 +694,9 @@ export default function UnifiedImportPage() {
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Label htmlFor="teamColumn">Team choices column</Label>
+                  <Label htmlFor="teamColumn" required>
+                    Team choices column
+                  </Label>
                   <NativeSelect
                     id="teamColumn"
                     value={singleColumn}
@@ -899,15 +903,14 @@ export default function UnifiedImportPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {gradersPreloadLoading && (
-                  <div
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  <span
+                    className="text-sm text-muted-foreground"
                     role="status"
                     aria-live="polite"
                     aria-busy="true"
                   >
-                    <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                    <span>Loading team users…</span>
-                  </div>
+                    Loading team users…
+                  </span>
                 )}
                 {gradersPreloadComplete && totalTeamGraders > 0 && (
                   <span className="text-sm text-emerald-700">
@@ -939,7 +942,9 @@ export default function UnifiedImportPage() {
 
             <div className="display-panel flex flex-wrap items-end gap-4 px-4 py-4">
               <div className="space-y-1.5">
-                <Label htmlFor="gradersPerApplication">Users per application</Label>
+                <Label htmlFor="gradersPerApplication" required>
+                  Users per application
+                </Label>
                 <NativeSelect
                   id="gradersPerApplication"
                   value={String(gradersPerApplication)}

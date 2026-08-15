@@ -887,7 +887,9 @@ export function TeamInterviewScheduleEditor({
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="interview-date">Date</Label>
+              <Label htmlFor="interview-date" required>
+                Date
+              </Label>
               <Input
                 id="interview-date"
                 type="date"
@@ -896,7 +898,9 @@ export function TeamInterviewScheduleEditor({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interview-start">First block starts</Label>
+              <Label htmlFor="interview-start" required>
+                First block starts
+              </Label>
               <Input
                 id="interview-start"
                 type="time"
@@ -905,7 +909,9 @@ export function TeamInterviewScheduleEditor({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="block-minutes">Block length (minutes)</Label>
+              <Label htmlFor="block-minutes" required>
+                Block length (minutes)
+              </Label>
               <Input
                 id="block-minutes"
                 type="number"

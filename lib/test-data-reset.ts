@@ -2,16 +2,27 @@ import { getDb } from '@/lib/db';
 
 export interface TestDataPurgeResult {
   roundsRemoved: number;
+  coffeeChatsRemoved: number;
   testUsersRemoved: number;
   orphanCandidatesRemoved: number;
 }
 
-/** Wipe in-progress rounds and simulated `.test@berkeley.edu` grader accounts. */
+/** Wipe all rounds (including closed archive), coffee chat submissions, and simulated `.test@berkeley.edu` grader accounts. */
 export async function purgeTestRecruitmentData(): Promise<TestDataPurgeResult> {
   const db = getDb();
 
+  // Org-wide intake — survives round deletion (round_id ON DELETE SET NULL).
+  const coffeeChats = await db.execute({ sql: 'DELETE FROM coffee_chats' });
+  await db.execute({
+    sql: `INSERT INTO org_coffee_chat_dates (id, coffee_chat_start_date, application_due_date)
+          VALUES (1, NULL, NULL)
+          ON CONFLICT(id) DO UPDATE SET
+            coffee_chat_start_date = NULL,
+            application_due_date = NULL`,
+  });
+
   const roundsResult = await db.execute({
-    sql: `SELECT id FROM rounds WHERE status != 'closed'`,
+    sql: `SELECT id FROM rounds`,
   });
   const roundIds = roundsResult.rows.map((row) => row.id as number);
 
@@ -86,6 +97,7 @@ export async function purgeTestRecruitmentData(): Promise<TestDataPurgeResult> {
 
   return {
     roundsRemoved: roundIds.length,
+    coffeeChatsRemoved: coffeeChats.rowsAffected,
     testUsersRemoved: testUserIds.length,
     orphanCandidatesRemoved: orphanCandidates.rowsAffected,
   };

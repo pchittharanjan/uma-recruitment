@@ -19,8 +19,8 @@ Gradient (marketing/landing surfaces only, not core app UI): linear or radial bl
 
 ## Typography
 
-- **Mugler Regular** — display/marketing headlines only (128 / 200). Not used in the grading app itself.
-- **Absans** — all in-app UI text, sizes 20 / 32 / 48.
+- **Absans** — headings (`h1`–`h6`, dialog titles, card titles).
+- **Futura Std** — body copy and all other UI text.
 
 Open question: does the grading tool need its own plainer UI scale (e.g. 14/16/20/24) rather than reusing the marketing sizes? Flag if so — will add a dedicated UI type scale.
 

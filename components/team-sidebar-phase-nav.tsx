@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, type ComponentType } from 'react';
+import { type ComponentType } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTeamNav, type TeamNavTeam } from '@/components/team-nav-provider';
+import { useIsClient } from '@/hooks/use-workspace-embed';
 import {
   CheckIcon,
   CoffeeIcon,
@@ -13,7 +15,6 @@ import {
   UserCheckIcon,
   ArrowUpCircleIcon,
 } from 'lucide-react';
-import { useTeamNav, type TeamNavTeam } from '@/components/team-nav-provider';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -79,12 +80,10 @@ function DisabledPhaseItem({
   label,
   icon: Icon,
   reason,
-  mounted,
 }: {
   label: string;
   icon?: ComponentType<{ className?: string }>;
   reason: string;
-  mounted: boolean;
 }) {
   return (
     <SidebarMenuItem>
@@ -100,7 +99,7 @@ function DisabledPhaseItem({
             </SidebarMenuButton>
           }
         />
-        {mounted && <TooltipContent side="right">{reason}</TooltipContent>}
+        <TooltipContent side="right">{reason}</TooltipContent>
       </Tooltip>
     </SidebarMenuItem>
   );
@@ -109,11 +108,11 @@ function DisabledPhaseItem({
 export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: string }[] }) {
   const pathname = usePathname();
   const { nav } = useTeamNav();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Server + first client paint both return null so we never hydrate a
+  // missing SidebarGroup into a present one (nav loads after mount).
+  if (!mounted) return null;
 
   const navTeams = nav?.teams ?? [];
   const globalStatus = nav?.status ?? null;
@@ -130,7 +129,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
   const currentIdx = statusIndex(teamStatus);
   const pipelineClosed = globalStatus === 'closed';
   const visiblePhases = PIPELINE_PHASES.filter((p) => p.status !== 'closed');
-  const finalActive = mounted && pathname.startsWith('/team/final-selection');
+  const finalActive = pathname.startsWith('/team/final-selection');
 
   return (
     <SidebarGroup>
@@ -142,9 +141,9 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             const isPipelineCurrent = phase.status === teamStatus;
             const isPast = phaseIdx < currentIdx;
             const isFuture = phaseIdx > currentIdx;
-            const isNavActive =
-              mounted &&
-              isTeamPhaseNavActive(pathname, phase.status, { teamCurrentStatus: teamStatus });
+            const isNavActive = isTeamPhaseNavActive(pathname, phase.status, {
+              teamCurrentStatus: teamStatus,
+            });
             const Icon = PHASE_ICONS[phase.status];
             const href = teamPhaseHref(activeTeam.id, phase.status);
             const accessible = phaseAccessible(phase.status, activeTeam, globalStatus);
@@ -152,16 +151,14 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
               phase.status === 'application' &&
               statusIndex(teamStatus) > statusIndex('application');
             const advanceHref = `/team/${activeTeam.id}/advancement`;
-            const advanceActive =
-              mounted && (pathname === advanceHref || pathname === `${advanceHref}/`);
+            const advanceActive = pathname === advanceHref || pathname === `${advanceHref}/`;
             const advancePast = applicationPast && !advanceActive;
 
             const firstRoundPast =
               phase.status === 'first_round' &&
               statusIndex(teamStatus) > statusIndex('first_round');
             const firstRoundAdvanceHref = `/team/${activeTeam.id}/advancement/first-round`;
-            const firstRoundAdvanceActive =
-              mounted && pathname.startsWith(firstRoundAdvanceHref);
+            const firstRoundAdvanceActive = pathname.startsWith(firstRoundAdvanceHref);
             const firstRoundAdvancePast = firstRoundPast && !firstRoundAdvanceActive;
 
             if (!accessible || !href) {
@@ -174,7 +171,6 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                   label={phase.label}
                   icon={Icon}
                   reason={reason}
-                  mounted={mounted}
                 />
               );
             }
@@ -183,7 +179,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
               <SidebarMenuItem key={phase.status}>
                 <SidebarMenuButton
                   isActive={isNavActive && !advanceActive && !firstRoundAdvanceActive}
-                  tooltip={mounted ? phase.label : undefined}
+                  tooltip={phase.label}
                   className={cn(
                     isPast && !isPipelineCurrent && !isNavActive && 'text-muted-foreground',
                   )}
@@ -195,13 +191,13 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                     <Icon
                       className={cn(
                         'size-4 shrink-0',
-                        (isPipelineCurrent || isNavActive) && 'text-primary',
+                        isPipelineCurrent && 'text-primary',
                       )}
                     />
                   ) : null}
                   <span
                     className={cn(
-                      (isPipelineCurrent || isNavActive) && 'font-medium text-primary',
+                      isPipelineCurrent && 'font-medium text-primary',
                     )}
                   >
                     {phase.label}
@@ -258,7 +254,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={finalActive}
-                tooltip={mounted ? 'Final selection' : undefined}
+                tooltip="Final selection"
                 render={<Link href="/team/final-selection" />}
               >
                 <CheckIcon className="size-4 shrink-0 text-green-600" />

@@ -26,6 +26,7 @@ import {
   todayIsoDate,
   type UserCoffeeChatListItem,
 } from '@/lib/coffee-chats';
+import { phasePageEyebrow } from '@/lib/stages';
 
 type MyChat = UserCoffeeChatListItem;
 
@@ -234,18 +235,13 @@ export default function CoffeeChatsPage() {
   return (
     <PageContainer className="space-y-8">
       <PageHeader
-        eyebrow="Coffee Chats"
-        title="Coffee chat notes"
+        eyebrow={phasePageEyebrow('pre_application')}
+        title="Submit notes"
         actions={
           isAdmin ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/admin/coffee-chats" />}>
-                All submissions
-              </Button>
-              <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/admin/dashboard" />}>
-                Dashboard
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/admin/coffee-chats" />}>
+              All submissions
+            </Button>
           ) : undefined
         }
       />
@@ -291,12 +287,15 @@ export default function CoffeeChatsPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="chatDate">Date of chat</Label>
+                    <Label htmlFor="chatDate" required>
+                      Date of chat
+                    </Label>
                     <Input
                       id="chatDate"
                       type="date"
                       value={form.chatDate}
                       disabled={formDisabled}
+                      required
                       onChange={(e) => setForm((f) => ({ ...f, chatDate: e.target.value }))}
                     />
                   </div>
@@ -308,12 +307,15 @@ export default function CoffeeChatsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="applicantName">Applicant full name</Label>
+                  <Label htmlFor="applicantName" required>
+                    Applicant full name
+                  </Label>
                   <Input
                     id="applicantName"
                     value={form.applicantName}
                     disabled={formDisabled}
                     placeholder="Full name"
+                    required
                     onChange={(e) => setForm((f) => ({ ...f, applicantName: e.target.value }))}
                   />
                 </div>

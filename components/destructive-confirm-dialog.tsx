@@ -71,7 +71,7 @@ export function DestructiveConfirmDialog({
             <DialogDescription className="leading-relaxed">{description}</DialogDescription>
           </DialogHeader>
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-border/60 bg-muted/40 px-6 py-4">
+        <div className="flex items-center justify-end gap-3 px-6 pb-6">
           <DialogClose render={<Button variant="outline" disabled={confirming} />}>
             Cancel
           </DialogClose>

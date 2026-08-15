@@ -11,6 +11,7 @@ import {
   RECRUITMENT_CYCLE_MIN_YEAR,
   type RecruitmentSemester,
 } from '@/lib/org-recruitment-cycle';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface CycleSettingsResponse {
@@ -114,10 +115,6 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
     }
   };
 
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading recruitment cycle…</p>;
-  }
-
   return (
     <div className="display-panel px-3 py-2.5">
       <button
@@ -137,9 +134,22 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
 
       {open && (
         <div className="mt-2 space-y-2">
+          {loading ? (
+            <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
+              <div className="w-[7.5rem] space-y-1">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+              <div className="w-[5.5rem] space-y-1">
+                <Skeleton className="h-4 w-10" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-[7.5rem] space-y-1">
-              <Label htmlFor="recruitmentSemester" className="text-sm">
+              <Label htmlFor="recruitmentSemester" className="text-sm" required>
                 Semester
               </Label>
               <NativeSelect
@@ -153,7 +163,7 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
               </NativeSelect>
             </div>
             <div className="w-[5.5rem] space-y-1">
-              <Label htmlFor="recruitmentYear" className="text-sm">
+              <Label htmlFor="recruitmentYear" className="text-sm" required>
                 Year
               </Label>
               <NativeSelect
@@ -182,6 +192,8 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
 
           {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -237,7 +237,9 @@ export default function TeamCommunicationsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pass-subject">Subject</Label>
+              <Label htmlFor="pass-subject" required>
+                Subject
+              </Label>
               <Input
                 id="pass-subject"
                 value={templates.passSubject}
@@ -245,7 +247,9 @@ export default function TeamCommunicationsPage({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pass-body">Body</Label>
+              <Label htmlFor="pass-body" required>
+                Body
+              </Label>
               <textarea
                 id="pass-body"
                 value={templates.passBody}
@@ -344,7 +348,9 @@ export default function TeamCommunicationsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="reject-subject">Subject</Label>
+              <Label htmlFor="reject-subject" required>
+                Subject
+              </Label>
               <Input
                 id="reject-subject"
                 value={templates.rejectSubject}
@@ -352,7 +358,9 @@ export default function TeamCommunicationsPage({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reject-body">Body</Label>
+              <Label htmlFor="reject-body" required>
+                Body
+              </Label>
               <textarea
                 id="reject-body"
                 value={templates.rejectBody}

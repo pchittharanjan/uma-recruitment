@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const CAP_INPUT_CLASS =
   'h-9 w-full max-w-[6rem] border-foreground/20 bg-background shadow-xs';
@@ -256,94 +257,113 @@ export function TeamAdvancementCapSettings() {
           changing it. The last column is how many offers they can make after deliberations.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 border-t border-border/60 px-6 pt-4">
+      <CardContent className="space-y-3 overflow-hidden border-t border-border/60 px-6 pt-4">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {loweredCapWarnings.length > 0 && isDirty ? (
+        {loweredCapWarnings.length > 0 && isDirty && !loading ? (
           <p className="text-sm text-amber-800 dark:text-amber-200">
             {loweredCapWarnings.length === 1
               ? loweredCapWarnings[0]
               : `${loweredCapWarnings.length} teams have a lowered limit. Over-limit pending lists can keep picks but not add more unless you check Can go over.`}
           </p>
         ) : null}
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading limits…</p>
-        ) : (
-          <div
-            role="table"
-            className="grid w-full grid-cols-[minmax(8rem,1fr)_1fr_1fr_1fr] items-start gap-x-4 gap-y-2"
-          >
-            <div role="columnheader" className="py-1 text-sm font-medium text-muted-foreground">
-              Team
-            </div>
-            <div
-              role="columnheader"
-              className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
-            >
-              Application → First Round
-            </div>
-            <div
-              role="columnheader"
-              className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
-            >
-              First Round → Final Round
-            </div>
-            <div
-              role="columnheader"
-              className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
-            >
-              Deliberations → Final selection
-            </div>
-
-            {rows.map((row) => (
-              <div key={row.teamId} role="row" className="contents">
-                <div role="cell" className="flex items-center py-1.5 font-medium">
-                  {row.teamName}
-                </div>
-                <CapCell
-                  teamName={row.teamName}
-                  stageLabel="Application advancement"
-                  inputId={`app-cap-${row.teamId}`}
-                  value={row.applicationCap}
-                  allowOver={row.applicationAllowOverCap}
-                  overId={`app-over-${row.teamId}`}
-                  onCapChange={(value) => updateCap(row.teamId, 'applicationCap', value)}
-                  onOverChange={(checked) =>
-                    updateOverCap(row.teamId, 'applicationAllowOverCap', checked)
-                  }
-                />
-                <CapCell
-                  teamName={row.teamName}
-                  stageLabel="First round advancement"
-                  inputId={`fr-cap-${row.teamId}`}
-                  value={row.firstRoundCap}
-                  allowOver={row.firstRoundAllowOverCap}
-                  overId={`fr-over-${row.teamId}`}
-                  onCapChange={(value) => updateCap(row.teamId, 'firstRoundCap', value)}
-                  onOverChange={(checked) =>
-                    updateOverCap(row.teamId, 'firstRoundAllowOverCap', checked)
-                  }
-                />
-                <CapCell
-                  teamName={row.teamName}
-                  stageLabel="Deliberations final selection"
-                  inputId={`delibs-cap-${row.teamId}`}
-                  value={row.deliberationsCap}
-                  allowOver={row.deliberationsAllowOverCap}
-                  overId={`delibs-over-${row.teamId}`}
-                  onCapChange={(value) => updateCap(row.teamId, 'deliberationsCap', value)}
-                  onOverChange={(checked) =>
-                    updateOverCap(row.teamId, 'deliberationsAllowOverCap', checked)
-                  }
-                />
-              </div>
-            ))}
+        <div
+          role="table"
+          aria-busy={loading}
+          className="grid w-full grid-cols-[minmax(8rem,1fr)_1fr_1fr_1fr] items-start gap-x-4 gap-y-2"
+        >
+          <div role="columnheader" className="py-1 text-sm font-medium text-muted-foreground">
+            Team
           </div>
-        )}
-        <div className="flex items-center justify-end gap-2">
-          <LoadingButton onClick={handleSave} disabled={!isDirty || loading} loading={saving}>
-            Save limits
-          </LoadingButton>
+          <div
+            role="columnheader"
+            className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
+          >
+            Application → First Round
+          </div>
+          <div
+            role="columnheader"
+            className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
+          >
+            First Round → Final Round
+          </div>
+          <div
+            role="columnheader"
+            className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
+          >
+            Deliberations → Final selection
+          </div>
+
+          {loading
+            ? Array.from({ length: 4 }, (_, index) => (
+                <div key={index} role="row" className="contents">
+                  <div role="cell" className="flex items-center py-1.5">
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <div role="cell" className="space-y-2 py-1.5">
+                    <Skeleton className="h-9 w-full max-w-[6rem]" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <div role="cell" className="space-y-2 py-1.5">
+                    <Skeleton className="h-9 w-full max-w-[6rem]" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <div role="cell" className="space-y-2 py-1.5">
+                    <Skeleton className="h-9 w-full max-w-[6rem]" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                </div>
+              ))
+            : rows.map((row) => (
+                <div key={row.teamId} role="row" className="contents">
+                  <div role="cell" className="flex items-center py-1.5 font-medium">
+                    {row.teamName}
+                  </div>
+                  <CapCell
+                    teamName={row.teamName}
+                    stageLabel="Application advancement"
+                    inputId={`app-cap-${row.teamId}`}
+                    value={row.applicationCap}
+                    allowOver={row.applicationAllowOverCap}
+                    overId={`app-over-${row.teamId}`}
+                    onCapChange={(value) => updateCap(row.teamId, 'applicationCap', value)}
+                    onOverChange={(checked) =>
+                      updateOverCap(row.teamId, 'applicationAllowOverCap', checked)
+                    }
+                  />
+                  <CapCell
+                    teamName={row.teamName}
+                    stageLabel="First round advancement"
+                    inputId={`fr-cap-${row.teamId}`}
+                    value={row.firstRoundCap}
+                    allowOver={row.firstRoundAllowOverCap}
+                    overId={`fr-over-${row.teamId}`}
+                    onCapChange={(value) => updateCap(row.teamId, 'firstRoundCap', value)}
+                    onOverChange={(checked) =>
+                      updateOverCap(row.teamId, 'firstRoundAllowOverCap', checked)
+                    }
+                  />
+                  <CapCell
+                    teamName={row.teamName}
+                    stageLabel="Deliberations final selection"
+                    inputId={`delibs-cap-${row.teamId}`}
+                    value={row.deliberationsCap}
+                    allowOver={row.deliberationsAllowOverCap}
+                    overId={`delibs-over-${row.teamId}`}
+                    onCapChange={(value) => updateCap(row.teamId, 'deliberationsCap', value)}
+                    onOverChange={(checked) =>
+                      updateOverCap(row.teamId, 'deliberationsAllowOverCap', checked)
+                    }
+                  />
+                </div>
+              ))}
         </div>
+        {!loading ? (
+          <div className="flex items-center justify-end gap-2">
+            <LoadingButton onClick={handleSave} disabled={!isDirty} loading={saving}>
+              Save limits
+            </LoadingButton>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

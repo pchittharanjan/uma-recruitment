@@ -1,4 +1,5 @@
 import type { RoundStatus } from '@/lib/db';
+import { phasePageEyebrow } from '@/lib/stages';
 
 /** Email moments after each advancement decision. */
 export type OutcomeEmailStage = 'application' | 'first_round' | 'final_round';
@@ -54,11 +55,11 @@ export function outcomeEmailTargetLabel(stage: OutcomeEmailStage): string {
 export function outcomeEmailPhaseEyebrow(stage: OutcomeEmailStage): string {
   switch (stage) {
     case 'application':
-      return 'Application phase';
+      return phasePageEyebrow('application');
     case 'first_round':
-      return 'First Round Interview';
+      return phasePageEyebrow('first_round');
     case 'final_round':
-      return 'Final Round / Deliberations';
+      return 'Final Round / Deliberations phase';
   }
 }
 

@@ -1,16 +1,16 @@
 import { redirect } from 'next/navigation';
 import { getAccessibleTeams } from '@/lib/access';
 import { getSessionUser } from '@/lib/auth';
-import AppHeader from '@/components/app-header';
+import { AdminShell } from '@/components/admin-shell';
 import { TeamShell } from '@/components/team-shell';
-import { PageShell } from '@/components/page-shell';
 import { getTeamPortalContext } from '@/lib/team-portal-context';
 import { getImpersonateTarget } from '@/lib/impersonation';
 import { initDb } from '@/lib/db';
+import { anyTeamHasActivePipeline } from '@/lib/rounds';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CoffeeChatsLayout({ children }: { children: React.ReactNode }) {
+export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   await initDb();
 
   const sessionUser = await getSessionUser();
@@ -49,10 +49,11 @@ export default async function CoffeeChatsLayout({ children }: { children: React.
 
   if (sessionUser.role !== 'admin') redirect('/login');
 
+  const hasActivePipeline = await anyTeamHasActivePipeline();
+
   return (
-    <PageShell>
-      <AppHeader user={sessionUser} homeHref="/admin/dashboard" />
+    <AdminShell user={sessionUser} showApplicationsNav={hasActivePipeline}>
       {children}
-    </PageShell>
+    </AdminShell>
   );
 }

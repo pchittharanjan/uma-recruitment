@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { RoundStatus } from '@/lib/db';
 import { phaseLabel } from '@/lib/stages';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface InterviewScheduleConfig {
@@ -93,11 +94,7 @@ export function InterviewScheduleSettings({
     }
   };
 
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading interview schedule settings…</p>;
-  }
-
-  if (!config) {
+  if (!config && !loading) {
     return error ? <p className="text-sm text-destructive">{error}</p> : null;
   }
 
@@ -111,20 +108,22 @@ export function InterviewScheduleSettings({
       >
         <div className="space-y-1">
           <p className="text-sm font-medium">{roundLabel} Interview day</p>
-          <p className="text-sm text-muted-foreground">
-            {isFirstRound ? (
-              <>
-                All teams interview on the same first-round day and use group blocks (up to{' '}
-                {config.groupSize} per group; often 3–4). Parallel groups at the same hour are set
-                per team on schedule pages.
-              </>
-            ) : (
-              <>
-                All teams interview on the same final-round day. Every team uses individual{' '}
-                {config.blockMinutes}-minute slots.
-              </>
-            )}
-          </p>
+          {!loading && config ? (
+            <p className="text-sm text-muted-foreground">
+              {isFirstRound ? (
+                <>
+                  All teams interview on the same first-round day and use group blocks (up to{' '}
+                  {config.groupSize} per group; often 3–4). Parallel groups at the same hour are set
+                  per team on schedule pages.
+                </>
+              ) : (
+                <>
+                  All teams interview on the same final-round day. Every team uses individual{' '}
+                  {config.blockMinutes}-minute slots.
+                </>
+              )}
+            </p>
+          ) : null}
         </div>
         <ChevronDownIcon
           className={cn(
@@ -136,9 +135,36 @@ export function InterviewScheduleSettings({
 
       {open && (
         <div className="mt-4 space-y-4">
+          {loading || !config ? (
+            <div className="space-y-4" role="status" aria-label="Loading">
+              <div className="grid gap-4 rounded-md border border-border/50 p-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="grid gap-4 rounded-md border border-primary/30 bg-primary/5 p-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="interviewDate">Interview date</Label>
+              <Label htmlFor="interviewDate" required>
+                Interview date
+              </Label>
               <Input
                 id="interviewDate"
                 type="date"
@@ -157,7 +183,9 @@ export function InterviewScheduleSettings({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interviewStartTime">First block starts</Label>
+              <Label htmlFor="interviewStartTime" required>
+                First block starts
+              </Label>
               <Input
                 id="interviewStartTime"
                 type="time"
@@ -177,7 +205,9 @@ export function InterviewScheduleSettings({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="blockMinutes">Block length (minutes)</Label>
+              <Label htmlFor="blockMinutes" required>
+                Block length (minutes)
+              </Label>
               <Input
                 id="blockMinutes"
                 type="number"
@@ -199,7 +229,9 @@ export function InterviewScheduleSettings({
             </div>
             {isFirstRound && (
               <div className="space-y-2">
-                <Label htmlFor="groupSize">Max group size</Label>
+                <Label htmlFor="groupSize" required>
+                  Max group size
+                </Label>
                 <Input
                   id="groupSize"
                   type="number"
@@ -237,6 +269,8 @@ export function InterviewScheduleSettings({
             </Link>
             .
           </p>
+            </>
+          )}
         </div>
       )}
     </div>

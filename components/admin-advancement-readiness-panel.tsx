@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import StageBadge from '@/components/stage-badge';
-import PageLoading from '@/components/page-loading';
 import { advancementFromStageLabel } from '@/lib/advancement-submissions-types';
 import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -101,10 +101,26 @@ export function AdminAdvancementReadinessPanel({
   }, [fetchData]);
 
   if (loading) {
-    return compact ? (
-      <p className="text-sm text-muted-foreground">Loading verdict progress…</p>
-    ) : (
-      <PageLoading />
+    return (
+      <Card>
+        <CardHeader className={cn(compact && 'pb-3')}>
+          <CardTitle className={cn(compact && 'text-base')}>
+            {fromStage === 'application' ? 'Color signals' : 'Interview signals'}
+          </CardTitle>
+          <CardDescription>
+            {fromStage === 'application'
+              ? 'Exec panel colors before Directors submit the advancement list.'
+              : `Panel signals before Directors submit (${advancementFromStageLabel(fromStage)}).`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2" role="status" aria-label="Loading">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

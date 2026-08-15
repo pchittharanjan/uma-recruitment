@@ -1,5 +1,7 @@
 'use client';
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 export type WizardStepId = 'upload' | 'teams' | 'scoring' | 'graders' | 'confirm';
 
 const WIZARD_STEPS: ReadonlyArray<{ id: WizardStepId; label: string }> = [
@@ -12,24 +14,18 @@ const WIZARD_STEPS: ReadonlyArray<{ id: WizardStepId; label: string }> = [
 
 export const WIZARD_STEP_IDS = WIZARD_STEPS.map((step) => step.id);
 
-/** Fixed layout shell — used as dynamic import loading fallback (no SSR for live labels). */
+/** Used as the dynamic-import fallback while wizard step labels hydrate. */
 export function ImportWizardProgressPlaceholder() {
   return (
     <div
-      className="mb-6 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm"
-      aria-hidden
+      className="mb-6 flex flex-wrap items-center gap-x-1 gap-y-2"
+      role="status"
+      aria-label="Loading"
     >
-      {WIZARD_STEPS.map((wizardStep, i) => (
-        <div key={wizardStep.id} className="flex items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-            {i + 1}
-          </div>
-          <span className="min-w-[3.5rem]">
-            <span className="inline-block h-4 w-14 rounded-sm bg-muted" />
-          </span>
-          {i < WIZARD_STEPS.length - 1 && (
-            <span className="text-muted-foreground/40">→</span>
-          )}
+      {WIZARD_STEPS.map((step) => (
+        <div key={step.id} className="flex items-center gap-2">
+          <Skeleton className="h-7 w-7 rounded-full" />
+          <Skeleton className="h-4 w-14" />
         </div>
       ))}
     </div>

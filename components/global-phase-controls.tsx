@@ -10,6 +10,7 @@ import { RecruitmentPhaseStepper } from '@/components/recruitment-phase-stepper'
 import { RecruitmentPhaseChecklist } from '@/components/recruitment-phase-checklist';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { RoundStatus } from '@/lib/db';
 import type { PhaseChecklistStep } from '@/lib/phase-checklist';
 import { dispatchPipelinePhaseChanged, PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
@@ -177,7 +178,25 @@ export function GlobalPhaseControls({
   };
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading phases…</p>;
+    return (
+      <div className="display-panel space-y-4" role="status" aria-label="Loading">
+        <div className="rounded-md border border-border/50 bg-background px-4 pb-4 pt-3">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground">
+            Global status
+          </p>
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-full max-w-md" />
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-3/4" />
+        </div>
+      </div>
+    );
   }
 
   if (!state?.status) {
@@ -208,7 +227,11 @@ export function GlobalPhaseControls({
         />
 
         {checklistLoading ? (
-          <p className="text-sm text-muted-foreground">Loading checklist…</p>
+          <div className="space-y-2" role="status" aria-label="Loading">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-3/4" />
+          </div>
         ) : (
           hasChecklist && (
             <RecruitmentPhaseChecklist
@@ -281,14 +304,14 @@ export function GlobalPhaseControls({
         </div>
       </div>
 
-      <div className="border-b border-border/40 pb-4">
+      <div id="stage-access" className="scroll-mt-24 border-b border-border/40 pb-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-muted-foreground">
-          Stage Locks (All teams)
+          Stage access (all teams)
         </p>
         <p className="mb-3 text-sm text-muted-foreground">
           {state.status === 'closed'
-            ? 'Cycle is closed — teams are view-only. All prior phases stay open for you to browse and edit; grader stage locks no longer apply.'
-            : 'Uncheck a stage to stop graders from editing. This does not change global status — use the button above to move everyone forward.'}
+            ? 'Cycle is closed — teams are view-only. All prior stages stay open for you to browse and edit.'
+            : 'Check a stage to let graders and execs work in it. Uncheck to lock editing for everyone.'}
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {unlockablePhases.map((phase) => {
@@ -335,7 +358,11 @@ export function GlobalPhaseControls({
       />
 
       {checklistLoading ? (
-        <p className="text-sm text-muted-foreground">Loading checklist…</p>
+        <div className="space-y-2" role="status" aria-label="Loading">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-3/4" />
+        </div>
       ) : (
         viewingChecklist.length > 0 && (
           <RecruitmentPhaseChecklist
