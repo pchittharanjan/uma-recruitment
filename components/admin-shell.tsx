@@ -12,10 +12,14 @@ import { cn } from '@/lib/utils';
 function AdminShellInner({
   user,
   showApplicationsNav = false,
+  defaultSidebarOpen,
+  defaultSidebarWidth,
   children,
 }: {
   user: { id?: number; name: string; email: string; role: string };
   showApplicationsNav?: boolean;
+  defaultSidebarOpen?: boolean;
+  defaultSidebarWidth?: number;
   children: React.ReactNode;
 }) {
   const embed = useWorkspaceEmbed();
@@ -26,6 +30,8 @@ function AdminShellInner({
 
   return (
     <SidebarProvider
+      defaultOpen={defaultSidebarOpen}
+      defaultWidth={defaultSidebarWidth}
       style={
         {
           '--header-height': 'calc(var(--spacing) * 12)',
@@ -50,6 +56,8 @@ function AdminShellInner({
 export function AdminShell(props: {
   user: { id?: number; name: string; email: string; role: string };
   showApplicationsNav?: boolean;
+  defaultSidebarOpen?: boolean;
+  defaultSidebarWidth?: number;
   children: React.ReactNode;
 }) {
   return (

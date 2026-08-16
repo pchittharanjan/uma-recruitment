@@ -16,11 +16,15 @@ function TeamShellInner({
   user,
   teams,
   isImpersonating = false,
+  defaultSidebarOpen,
+  defaultSidebarWidth,
   children,
 }: {
   user: { id?: number; name: string; email: string; role: string };
   teams: { id: number; name: string }[];
   isImpersonating?: boolean;
+  defaultSidebarOpen?: boolean;
+  defaultSidebarWidth?: number;
   children: React.ReactNode;
 }) {
   const embed = useWorkspaceEmbed();
@@ -31,6 +35,8 @@ function TeamShellInner({
 
   return (
     <SidebarProvider
+      defaultOpen={defaultSidebarOpen}
+      defaultWidth={defaultSidebarWidth}
       style={
         {
           '--header-height': 'calc(var(--spacing) * 12)',
@@ -63,6 +69,8 @@ export function TeamShell(props: {
   teams: { id: number; name: string }[];
   isImpersonating?: boolean;
   impersonationAdmin?: { name: string; email: string };
+  defaultSidebarOpen?: boolean;
+  defaultSidebarWidth?: number;
   children: React.ReactNode;
 }) {
   const impersonation =

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getAccessibleTeams } from '@/lib/access';
 import { getSessionUser } from '@/lib/auth';
 import { AdminShell } from '@/components/admin-shell';
@@ -8,6 +9,7 @@ import { getImpersonateTarget } from '@/lib/impersonation';
 import { initDb } from '@/lib/db';
 import { anyTeamHasActivePipeline } from '@/lib/rounds';
 import { runWithRequestCache } from '@/lib/request-cache';
+import { readSidebarPrefs } from '@/lib/sidebar-prefs';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,8 @@ export default async function PortalLayout({ children }: { children: React.React
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) redirect('/login');
+
+    const sidebarPrefs = readSidebarPrefs(await cookies());
 
     const impersonateTarget = await getImpersonateTarget();
     if (impersonateTarget && sessionUser.role === 'admin') {
@@ -35,6 +39,8 @@ export default async function PortalLayout({ children }: { children: React.React
             name: sessionUser.name,
             email: sessionUser.email,
           }}
+          defaultSidebarOpen={sidebarPrefs.defaultOpen}
+          defaultSidebarWidth={sidebarPrefs.defaultWidth}
         >
           {children}
         </TeamShell>
@@ -48,6 +54,8 @@ export default async function PortalLayout({ children }: { children: React.React
           user={portalCtx.portalUser}
           teams={portalCtx.teams}
           isImpersonating={portalCtx.isImpersonating}
+          defaultSidebarOpen={sidebarPrefs.defaultOpen}
+          defaultSidebarWidth={sidebarPrefs.defaultWidth}
         >
           {children}
         </TeamShell>
@@ -67,6 +75,8 @@ export default async function PortalLayout({ children }: { children: React.React
           role: sessionUser.role,
         }}
         showApplicationsNav={hasActivePipeline}
+        defaultSidebarOpen={sidebarPrefs.defaultOpen}
+        defaultSidebarWidth={sidebarPrefs.defaultWidth}
       >
         {children}
       </AdminShell>

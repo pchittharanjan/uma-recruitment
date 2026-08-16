@@ -24,30 +24,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PanelLeftIcon } from "lucide-react"
+import {
+  SIDEBAR_DEFAULT_WIDTH_PX,
+  SIDEBAR_STATE_COOKIE,
+  SIDEBAR_WIDTH_COOKIE,
+  clampSidebarWidth,
+} from "@/lib/sidebar-prefs"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_WIDTH_COOKIE_NAME = "sidebar_width"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
-const SIDEBAR_MIN_WIDTH_PX = 224
-const SIDEBAR_MAX_WIDTH_PX = 448
-const SIDEBAR_DEFAULT_WIDTH_PX = 288
-
-function clampSidebarWidth(px: number) {
-  return Math.min(SIDEBAR_MAX_WIDTH_PX, Math.max(SIDEBAR_MIN_WIDTH_PX, Math.round(px)))
-}
-
-function readStoredSidebarWidth(): number {
-  if (typeof document === "undefined") return SIDEBAR_DEFAULT_WIDTH_PX
-  const match = document.cookie.match(new RegExp(`(?:^|; )${SIDEBAR_WIDTH_COOKIE_NAME}=(\\d+)`))
-  const parsed = match ? Number.parseInt(match[1], 10) : NaN
-  return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : SIDEBAR_DEFAULT_WIDTH_PX
-}
 
 function persistSidebarWidth(px: number) {
-  document.cookie = `${SIDEBAR_WIDTH_COOKIE_NAME}=${px}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+  document.cookie = `${SIDEBAR_WIDTH_COOKIE}=${px}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
 }
 
 type SidebarContextProps = {
@@ -77,6 +67,7 @@ function useSidebar() {
 
 function SidebarProvider({
   defaultOpen = true,
+  defaultWidth = SIDEBAR_DEFAULT_WIDTH_PX,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -85,16 +76,19 @@ function SidebarProvider({
   ...props
 }: React.ComponentProps<"div"> & {
   defaultOpen?: boolean
+  /** Pixel width from cookie / last resize — set on the server to avoid a refresh flash. */
+  defaultWidth?: number
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
-  const [width, setWidthState] = React.useState(SIDEBAR_DEFAULT_WIDTH_PX)
+  const [width, setWidthState] = React.useState(() => clampSidebarWidth(defaultWidth))
   const [isResizing, setIsResizing] = React.useState(false)
-
+  // Skip CSS width transitions on the first paint so hard refresh doesn't animate open→saved.
+  const [transitionsReady, setTransitionsReady] = React.useState(false)
   React.useEffect(() => {
-    setWidthState(readStoredSidebarWidth())
+    setTransitionsReady(true)
   }, [])
 
   const setWidth = React.useCallback((px: number, persist = true) => {
@@ -117,7 +111,7 @@ function SidebarProvider({
       }
 
       // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      document.cookie = `${SIDEBAR_STATE_COOKIE}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
     [setOpenProp, open]
   )
@@ -189,7 +183,7 @@ function SidebarProvider({
         }
         className={cn(
           "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
-          isResizing &&
+          (!transitionsReady || isResizing) &&
             "[&_[data-slot=sidebar-gap]]:duration-0 [&_[data-slot=sidebar-container]]:duration-0",
           className
         )}
