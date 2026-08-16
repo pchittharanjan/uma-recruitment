@@ -7,10 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { displayApplicantId } from '@/lib/applicant-id';
+import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 import type { DeliberationsCandidateDetail } from '@/lib/deliberations-types';
 import type { ApplicationStage } from '@/lib/db';
 import { applicationStageLabel } from '@/lib/stages';
 import { cn } from '@/lib/utils';
+
+export function prefetchDeliberationsDetail(url: string): void {
+  void cachedJsonFetch(url);
+}
 
 function formatScore(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -161,14 +166,13 @@ export function DeliberationsCandidateDetailPanel({
     setError('');
     setDetail(null);
 
-    fetch(url, { cache: 'no-store' })
-      .then(async (res) => {
-        const json = (await res.json()) as {
-          detail?: DeliberationsCandidateDetail;
-          error?: string;
-        };
-        if (cancelled) return;
-        if (!res.ok || !json.detail) {
+    cachedJsonFetch<{
+      detail?: DeliberationsCandidateDetail;
+      error?: string;
+    }>(url)
+      .then(({ ok, json }) => {
+        if (cancelled || !json) return;
+        if (!ok || !json.detail) {
           setError(json.error ?? 'Failed to load applicant.');
           return;
         }

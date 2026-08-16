@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { RoundStatus } from '@/lib/db';
+import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import type { UnlockableStage } from '@/lib/stages';
 
@@ -58,15 +59,19 @@ function parseNav(json: Record<string, unknown>): TeamNavSnapshot {
   };
 }
 
+const NAV_URL = '/api/team/nav';
+
 export function TeamNavProvider({ children }: { children: ReactNode }) {
   const [nav, setNav] = useState<TeamNavSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/team/nav', { cache: 'no-store' });
-      if (!res.ok) return;
-      const json = (await res.json()) as Record<string, unknown>;
+      invalidateClientFetchCache(NAV_URL);
+      const { ok, json } = await cachedJsonFetch<Record<string, unknown>>(NAV_URL, {
+        force: true,
+      });
+      if (!ok || !json) return;
       setNav(parseNav(json));
     } catch {
       // Shell stays usable without nav data.
@@ -78,11 +83,10 @@ export function TeamNavProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch('/api/team/nav', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled || !json) return;
-        setNav(parseNav(json as Record<string, unknown>));
+    cachedJsonFetch<Record<string, unknown>>(NAV_URL)
+      .then(({ ok, json }) => {
+        if (cancelled || !ok || !json) return;
+        setNav(parseNav(json));
       })
       .catch(() => {})
       .finally(() => {

@@ -3,6 +3,7 @@ import { getLatestAdvancementSubmission } from '@/lib/advancement-submissions';
 import type { User } from '@/lib/db';
 import { getDb } from '@/lib/db';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
+import { cachedPerRequest } from '@/lib/request-cache';
 
 export type AdvancementOutcomeLabel = 'advanced' | 'rejected' | 'pending';
 
@@ -48,6 +49,17 @@ function requiredGlobalStatus(fromStage: AdvancementFromStage): 'application' | 
 }
 
 export async function getTeamAdvancementOutcome(
+  teamId: number,
+  roundId: number,
+  fromStage: AdvancementFromStage,
+): Promise<TeamAdvancementOutcome> {
+  return cachedPerRequest(
+    `advancementOutcome:${teamId}:${roundId}:${fromStage}`,
+    () => getTeamAdvancementOutcomeUncached(teamId, roundId, fromStage),
+  );
+}
+
+async function getTeamAdvancementOutcomeUncached(
   teamId: number,
   roundId: number,
   fromStage: AdvancementFromStage,

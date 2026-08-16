@@ -1,8 +1,8 @@
+import { cache } from 'react';
 import {
   getDb,
   getRoundById,
   getTeamById,
-  getTeams,
   getUserByEmail,
   rowToRound,
   type ResultSet,
@@ -151,14 +151,52 @@ export async function teamHasApplicationPipeline(teamId: number): Promise<boolea
   return ((result.rows[0]?.count as number) ?? 0) > 0;
 }
 
-/** True when any team has imported applications for the current pipeline. */
-export async function anyTeamHasActivePipeline(): Promise<boolean> {
-  const teams = await getTeams();
-  for (const team of teams) {
-    if (await teamHasApplicationPipeline(team.id)) return true;
-  }
-  return false;
-}
+/**
+ * True when any team has imported applications for its active round.
+ * Single EXISTS query (matches getActiveRoundForTeam: prefer non-closed, else latest closed).
+ * React-cached so layouts share one result per RSC request.
+ */
+export const anyTeamHasActivePipeline = cache(async function anyTeamHasActivePipeline(): Promise<boolean> {
+  return cachedPerRequest('anyTeamHasActivePipeline', async () => {
+    const db = getDb();
+    const result = await db.execute({
+      sql: `SELECT EXISTS (
+              SELECT 1
+              FROM teams t
+              WHERE EXISTS (
+                SELECT 1
+                FROM applications app
+                WHERE app.team_id = t.id
+                  AND app.round_id = COALESCE(
+                    (
+                      SELECT r.id FROM rounds r
+                      WHERE r.team_id = t.id AND r.status != 'closed'
+                      ORDER BY
+                        CASE r.status
+                          WHEN 'deliberations' THEN 6
+                          WHEN 'final_round' THEN 5
+                          WHEN 'first_round' THEN 4
+                          WHEN 'application' THEN 3
+                          WHEN 'pre_application' THEN 2
+                          WHEN 'setup' THEN 1
+                          ELSE 0
+                        END DESC,
+                        r.created_at DESC
+                      LIMIT 1
+                    ),
+                    (
+                      SELECT r.id FROM rounds r
+                      WHERE r.team_id = t.id AND r.status = 'closed'
+                      ORDER BY r.created_at DESC
+                      LIMIT 1
+                    )
+                  )
+              )
+            ) AS has_pipeline`,
+    });
+    return Boolean(result.rows[0]?.has_pipeline);
+  });
+});
 
 export interface ImportRoundInput {
   teamId: number;

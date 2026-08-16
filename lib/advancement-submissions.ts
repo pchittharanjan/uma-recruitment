@@ -294,8 +294,13 @@ export async function getLatestAdvancementSubmission(
   roundId: number,
   fromStage: AdvancementFromStage = 'application',
 ): Promise<AdvancementSubmission | null> {
-  const history = await listAdvancementSubmissionHistory(teamId, roundId, fromStage);
-  return history[0] ?? null;
+  return cachedPerRequest(
+    `latestAdvancementSubmission:${teamId}:${roundId}:${fromStage}`,
+    async () => {
+      const history = await listAdvancementSubmissionHistory(teamId, roundId, fromStage);
+      return history[0] ?? null;
+    },
+  );
 }
 
 function lockMessages(fromStage: AdvancementFromStage): {

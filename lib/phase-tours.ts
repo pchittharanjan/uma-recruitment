@@ -2,7 +2,6 @@ import {
   CalendarIcon,
   ClipboardCheckIcon,
   CoffeeIcon,
-  EyeOffIcon,
   FileTextIcon,
   FlagIcon,
   LayoutGridIcon,
@@ -69,18 +68,20 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
     steps: [
       {
         icon: FileTextIcon,
-        title: 'Open your assignments',
-        description: 'Find applications waiting for your score in the sidebar.',
-      },
-      {
-        icon: EyeOffIcon,
-        title: 'Grade blind',
+        title: '1. Grade your assignments',
         description: 'Score each application on merit — identifying info is stripped.',
       },
       {
-        icon: ClipboardCheckIcon,
-        title: 'Submit before the deadline',
-        description: 'Finish all assigned apps before the phase advances.',
+        icon: FlagIcon,
+        title: '2. Add color recommendations',
+        description:
+          'After grading, mark who you think should move forward with color signals.',
+      },
+      {
+        icon: UsersIcon,
+        title: '3. Directors finalize',
+        description:
+          'Directors meet with PMs, then submit the advancement list to Admin.',
       },
     ],
     execSteps: [
@@ -90,14 +91,15 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
         description: 'See who has finished grading and who still has apps left.',
       },
       {
-        icon: ListChecksIcon,
-        title: 'Manage assignments',
-        description: 'Reassign or balance workload across graders as needed.',
+        icon: FlagIcon,
+        title: 'Color recommendations',
+        description:
+          'Graders set signals; Directors align with PMs and submit the list.',
       },
       {
         icon: ClipboardCheckIcon,
         title: 'Advance when ready',
-        description: 'Move to First Round once grading is complete.',
+        description: 'Move to First Round once Admin approves the advancement list.',
       },
     ],
   },
@@ -111,18 +113,19 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
     steps: [
       {
         icon: CalendarIcon,
-        title: 'Check your schedule',
+        title: '1. Check your schedule',
         description: 'See interview slots and candidates assigned to you.',
       },
       {
         icon: MicIcon,
-        title: 'Score your interviews',
+        title: '2. Score your interviews',
         description: 'Submit rubric scores after each conversation.',
       },
       {
-        icon: ClipboardCheckIcon,
-        title: 'Complete all slots',
-        description: 'Finish every assigned interview before deliberations.',
+        icon: FlagIcon,
+        title: '3. Add color recommendations',
+        description:
+          'After scoring, mark who you think should move forward. Directors finalize with PMs.',
       },
     ],
     execSteps: [
@@ -137,9 +140,10 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
         description: 'Monitor which interviews still need scores.',
       },
       {
-        icon: ClipboardCheckIcon,
-        title: 'Advance when ready',
-        description: 'Move to Final Round once first round scoring is done.',
+        icon: FlagIcon,
+        title: 'Recommendations & advance',
+        description:
+          'Collect color signals, meet with PMs, then submit the list to Admin.',
       },
     ],
   },

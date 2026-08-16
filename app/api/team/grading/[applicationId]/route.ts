@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initDb } from '@/lib/db';
 import { forbidden, notFound, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
+import { isTeamDirector } from '@/lib/directors';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { resolveContextFields } from '@/lib/blind';
@@ -79,6 +80,8 @@ async function handleGet(
 
     const blind = userSeesBlindApplications(user);
     const contextFields = graderContextFieldsForSettings(settings);
+    const isDirector =
+      user.role === 'exec' && (await isTeamDirector(user.id, teamId));
 
     return NextResponse.json({
       applicationId: assignment.applicationId,
@@ -96,6 +99,7 @@ async function handleGet(
       contextFields: blind ? contextFields : resolveContextFields(settings),
       graderInstructions: settings.grader_instructions,
       gradingEditLock,
+      isDirector,
     });
   } catch (e) {
     console.error(e);

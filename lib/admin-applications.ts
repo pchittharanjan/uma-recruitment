@@ -1,4 +1,4 @@
-import { resolveApplicantEmail } from '@/lib/candidates';
+import { isPlaceholderCandidateEmail, resolveApplicantEmail } from '@/lib/candidates';
 import { getDb, getTeams, type ApplicationStage, type Team } from '@/lib/db';
 import type { AdminApplicationDetail, AdminApplicationRow } from '@/lib/admin-application-types';
 
@@ -10,7 +10,14 @@ export interface ListAdminApplicationsOptions {
   q?: string;
   teamId?: number;
   stage?: ApplicationStage;
+  /** Max rows to return (default 150). */
+  limit?: number;
+  /** Offset for pagination (default 0). */
+  offset?: number;
 }
+
+const DEFAULT_LIST_LIMIT = 150;
+const MAX_LIST_LIMIT = 500;
 
 function searchPattern(q: string): string {
   return `%${q.trim().toLowerCase()}%`;
@@ -18,12 +25,24 @@ function searchPattern(q: string): string {
 
 export async function listAdminApplications(
   options: ListAdminApplicationsOptions = {},
-): Promise<{ applications: AdminApplicationRow[]; teams: Team[] }> {
+): Promise<{
+  applications: AdminApplicationRow[];
+  teams: Team[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}> {
   const db = getDb();
   const teams = await getTeams();
   const q = options.q?.trim() ?? '';
   const hasSearch = q.length > 0;
   const pattern = hasSearch ? searchPattern(q) : null;
+  const limit = Math.min(
+    Math.max(options.limit ?? DEFAULT_LIST_LIMIT, 1),
+    MAX_LIST_LIMIT,
+  );
+  const offset = Math.max(options.offset ?? 0, 0);
 
   const args: (string | number)[] = [];
   let where = `WHERE r.status != 'closed'`;
@@ -55,9 +74,26 @@ export async function listAdminApplications(
     where += ')';
   }
 
+  const countResult = await db.execute({
+    sql: `SELECT COUNT(*) AS total
+          FROM applications app
+          JOIN candidates c ON c.id = app.candidate_id
+          JOIN teams t ON t.id = app.team_id
+          JOIN rounds r ON r.id = app.round_id
+          ${where}`,
+    args,
+  });
+  const total = (countResult.rows[0]?.total as number) ?? 0;
+
+  // List payload skips app.fields when candidate email is usable — detail fetch loads fields.
   const result = await db.execute({
     sql: `SELECT app.id, app.row_index, app.stage, app.team_id, app.round_id,
-                 app.final_score, app.rank, app.admin_note, app.fields,
+                 app.final_score, app.rank, app.admin_note,
+                 CASE
+                   WHEN c.email IS NULL OR TRIM(c.email) = '' OR LOWER(c.email) LIKE '%@unknown.local'
+                   THEN app.fields
+                   ELSE NULL
+                 END AS fields,
                  c.id AS candidate_id, c.name AS candidate_name, c.email AS candidate_email,
                  t.name AS team_name
           FROM applications app
@@ -65,8 +101,9 @@ export async function listAdminApplications(
           JOIN teams t ON t.id = app.team_id
           JOIN rounds r ON r.id = app.round_id
           ${where}
-          ORDER BY t.name ASC, app.row_index ASC`,
-    args,
+          ORDER BY t.name ASC, app.row_index ASC
+          LIMIT ? OFFSET ?`,
+    args: [...args, limit, offset],
   });
 
   const appIds = result.rows.map((r) => r.id as number);
@@ -94,7 +131,12 @@ export async function listAdminApplications(
   const applications: AdminApplicationRow[] = result.rows.map((row) => {
     const id = row.id as number;
     const prog = progressByApp.get(id) ?? { completed: 0, total: 0 };
-    const fields = parseApplicationFields(row.fields);
+    const candidateEmailRaw = (row.candidate_email as string | null) ?? '';
+    const fields = row.fields != null ? parseApplicationFields(row.fields) : {};
+    const candidateEmail =
+      candidateEmailRaw && !isPlaceholderCandidateEmail(candidateEmailRaw)
+        ? candidateEmailRaw
+        : resolveApplicantEmail(fields, candidateEmailRaw);
     return {
       id,
       rowIndex: (row.row_index as number | null) ?? 0,
@@ -104,10 +146,7 @@ export async function listAdminApplications(
       roundId: row.round_id as number,
       candidateId: row.candidate_id as number,
       candidateName: row.candidate_name as string,
-      candidateEmail: resolveApplicantEmail(
-        fields,
-        (row.candidate_email as string | null) ?? '',
-      ),
+      candidateEmail,
       finalScore: (row.final_score as number | null) ?? null,
       rank: (row.rank as number | null) ?? null,
       adminNote: (row.admin_note as string | null) ?? null,
@@ -116,7 +155,14 @@ export async function listAdminApplications(
     };
   });
 
-  return { applications, teams };
+  return {
+    applications,
+    teams,
+    total,
+    limit,
+    offset,
+    hasMore: offset + applications.length < total,
+  };
 }
 
 export async function getAdminApplication(

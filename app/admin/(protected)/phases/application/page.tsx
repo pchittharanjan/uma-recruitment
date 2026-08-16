@@ -99,7 +99,7 @@ export default function ApplicationPhasePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetch('/api/admin/dashboard'), fetch('/api/admin/phase')])
+    Promise.all([fetch('/api/admin/dashboard'), fetch('/api/admin/phase?light=1')])
       .then(async ([dashboardRes, phaseRes]) => {
         if (dashboardRes.status === 401) {
           router.push('/login');
@@ -155,6 +155,8 @@ export default function ApplicationPhasePage() {
         <StatusBanner
           type="info"
           message="Application grading is locked for graders. Unlock it from the dashboard when you're ready."
+          actionLabel="Open stage access"
+          actionHref="/admin/dashboard#stage-access"
         />
       )}
 

@@ -11,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { useOptionalShellUser } from '@/components/shell-user-provider';
 import {
   buildBreadcrumbs,
   extractTeamIdFromPath,
@@ -71,46 +72,27 @@ function TeamBreadcrumbTrail({
   teamId?: string;
   teamName?: string;
 }) {
+  const shell = useOptionalShellUser();
   const teamId = teamIdProp ?? extractTeamIdFromPath(pathname);
   const interviewScore = parseInterviewScorePath(pathname);
+  const shellTeamName =
+    teamName ??
+    (teamId
+      ? shell?.teams.find((t) => String(t.id) === teamId)?.name
+      : undefined);
   const [teamNames, setTeamNames] = useState<Record<string, string>>(() =>
-    teamId && teamName ? { [teamId]: teamName } : {},
+    teamId && shellTeamName ? { [teamId]: shellTeamName } : {},
   );
   const [interviewProgress, setInterviewProgress] = useState<
     Record<string, { current: number; total: number }>
   >({});
 
-  // Prefer the name passed from the shell/layout over the "Team {id}" fallback.
   useEffect(() => {
-    if (!teamId || !teamName) return;
-    setTeamNames((prev) => (prev[teamId] === teamName ? prev : { ...prev, [teamId]: teamName }));
-  }, [teamId, teamName]);
-
-  useEffect(() => {
-    if (!teamId || teamNames[teamId] || interviewScore) return;
-
-    let cancelled = false;
-
-    const loadTeamName = async () => {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (!res.ok) return;
-        const json = await res.json();
-        const team = json.teams?.find((entry: { id: number }) => String(entry.id) === teamId);
-        if (!cancelled && team?.name) {
-          setTeamNames((prev) => ({ ...prev, [teamId]: team.name }));
-        }
-      } catch {
-        // Keep fallback label from buildBreadcrumbs.
-      }
-    };
-
-    void loadTeamName();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname, teamId, teamNames, interviewScore]);
+    if (!teamId || !shellTeamName) return;
+    setTeamNames((prev) =>
+      prev[teamId] === shellTeamName ? prev : { ...prev, [teamId]: shellTeamName },
+    );
+  }, [teamId, shellTeamName]);
 
   useEffect(() => {
     if (!interviewScore) return;

@@ -336,3 +336,18 @@ CREATE TABLE IF NOT EXISTS round_communications (
   pass_notified_at INTEGER,
   reject_notified_at INTEGER
 );
+
+-- Per-user in-app notifications (assignment / unlock events).
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  href TEXT,
+  team_id INTEGER REFERENCES teams(id),
+  read_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON notifications(user_id, created_at DESC);

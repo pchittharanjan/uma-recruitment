@@ -4,6 +4,7 @@ import React, { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import PageLoading from '@/components/page-loading';
+import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -261,7 +262,15 @@ export default function TeamInterviewScorePage({
         toast.error(json.error ?? 'Failed to submit score');
         return;
       }
-      toast.success('Interview score submitted');
+      toast.success(
+        json.nextApplicationId
+          ? 'Interview score submitted'
+          : stage === 'first_round'
+            ? json.isDirector
+              ? 'All interviews scored — next: color recommendations, then meet with your PMs'
+              : 'All interviews scored — next: color recommendations'
+            : 'All interviews scored',
+      );
       if (json.nextApplicationId) {
         router.push(`/team/${teamId}/interviews/${stage}/${json.nextApplicationId}`);
       } else {
@@ -331,12 +340,12 @@ export default function TeamInterviewScorePage({
 
   if (error) {
     return (
-      <PageContainer className="space-y-6">
-        <PageHeader title="Couldn't load interview" description={error} />
-        <LoadingButton onClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}>
-          Back
-        </LoadingButton>
-      </PageContainer>
+      <CenteredMessage
+        title="Couldn't load interview"
+        description={error}
+        ctaLabel="Back"
+        onCtaClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}
+      />
     );
   }
 

@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { initDb, type AssignmentStage } from '@/lib/db';
 import { forbidden, unauthorized } from '@/lib/auth';
+import { isTeamDirector } from '@/lib/directors';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
@@ -37,6 +38,19 @@ async function handleGet(req: NextRequest) {
 
     const assignments = await listGraderAssignments(user.id, teamId, stage);
     const completed = assignments.filter((a) => a.status === 'completed').length;
+    const allDone = assignments.length > 0 && completed === assignments.length;
+    const canOpenFirstRoundAdvancement =
+      user.role === 'exec' && stage === 'first_round';
+    const isDirector =
+      canOpenFirstRoundAdvancement && (await isTeamDirector(user.id, teamId));
+    const nextStep =
+      allDone && canOpenFirstRoundAdvancement
+        ? {
+            kind: 'color_recommendations' as const,
+            href: `/team/${teamId}/advancement/first-round`,
+            isDirector,
+          }
+        : null;
 
     return NextResponse.json({
       grader: { id: user.id, name: user.name, email: user.email },
@@ -44,6 +58,8 @@ async function handleGet(req: NextRequest) {
       stageLabel: assignmentStageLabel(stage),
       assignments,
       progress: { completed, total: assignments.length },
+      isDirector,
+      nextStep,
     });
   } catch (e) {
     console.error(e);

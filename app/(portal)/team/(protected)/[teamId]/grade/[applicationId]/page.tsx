@@ -3,6 +3,7 @@
 import React, { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
+import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ import {
   prefetchNextPendingGradeData,
   type GradeAppData,
 } from '@/lib/grading-client';
+import { gradingCompleteToast } from '@/lib/next-step-guidance';
 import { cn } from '@/lib/utils';
 
 export default function TeamGradingScorePage({
@@ -88,12 +90,14 @@ export default function TeamGradingScorePage({
         toast.error(data.error ?? 'Failed to submit score');
         return;
       }
-      toast.success('Score submitted');
       invalidateGradeData(teamId, applicationId);
       if (data.nextApplicationId) {
+        toast.success('Score submitted');
         router.push(`/team/${teamId}/grade/${data.nextApplicationId}`);
       } else {
-        router.push(`/team/${teamId}`);
+        toast.success(gradingCompleteToast(Boolean(data.isDirector)));
+        // Grade list shows the role-aware “what’s next” prompt.
+        router.push(`/team/${teamId}/grade`);
       }
     } catch {
       setSubmitError('Network error. Please try again.');
@@ -158,10 +162,12 @@ export default function TeamGradingScorePage({
 
   if (error) {
     return (
-      <PageContainer className="space-y-6">
-        <PageHeader title="Couldn't load application" description={error} />
-        <LoadingButton onClick={() => router.push(`/team/${teamId}`)}>Back</LoadingButton>
-      </PageContainer>
+      <CenteredMessage
+        title="Couldn't load application"
+        description={error}
+        ctaLabel="Back"
+        onCtaClick={() => router.push(`/team/${teamId}`)}
+      />
     );
   }
 
@@ -197,6 +203,10 @@ export default function TeamGradingScorePage({
   const scoredCount = allScoredFields.filter((f) => scores[f] !== undefined).length;
   const totalScored = allScoredFields.length;
   const lockMessage = appData.gradingEditLock?.message ?? '';
+  const isLastPending =
+    !gradingLocked &&
+    appData.graderProgress.total > 0 &&
+    appData.graderProgress.completed === appData.graderProgress.total - 1;
 
   return (
     <>
@@ -208,7 +218,7 @@ export default function TeamGradingScorePage({
           >
             <button
               type="button"
-              onClick={() => router.push(`/team/${teamId}`)}
+              onClick={() => router.push(`/team/${teamId}/grade`)}
               className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
             >
               ← Back
@@ -231,6 +241,17 @@ export default function TeamGradingScorePage({
       <PageContainer className="py-6 sm:py-6 lg:py-6">
         <PageContent width="comfortable" className="space-y-6 pb-8">
           {gradingLocked && <StatusBanner type="info" message={lockMessage} />}
+
+          {isLastPending && (
+            <StatusBanner
+              type="info"
+              message={
+                appData.isDirector
+                  ? 'Last application in your queue. After you submit, you’ll add color recommendations, then meet with your PMs.'
+                  : 'Last application in your queue. After you submit, you’ll add color recommendations on who should move forward.'
+              }
+            />
+          )}
 
           {appData.graderInstructions && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-4">

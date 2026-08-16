@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Columns2Icon, PlusIcon, XIcon } from 'lucide-react';
+import { Columns2Icon, LayoutGridIcon, PlusIcon, XIcon } from 'lucide-react';
 import { DeliberationsTeamBoard } from '@/components/deliberations-team-board';
+import { CenteredMessage } from '@/components/centered-message';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
@@ -303,13 +304,14 @@ export function DeliberationsWorkspace() {
 
         <div className={cn('min-h-0 flex-1', split && openTabIds.length > 0 ? 'flex overflow-hidden' : 'overflow-auto p-4 sm:p-5')}>
           {openTabIds.length === 0 ? (
-            <div className="flex flex-col items-start gap-3 p-4 py-8 sm:p-5">
-              <p className="text-sm text-muted-foreground">
-                Open a team board to start deliberations. You can keep several boards open and
-                switch between them like browser tabs.
-              </p>
-              {closedTeams.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+            <CenteredMessage
+              className="min-h-[min(56vh,32rem)]"
+              icon={LayoutGridIcon}
+              title="Open a team board"
+              description="Start deliberations by opening a team. You can keep several boards open and switch between them like browser tabs."
+            >
+              {closedTeams.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-2">
                   {closedTeams.map((team) => (
                     <Button
                       key={team.id}
@@ -322,13 +324,12 @@ export function DeliberationsWorkspace() {
                     </Button>
                   ))}
                 </div>
-              )}
-              {!teamsLoading && closedTeams.length === 0 && (
+              ) : !teamsLoading ? (
                 <p className="text-sm text-muted-foreground">
                   No teams with an active round are available yet.
                 </p>
-              )}
-            </div>
+              ) : null}
+            </CenteredMessage>
           ) : split ? (
             <>
               <div className="min-h-0 overflow-auto p-4 sm:p-5" style={{ width: `${splitRatio}%` }}>

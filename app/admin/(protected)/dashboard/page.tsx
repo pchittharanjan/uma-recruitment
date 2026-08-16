@@ -17,12 +17,17 @@ import {
 } from '@/lib/stages';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { useShellUser } from '@/components/shell-user-provider';
 import StatusBanner from '@/components/status-banner';
+import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 
 interface DashboardData {
   pipelineStatus: RoundStatus;
   teams: PhaseTeamSummary[];
 }
+
+/** Survive client navigations so we can paint instantly, then force-refresh. */
+let lastDashboardData: DashboardData | null = null;
 
 function firstNameFromName(name: string | null | undefined): string {
   if (!name) return '';
@@ -33,28 +38,35 @@ function AdminDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewParam = searchParams.get('view') ?? '';
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [viewingStatus, setViewingStatus] = useState<RoundStatus | null>(null);
-  const [firstName, setFirstName] = useState('');
+  const { user } = useShellUser();
+  const firstName = firstNameFromName(user.name);
+  const [data, setData] = useState<DashboardData | null>(lastDashboardData);
+  const [viewingStatus, setViewingStatus] = useState<RoundStatus | null>(() =>
+    lastDashboardData
+      ? parseDashboardViewPhase(viewParam || null, lastDashboardData.pipelineStatus)
+      : null,
+  );
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const interviewOverviewScrolledRef = useRef<string | null>(null);
 
   const loadDashboard = useCallback(() => {
-    fetch('/api/admin/dashboard')
-      .then((res) => {
-        if (res.status === 401) {
+    // Always refetch — progress numbers go stale after simulate/grading, and the
+    // shared client cache otherwise serves a 5-minute snapshot.
+    cachedJsonFetch<DashboardData & { error?: string }>('/api/admin/dashboard', {
+      force: true,
+    })
+      .then(({ status, json }) => {
+        if (status === 401) {
           router.push('/login');
-          return null;
+          return;
         }
-        return res.json();
-      })
-      .then((json) => {
         if (!json) return;
         if (json.error) {
           setError(json.error);
           return;
         }
+        lastDashboardData = json;
         setData(json);
         const view = parseDashboardViewPhase(
           viewParam || null,
@@ -63,11 +75,11 @@ function AdminDashboardContent() {
         setViewingStatus(view);
       })
       .catch(() => setError('Failed to load dashboard'));
-  }, [router, viewParam]);
+  }, [router, viewParam, refreshKey]);
 
   useEffect(() => {
     loadDashboard();
-  }, [loadDashboard, refreshKey]);
+  }, [loadDashboard]);
 
   useEffect(() => {
     if (!data) return;
@@ -78,7 +90,11 @@ function AdminDashboardContent() {
   useEffect(() => {
     if (!data || typeof window === 'undefined') return;
     const hash = window.location.hash;
-    if (hash !== '#interview-overview' && hash !== '#move-all-teams') {
+    if (
+      hash !== '#interview-overview' &&
+      hash !== '#move-all-teams' &&
+      hash !== '#stage-access'
+    ) {
       interviewOverviewScrolledRef.current = null;
       return;
     }
@@ -92,24 +108,6 @@ function AdminDashboardContent() {
     interviewOverviewScrolledRef.current = scrollKey;
     el.scrollIntoView({ behavior: 'instant', block: 'start' });
   }, [data, viewParam]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled) return;
-        const nextFirstName = firstNameFromName(json?.user?.name);
-        setFirstName(nextFirstName);
-      })
-      .catch(() => {
-        if (!cancelled) setFirstName('');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleViewingChange = (status: RoundStatus) => {
     setViewingStatus(status);

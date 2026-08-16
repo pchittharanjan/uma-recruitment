@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
     const roundLabel = ((formData.get('roundLabel') as string | null) ?? '').trim();
     const graderInstructions = (formData.get('graderInstructions') as string | null) ?? undefined;
 
-    if (!csvFile) return NextResponse.json({ error: 'CSV file is required.' }, { status: 400 });
+    if (!csvFile) {
+      return NextResponse.json({ error: 'Spreadsheet file is required.' }, { status: 400 });
+    }
 
     const teamSplitRaw = formData.get('teamSplitConfig') as string | null;
     if (!teamSplitRaw) {
@@ -93,7 +95,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const csvText = await csvFile.text();
+    const spreadsheetBuffer = await csvFile.arrayBuffer();
+    let spreadsheet;
+    try {
+      const { parseSpreadsheetArrayBuffer } = await import('@/lib/spreadsheet');
+      spreadsheet = await parseSpreadsheetArrayBuffer(spreadsheetBuffer, csvFile.name);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not read spreadsheet.';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
     const contextFieldsRaw = formData.get('contextFields') as string | null;
     let contextFields: string[] = [];
     if (contextFieldsRaw) {
@@ -118,7 +129,7 @@ export async function POST(req: NextRequest) {
         try {
           const result = await importUnifiedApplicationRound({
             roundLabel: roundLabel || 'Application Round',
-            csvText,
+            spreadsheet,
             scoreFieldsByTeam,
             contextFields,
             customScoreFields,

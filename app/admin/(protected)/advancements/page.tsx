@@ -16,6 +16,7 @@ import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AvgScoreCell, AvgScoreHeader } from '@/components/avg-score-header';
+import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import {
   Table,
   TableBody,
@@ -123,18 +124,26 @@ export default function AdminAdvancementsPage() {
   const [approveError, setApproveError] = useState('');
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  const fetchData = useCallback(async () => {
-    const res = await fetch('/api/admin/advancements?includeReadiness=1');
-    if (res.status === 401) {
+  const fetchData = useCallback(async (opts?: { force?: boolean }) => {
+    const { status, ok, json } = await cachedJsonFetch<{
+      submissions?: Submission[];
+      activity?: ActivityEntry[];
+      teamReadiness?: TeamReadinessRow[];
+      error?: string;
+    }>('/api/admin/advancements?includeReadiness=1', { force: opts?.force });
+    if (status === 401) {
       router.push('/login');
       return;
     }
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error ?? 'Failed to load submissions.');
+    if (!ok || !json) {
+      setError('Failed to load submissions.');
       return;
     }
-    setSubmissions(json.submissions);
+    if (json.error) {
+      setError(json.error);
+      return;
+    }
+    setSubmissions(json.submissions ?? []);
     setActivity(json.activity ?? []);
     const readiness = (json.teamReadiness ?? []) as TeamReadinessRow[];
     setTeamReadiness(readiness);
@@ -142,7 +151,7 @@ export default function AdminAdvancementsPage() {
   }, [router]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   const handleApprove = async (submissionId: number, force = false) => {
@@ -167,7 +176,8 @@ export default function AdminAdvancementsPage() {
       }
       setConfirmId(null);
       toast.success('Advancement approved');
-      await fetchData();
+      invalidateClientFetchCache('/api/admin/advancements');
+      await fetchData({ force: true });
     } catch {
       setApproveError('Approval failed.');
       toast.error('Approval failed.');

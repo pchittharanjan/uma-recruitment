@@ -187,7 +187,7 @@ async function loadStateWithWarnings(warnings: string[]): Promise<GlobalPipeline
 
 /** Advance every active round to the next pipeline phase (reconciles drift). */
 export async function advanceGlobalPipeline(
-  unlockedBy: number,
+  _unlockedBy: number,
 ): Promise<GlobalPipelineActionResult> {
   const state = await getGlobalPipelineState();
   const warnings: string[] = [];
@@ -228,10 +228,13 @@ export async function advanceGlobalPipeline(
     args: [next, ...roundIds],
   });
 
+  // Do not auto-unlock grader access. Admins set up the phase (import, schedule,
+  // rubric, …) while the stage stays locked; they open grading from Stage access.
   const unlockStage = unlockKeyForStatus(next);
   if (unlockStage) {
-    await Promise.all(rounds.map((round) => unlockRoundStage(round.id, unlockStage, unlockedBy)));
-    warnings.push(`${phaseLabel(next)} reopened for grading on all active teams.`);
+    warnings.push(
+      `${phaseLabel(next)} is ready for setup. Unlock it under Stage access when graders should start.`,
+    );
   }
 
   return loadStateWithWarnings(warnings);
@@ -263,6 +266,11 @@ export async function unlockGlobalStage(
   }
 
   await Promise.all(rounds.map((round) => unlockRoundStage(round.id, stage, unlockedBy)));
+
+  if (stage === 'application') {
+    const { notifyApplicationUnlocked } = await import('@/lib/notifications');
+    await notifyApplicationUnlocked(rounds.map((r) => r.id));
+  }
 
   return loadStateWithWarnings(warnings);
 }

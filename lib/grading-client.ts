@@ -15,6 +15,7 @@ export interface GradeAppData {
   customScoreFields: string[];
   graderInstructions: string | null;
   gradingEditLock: GradingEditLock;
+  isDirector?: boolean;
 }
 
 interface QueueAssignment {

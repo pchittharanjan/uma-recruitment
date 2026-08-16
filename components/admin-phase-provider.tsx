@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { RoundStatus } from '@/lib/db';
+import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
 import type { UnlockableStage } from '@/lib/stages';
 
@@ -27,20 +28,28 @@ type AdminPhaseContextValue = {
 
 const AdminPhaseContext = createContext<AdminPhaseContextValue | null>(null);
 
+const LIGHT_PHASE_URL = '/api/admin/phase?light=1';
+
+function parsePhase(json: Record<string, unknown>): AdminPhaseSnapshot {
+  return {
+    status: (json.status as RoundStatus | null) ?? null,
+    unlockedStages: (json.unlockedStages as UnlockableStage[]) ?? [],
+    pipelineClosed: json.status === 'closed' || Boolean(json.pipelineClosed),
+  };
+}
+
 export function AdminPhaseProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<AdminPhaseSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/phase', { cache: 'no-store' });
-      if (!res.ok) return;
-      const json = await res.json();
-      setPhase({
-        status: json.status ?? null,
-        unlockedStages: json.unlockedStages ?? [],
-        pipelineClosed: json.status === 'closed' || Boolean(json.pipelineClosed),
+      invalidateClientFetchCache('/api/admin/phase');
+      const { ok, json } = await cachedJsonFetch<Record<string, unknown>>(LIGHT_PHASE_URL, {
+        force: true,
       });
+      if (!ok || !json) return;
+      setPhase(parsePhase(json));
     } catch {
       // Shell stays usable without phase data.
     } finally {
@@ -51,15 +60,10 @@ export function AdminPhaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch('/api/admin/phase', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled || !json) return;
-        setPhase({
-          status: json.status ?? null,
-          unlockedStages: json.unlockedStages ?? [],
-          pipelineClosed: json.status === 'closed' || Boolean(json.pipelineClosed),
-        });
+    cachedJsonFetch<Record<string, unknown>>(LIGHT_PHASE_URL)
+      .then(({ ok, json }) => {
+        if (cancelled || !ok || !json) return;
+        setPhase(parsePhase(json));
       })
       .catch(() => {})
       .finally(() => {
@@ -78,14 +82,9 @@ export function AdminPhaseProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(PIPELINE_PHASE_CHANGED_EVENT, onChange);
   }, [refresh]);
 
-  const value = useMemo(
-    () => ({ phase, loading, refresh }),
-    [phase, loading, refresh],
-  );
+  const value = useMemo(() => ({ phase, loading, refresh }), [phase, loading, refresh]);
 
-  return (
-    <AdminPhaseContext.Provider value={value}>{children}</AdminPhaseContext.Provider>
-  );
+  return <AdminPhaseContext.Provider value={value}>{children}</AdminPhaseContext.Provider>;
 }
 
 export function useAdminPhase(): AdminPhaseContextValue {

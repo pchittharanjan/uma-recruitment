@@ -20,7 +20,7 @@ export function TeamStageControls() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/phase');
+      const res = await fetch('/api/admin/phase?light=1');
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? 'Failed to load phase.');

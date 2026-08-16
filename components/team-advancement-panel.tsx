@@ -47,7 +47,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { ApplicationAdvancementDetailPanel } from '@/components/application-advancement-detail-panel';
+import { ApplicationAdvancementDetailPanel, prefetchAdvancementDetail } from '@/components/application-advancement-detail-panel';
+import { useOptionalShellUser } from '@/components/shell-user-provider';
+import {
+  advancementStepGuide,
+  recommendationsCompleteMessage,
+} from '@/lib/next-step-guidance';
 
 interface RankedApplicant {
   applicationId: number;
@@ -368,6 +373,9 @@ export function TeamAdvancementPanel({
   fromStage: AdvancementFromStage;
 }) {
   const router = useRouter();
+  const shell = useOptionalShellUser();
+  const teamName =
+    shell?.teams.find((t) => String(t.id) === teamId)?.name ?? '';
   const config = PANEL_CONFIG[fromStage];
   const isFirstRound = fromStage === 'first_round';
   const [data, setData] = useState<AdvancementData | null>(null);
@@ -376,7 +384,6 @@ export function TeamAdvancementPanel({
   const [finalSelection, setFinalSelection] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [teamName, setTeamName] = useState('');
   const [filterMyInterviewees, setFilterMyInterviewees] = useState<boolean | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showSlotBreakdown, setShowSlotBreakdown] = useState(false);
@@ -422,14 +429,8 @@ export function TeamAdvancementPanel({
   }, [filterMyInterviewees, fromStage, router, teamId]);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then((me) => {
-        const team = me.teams?.find((t: { id: number }) => String(t.id) === teamId);
-        if (team) setTeamName(team.name);
-      });
     fetchData();
-  }, [fetchData, teamId]);
+  }, [fetchData]);
 
   const panelGreenIds = useMemo(() => {
     if (!data) return new Set<number>();
@@ -735,6 +736,23 @@ export function TeamAdvancementPanel({
     [verdicts],
   );
 
+  const myVerdictTargets = useMemo(() => {
+    if (!data) return { total: 0, set: 0 };
+    let total = 0;
+    let set = 0;
+    for (const app of data.preview.applications) {
+      const ctx = rowVerdictContext(data, app.applicationId, fromStage);
+      if (!ctx.canSetVerdict) continue;
+      total += 1;
+      const current = verdicts[app.applicationId] ?? ctx.myVerdict;
+      if (current) set += 1;
+    }
+    return { total, set };
+  }, [data, fromStage, verdicts]);
+
+  const myRecommendationsComplete =
+    myVerdictTargets.total > 0 && myVerdictTargets.set === myVerdictTargets.total;
+
   if (error) {
     return (
       <PageContainer size="full">
@@ -760,10 +778,21 @@ export function TeamAdvancementPanel({
 
       {isReadOnly && <StatusBanner type="info" message={config.readOnlyMessage} />}
 
-      {usesFinalSelection && !canSubmitList && canMarkVerdicts && (
+      {canMarkVerdicts && !isPending && !isApproved && (
+        <StatusBanner type="info" message={advancementStepGuide(canSubmitList)} />
+      )}
+
+      {!canSubmitList && canMarkVerdicts && myRecommendationsComplete && (
         <StatusBanner
-          type="info"
-          message={`Set panel recommendations on applicants you ${isFirstRound ? 'interviewed' : 'graded'}. Only Directors can submit the list to Admin.`}
+          type="success"
+          message={recommendationsCompleteMessage(false)}
+        />
+      )}
+
+      {canSubmitList && canMarkVerdicts && myRecommendationsComplete && !isPending && !isApproved && (
+        <StatusBanner
+          type="success"
+          message={recommendationsCompleteMessage(true)}
         />
       )}
 
@@ -1313,6 +1342,12 @@ export function TeamAdvancementPanel({
                                   variant="outline"
                                   size="sm"
                                   aria-expanded={expanded}
+                                  onMouseEnter={() =>
+                                    prefetchAdvancementDetail(teamId, app.applicationId)
+                                  }
+                                  onFocus={() =>
+                                    prefetchAdvancementDetail(teamId, app.applicationId)
+                                  }
                                   onClick={() => toggleExpanded(app.applicationId)}
                                 >
                                   {expanded ? 'Hide' : 'View'}

@@ -228,6 +228,17 @@ export async function saveInterviewSchedule(
   );
 
   // Cascade deletes interview_slot_interviewers via FK; one statement instead of N round-trips.
+  const previousInterviewers = await db.execute({
+    sql: `SELECT DISTINCT isi.user_id
+          FROM interview_slot_interviewers isi
+          JOIN interview_slots islot ON islot.id = isi.slot_id
+          WHERE islot.round_id = ? AND islot.team_id = ? AND islot.stage = ?`,
+    args: [roundId, teamId, stage],
+  });
+  const previouslyAssigned = new Set(
+    previousInterviewers.rows.map((r) => r.user_id as number),
+  );
+
   await db.execute({
     sql: 'DELETE FROM interview_slots WHERE round_id = ? AND team_id = ? AND stage = ?',
     args: [roundId, teamId, stage],
@@ -262,6 +273,27 @@ export async function saveInterviewSchedule(
   }
 
   await syncInterviewAssignments(teamId, roundId, stage);
+
+  const newlyAssigned = [
+    ...new Set(
+      slots.flatMap((s) => (s.scheduledAt.trim() ? s.interviewerIds : [])),
+    ),
+  ].filter((userId) => !previouslyAssigned.has(userId));
+
+  if (newlyAssigned.length > 0) {
+    const teamResult = await db.execute({
+      sql: 'SELECT name FROM teams WHERE id = ?',
+      args: [teamId],
+    });
+    const teamName = (teamResult.rows[0]?.name as string) ?? 'your team';
+    const { notifyInterviewAssigned } = await import('@/lib/notifications');
+    await notifyInterviewAssigned({
+      teamId,
+      teamName,
+      stage,
+      interviewerUserIds: newlyAssigned,
+    });
+  }
 }
 
 export async function saveFirstRoundSchedule(

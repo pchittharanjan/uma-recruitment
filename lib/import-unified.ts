@@ -7,7 +7,7 @@ import {
 } from '@/lib/db';
 import { assignGraders, DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
 import { extractCandidateFromFields } from '@/lib/candidates';
-import { parseCsv } from '@/lib/csv';
+import { parseCsv, type ParsedCsv } from '@/lib/csv';
 import { isTestGraderEmail, type GraderInput } from '@/lib/grader-parse';
 import { seedDefaultUnlocksForRound } from '@/lib/stage-access';
 import { applyGlobalPipelineToRound } from '@/lib/pipeline-phase';
@@ -29,7 +29,10 @@ import {
 
 export interface UnifiedImportInput {
   roundLabel: string;
-  csvText: string;
+  /** Raw CSV text — used when `spreadsheet` is not provided. */
+  csvText?: string;
+  /** Pre-parsed sheet (CSV / Excel / ODS). Preferred when available. */
+  spreadsheet?: ParsedCsv;
   scoreFieldsByTeam: Partial<Record<TeamName, string[]>>;
   contextFields: string[];
   customScoreFields: string[];
@@ -222,6 +225,13 @@ async function importRowsForTeam(params: {
     });
   }
 
+  const { notifyApplicationsAssigned } = await import('@/lib/notifications');
+  await notifyApplicationsAssigned({
+    teamId: params.team.id,
+    teamName: params.team.name,
+    assignments: assignments.map((a) => ({ userId: a.userId })),
+  });
+
   return {
     team: params.team,
     round,
@@ -233,7 +243,14 @@ async function importRowsForTeam(params: {
 export async function importUnifiedApplicationRound(
   input: UnifiedImportInput,
 ): Promise<UnifiedImportResult> {
-  const parsed = parseCsv(input.csvText);
+  const parsed =
+    input.spreadsheet ??
+    (input.csvText != null && input.csvText !== ''
+      ? parseCsv(input.csvText)
+      : null);
+  if (!parsed) {
+    throw new Error('Spreadsheet data is required.');
+  }
   const customScoreFields = input.customScoreFields.map((f) => f.trim()).filter(Boolean);
   const roundLabel =
     input.roundLabel.trim() || (await getRecruitmentCycleShortLabel());

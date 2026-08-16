@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initDb } from '@/lib/db';
 import { forbidden, notFound, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
+import { isTeamDirector } from '@/lib/directors';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { getRoundSettings } from '@/lib/rounds';
@@ -100,8 +101,16 @@ export async function POST(
 
     const nextApplicationId =
       next.rows.length > 0 ? (next.rows[0].application_id as number) : null;
+    const isDirector =
+      nextApplicationId == null &&
+      user.role === 'exec' &&
+      (await isTeamDirector(user.id, teamId));
 
-    return NextResponse.json({ success: true, nextApplicationId });
+    return NextResponse.json({
+      success: true,
+      nextApplicationId,
+      isDirector: Boolean(isDirector),
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

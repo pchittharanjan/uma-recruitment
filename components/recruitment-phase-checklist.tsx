@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   CircleDashedIcon,
 } from 'lucide-react';
+import { AdvancePipelineButton } from '@/components/advance-pipeline-button';
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -164,9 +165,9 @@ export function RecruitmentPhaseChecklist({
 
         <CollapsibleContent
           id={panelId}
-          className="pb-1 pt-1 [overflow-anchor:none]"
+          className="pb-2 pt-2 [overflow-anchor:none]"
         >
-          <div className="space-y-0 [overflow-anchor:none]">
+          <div className="space-y-1 [overflow-anchor:none]">
             {steps.map((step, index) => {
               const isOpen = openStepId === step.id;
               const hasDescription = Boolean(step.description?.trim());
@@ -177,39 +178,37 @@ export function RecruitmentPhaseChecklist({
 
               return (
                 <div
-                  className={cn('group', showDivider && 'mt-0.5')}
+                  className={cn('group', showDivider && 'mt-1')}
                   key={step.id}
                 >
                   <div className="relative overflow-hidden rounded-lg transition-colors">
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full cursor-pointer items-center justify-between gap-3 pr-1 pl-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                        isOpen
-                          ? hasDescription
-                            ? 'py-2'
-                            : 'pt-2 pb-1'
-                          : 'py-2',
+                        'flex w-full cursor-pointer items-center justify-between gap-3 px-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        isOpen ? 'pt-3 pb-2' : 'py-3',
                       )}
                       onClick={(event) => {
                         event.currentTarget.focus({ preventScroll: true });
                         handleStepToggle(step.id, isOpen);
                       }}
                     >
-                      <div className="flex min-w-0 flex-1 gap-3">
+                      <div className="flex min-w-0 flex-1 gap-3.5">
                         <StepIndicator completed={step.completed} />
                         <div className="min-w-0 grow">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                             <h4
                               className={cn(
-                                'text-sm font-semibold',
+                                'text-sm font-semibold leading-snug',
                                 step.completed ? 'text-primary' : 'text-foreground',
                               )}
                             >
                               {step.title}
                             </h4>
                             {step.detail && (
-                              <span className="text-sm text-muted-foreground">{step.detail}</span>
+                              <span className="text-sm leading-snug text-muted-foreground">
+                                {step.detail}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -224,20 +223,28 @@ export function RecruitmentPhaseChecklist({
                     </button>
 
                     {isOpen && (
-                      <div className="px-1 pb-2 pl-10">
+                      <div className="space-y-3 px-1.5 pb-3.5 pl-[2.125rem]">
                         {hasDescription && (
-                          <p className="max-w-prose text-pretty text-sm text-muted-foreground">
+                          <p className="max-w-prose text-pretty text-sm leading-relaxed text-muted-foreground">
                             {step.description}
                           </p>
                         )}
-                        <Button
-                          className={cn(hasDescription ? 'mt-2' : 'mt-0')}
-                          size="sm"
-                          nativeButton={false}
-                          render={<Link href={step.href} />}
-                        >
-                          {step.actionLabel}
-                        </Button>
+                        {step.advancePipeline && !step.completed ? (
+                          <AdvancePipelineButton
+                            label={step.actionLabel}
+                            size="sm"
+                            className="uma-cta-primary"
+                            redirectTo={step.advanceRedirectTo}
+                          />
+                        ) : (
+                          <Button
+                            size="sm"
+                            nativeButton={false}
+                            render={<Link href={step.href} />}
+                          >
+                            {step.actionLabel}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>

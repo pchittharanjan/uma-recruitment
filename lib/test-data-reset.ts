@@ -77,6 +77,10 @@ export async function purgeTestRecruitmentData(): Promise<TestDataPurgeResult> {
   if (testUserIds.length > 0) {
     const placeholders = testUserIds.map(() => '?').join(',');
     await db.execute({
+      sql: `DELETE FROM notifications WHERE user_id IN (${placeholders})`,
+      args: testUserIds,
+    });
+    await db.execute({
       sql: `DELETE FROM access_grants WHERE user_id IN (${placeholders})`,
       args: testUserIds,
     });

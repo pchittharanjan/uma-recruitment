@@ -11,9 +11,12 @@ import {
   type TeamInterviewRoundStats,
 } from '@/lib/interview-slots';
 import { runWithRequestCache } from '@/lib/request-cache';
+import { withPerfLog } from '@/lib/perf-log';
 
 export async function GET(req: NextRequest) {
-  return runWithRequestCache(() => handleGet(req));
+  return runWithRequestCache(() =>
+    withPerfLog('GET /api/admin/dashboard', () => handleGet(req)),
+  );
 }
 
 async function handleGet(req: NextRequest) {

@@ -32,6 +32,13 @@ export interface PhaseChecklistStep {
   actionLabel: string;
   href: string;
   detail?: string;
+  /**
+   * When true, the CTA POSTs global phase advance instead of only linking.
+   * Use for "Move all teams…" steps so the label matches the action.
+   */
+  advancePipeline?: boolean;
+  /** Optional redirect after a successful advancePipeline click. */
+  advanceRedirectTo?: string;
 }
 
 async function countCoffeeChats(): Promise<number> {
@@ -136,6 +143,13 @@ async function buildPreApplicationChecklist(): Promise<PhaseChecklistStep[]> {
   const orgDates = await getOrgCoffeeChatDates();
   const orgDatesDone = Boolean(orgDates.coffeeChatStartDate && orgDates.applicationDueDate);
   const coffeeChatCount = await countCoffeeChats();
+  const pipeline = await getActiveRoundsByTeam();
+  const withRound = pipeline.filter((t) => t.round);
+  const teamCount = withRound.length;
+  const teamsOnApplication = withRound.filter((t) =>
+    isRoundAtOrPastStatus(t.round!.status, 'application'),
+  ).length;
+  const moveComplete = teamCount > 0 && teamsOnApplication === teamCount;
 
   return [
     {
@@ -154,11 +168,22 @@ async function buildPreApplicationChecklist(): Promise<PhaseChecklistStep[]> {
       href: '/admin/coffee-chats',
       detail: coffeeChatCount > 0 ? `${coffeeChatCount} logged` : undefined,
     },
+    {
+      id: 'move-to-application',
+      title: 'Move all teams into Application',
+      completed: moveComplete,
+      actionLabel: 'Move teams',
+      href: '/admin/dashboard#move-all-teams',
+      advancePipeline: !moveComplete && teamCount > 0,
+      advanceRedirectTo: '/admin/import',
+      detail: teamDetail(teamsOnApplication, teamCount),
+    },
   ];
 }
 
 async function buildApplicationChecklist(
   withRound: Array<TeamPipelineRound & { round: NonNullable<TeamPipelineRound['round']> }>,
+  unlockedStages: UnlockableStage[] = [],
 ): Promise<PhaseChecklistStep[]> {
   const roundIds = withRound.map((t) => t.round.id);
   const teamCount = withRound.length;
@@ -173,6 +198,7 @@ async function buildApplicationChecklist(
   const importedCount = stats.filter((s) => s.applicationCount > 0).length;
   const rubricCount = rubricResults.filter((s) => (s?.score_fields.length ?? 0) > 0).length;
   const assignedCount = stats.filter((s) => s.assignmentProgress.total > 0).length;
+  const gradingUnlocked = unlockedStages.includes('application');
 
   const submittedTeams = await teamsWithSubmittedAdvancement(roundIds, 'application');
   const approvedTeams = await teamsWithApprovedAdvancement(roundIds, 'application');
@@ -211,6 +237,16 @@ async function buildApplicationChecklist(
       actionLabel: 'View assignments',
       href: '/admin/dashboard',
       detail: teamDetail(assignedCount, teamCount),
+    },
+    {
+      id: 'unlock-grading',
+      title: 'Unlock Application for graders',
+      completed: gradingUnlocked,
+      actionLabel: 'Open stage access',
+      href: '/admin/dashboard#stage-access',
+      description:
+        'Keep this locked while you finish import and setup. Unlock when team members should start grading.',
+      detail: gradingUnlocked ? 'Open for grading' : 'Locked',
     },
     {
       id: 'grading',
@@ -294,6 +330,8 @@ async function buildInterviewChecklist(
       actionLabel: 'Move teams',
       // Keep First Round view (bare /admin/dashboard falls back to live pipeline = Application).
       href: `${adminPhaseHref('first_round')}#move-all-teams`,
+      advancePipeline: !(teamCount > 0 && teamsOnStage === teamCount),
+      advanceRedirectTo: adminPhaseHref('first_round'),
       detail: teamDetail(teamsOnStage, teamCount),
     });
   }
@@ -451,7 +489,7 @@ export async function getPhaseChecklistForStatus(
     case 'pre_application':
       return buildPreApplicationChecklist();
     case 'application':
-      return buildApplicationChecklist(withRound);
+      return buildApplicationChecklist(withRound, unlockedStages);
     case 'first_round':
       return buildInterviewChecklist('first_round', withRound);
     case 'final_round':

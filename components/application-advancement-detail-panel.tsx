@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ApplicationFieldsList } from '@/components/application-fields-list';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 
 interface ApplicationDetailData {
   displayId: string | null;
@@ -13,6 +14,16 @@ interface ApplicationDetailData {
   scoreFields: string[];
   customScoreFields: string[];
   blind: boolean;
+  error?: string;
+}
+
+export function advancementDetailUrl(teamId: string, applicationId: number): string {
+  return `/api/team/advancement/${applicationId}?teamId=${teamId}&fromStage=application`;
+}
+
+/** Warm the short-lived client cache before expand (e.g. on hover). */
+export function prefetchAdvancementDetail(teamId: string, applicationId: number): void {
+  void cachedJsonFetch(advancementDetailUrl(teamId, applicationId));
 }
 
 export function ApplicationAdvancementDetailPanel({
@@ -32,11 +43,10 @@ export function ApplicationAdvancementDetailPanel({
     setError('');
     setData(null);
 
-    fetch(`/api/team/advancement/${applicationId}?teamId=${teamId}&fromStage=application`)
-      .then(async (res) => {
-        const json = await res.json();
-        if (cancelled) return;
-        if (!res.ok) {
+    cachedJsonFetch<ApplicationDetailData>(advancementDetailUrl(teamId, applicationId))
+      .then(({ ok, json }) => {
+        if (cancelled || !json) return;
+        if (!ok) {
           setError(json.error ?? 'Failed to load application.');
           return;
         }

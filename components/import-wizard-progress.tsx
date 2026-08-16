@@ -1,6 +1,8 @@
 'use client';
 
+import { CheckIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 export type WizardStepId = 'upload' | 'teams' | 'scoring' | 'graders' | 'confirm';
 
@@ -18,13 +20,13 @@ export const WIZARD_STEP_IDS = WIZARD_STEPS.map((step) => step.id);
 export function ImportWizardProgressPlaceholder() {
   return (
     <div
-      className="mb-6 flex flex-wrap items-center gap-x-1 gap-y-2"
+      className="flex flex-wrap items-center gap-2"
       role="status"
       aria-label="Loading"
     >
       {WIZARD_STEPS.map((step) => (
         <div key={step.id} className="flex items-center gap-2">
-          <Skeleton className="h-7 w-7 rounded-full" />
+          <Skeleton className="size-8 rounded-full" />
           <Skeleton className="h-4 w-14" />
         </div>
       ))}
@@ -40,37 +42,53 @@ export default function ImportWizardProgress({
   const currentStepIndex = WIZARD_STEP_IDS.indexOf(currentStepId);
 
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
-      {WIZARD_STEPS.map((wizardStep, i) => {
-        const isComplete = currentStepIndex > i;
-        const isCurrent = currentStepId === wizardStep.id;
+    <nav aria-label="Import steps" className="w-full">
+      <ol className="flex flex-wrap items-center gap-y-2">
+        {WIZARD_STEPS.map((wizardStep, i) => {
+          const isComplete = currentStepIndex > i;
+          const isCurrent = currentStepId === wizardStep.id;
 
-        return (
-          <div key={wizardStep.id} className="flex items-center gap-2">
-            <div
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-300 ${
-                isCurrent
-                  ? 'bg-primary text-primary-foreground'
-                  : isComplete
-                    ? 'bg-green-500 text-white'
-                    : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {isComplete ? '✓' : i + 1}
-            </div>
-            <span
-              className={`min-w-[3.5rem] transition-colors duration-300 ${
-                isCurrent ? 'font-medium text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              {wizardStep.label}
-            </span>
-            {i < WIZARD_STEPS.length - 1 && (
-              <span className="text-muted-foreground/40">→</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
+          return (
+            <li key={wizardStep.id} className="flex items-center">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors',
+                    isCurrent && 'bg-primary text-primary-foreground shadow-sm',
+                    isComplete && !isCurrent && 'bg-emerald-600 text-white',
+                    !isCurrent && !isComplete && 'bg-muted text-muted-foreground',
+                  )}
+                  aria-current={isCurrent ? 'step' : undefined}
+                >
+                  {isComplete && !isCurrent ? (
+                    <CheckIcon className="size-3.5" aria-hidden />
+                  ) : (
+                    i + 1
+                  )}
+                </span>
+                <span
+                  className={cn(
+                    'text-sm',
+                    isCurrent && 'font-semibold text-foreground',
+                    !isCurrent && 'text-muted-foreground',
+                  )}
+                >
+                  {wizardStep.label}
+                </span>
+              </div>
+              {i < WIZARD_STEPS.length - 1 ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    'mx-3 h-px w-6 sm:w-10',
+                    isComplete ? 'bg-emerald-500/50' : 'bg-border',
+                  )}
+                />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }

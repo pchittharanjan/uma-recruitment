@@ -5,6 +5,7 @@ import { ImpersonationBanner } from '@/components/impersonation-banner';
 import { PhaseOpenedGate } from '@/components/phase-opened-gate';
 import { PipelineClosedBanner } from '@/components/pipeline-closed-banner';
 import { RecruitmentCompleteGate } from '@/components/recruitment-complete-gate';
+import { ShellUserProvider } from '@/components/shell-user-provider';
 import { TeamNavProvider } from '@/components/team-nav-provider';
 import { WorkspaceFrame } from '@/components/workspace-frame';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -17,7 +18,7 @@ function TeamShellInner({
   isImpersonating = false,
   children,
 }: {
-  user: { name: string; email: string; role: string };
+  user: { id?: number; name: string; email: string; role: string };
   teams: { id: number; name: string }[];
   isImpersonating?: boolean;
   children: React.ReactNode;
@@ -58,16 +59,24 @@ function TeamShellInner({
 }
 
 export function TeamShell(props: {
-  user: { name: string; email: string; role: string };
+  user: { id?: number; name: string; email: string; role: string };
   teams: { id: number; name: string }[];
   isImpersonating?: boolean;
+  impersonationAdmin?: { name: string; email: string };
   children: React.ReactNode;
 }) {
+  const impersonation =
+    props.isImpersonating && props.impersonationAdmin
+      ? { active: true as const, admin: props.impersonationAdmin }
+      : null;
+
   return (
-    <TeamNavProvider>
-      <PhaseOpenedGate userName={props.user.name} />
-      <RecruitmentCompleteGate />
-      <TeamShellInner {...props} />
-    </TeamNavProvider>
+    <ShellUserProvider user={props.user} teams={props.teams} impersonation={impersonation}>
+      <TeamNavProvider>
+        <PhaseOpenedGate userName={props.user.name} />
+        <RecruitmentCompleteGate />
+        <TeamShellInner {...props} />
+      </TeamNavProvider>
+    </ShellUserProvider>
   );
 }

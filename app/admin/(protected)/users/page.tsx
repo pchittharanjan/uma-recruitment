@@ -18,6 +18,8 @@ import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { useShellUser } from '@/components/shell-user-provider';
+import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -276,6 +278,7 @@ function UserFormBody({
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { user: shellUser } = useShellUser();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -361,34 +364,43 @@ export default function AdminUsersPage() {
     setBulkSummary('');
   };
 
-  const fetchUsers = useCallback(async () => {
-    const res = await fetch('/api/admin/users');
-    if (res.status === 401) {
+  const fetchUsers = useCallback(async (opts?: { force?: boolean }) => {
+    const { status, ok, json } = await cachedJsonFetch<{
+      users?: UserRow[];
+      teams?: Team[];
+      error?: string;
+    }>('/api/admin/users', { force: opts?.force });
+    if (status === 401) {
       router.push('/login');
       return;
     }
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error ?? 'Failed to load users');
+    if (!ok || !json) {
+      setError('Failed to load users');
+      setLoading(false);
       return;
     }
-    setUsers(json.users);
-    setTeams(json.teams);
+    if (json.error) {
+      setError(json.error);
+      setLoading(false);
+      return;
+    }
+    setUsers(json.users ?? []);
+    setTeams(json.teams ?? []);
     setLoading(false);
   }, [router]);
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, [fetchUsers]);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.user?.id) setCurrentUserId(json.user.id);
-      })
-      .catch(() => {});
-  }, []);
+    if (typeof shellUser.id === 'number') setCurrentUserId(shellUser.id);
+  }, [shellUser.id]);
+
+  const reloadUsers = useCallback(async () => {
+    invalidateClientFetchCache('/api/admin/users');
+    await fetchUsers({ force: true });
+  }, [fetchUsers]);
 
   useEffect(() => {
     setBulkResults(new Map());
@@ -513,7 +525,7 @@ export default function AdminUsersPage() {
       }
       setEditingUser(null);
       toast.success('User updated');
-      await fetchUsers();
+      await reloadUsers();
     } catch {
       setEditError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
@@ -535,7 +547,7 @@ export default function AdminUsersPage() {
       }
       toast.success(`${removingUser.name} removed`);
       setRemovingUser(null);
-      await fetchUsers();
+      await reloadUsers();
     } catch (e) {
       if (e instanceof Error && e.message) return;
       toast.error('Network error. Please try again.');
@@ -595,7 +607,7 @@ export default function AdminUsersPage() {
       toast.success(`${json.user.name} added`);
       setAddOpen(false);
       resetAddForm();
-      await fetchUsers();
+      await reloadUsers();
     } catch {
       setFormError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
@@ -650,7 +662,7 @@ export default function AdminUsersPage() {
       setBulkSummary(`Created ${createdCount}. ${failedCount} failed.`);
       if (createdCount > 0) {
         toast.success(`Created ${createdCount} people.`);
-        await fetchUsers();
+        await reloadUsers();
       }
       if (failedCount > 0) {
         toast.error(`${failedCount} rows failed.`);

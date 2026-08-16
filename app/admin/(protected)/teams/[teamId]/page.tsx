@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import StageBadge from '@/components/stage-badge';
-import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { AdminAdvancementReadinessPanel } from '@/components/admin-advancement-readiness-panel';
@@ -20,10 +19,13 @@ import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communi
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import type { RoundStatus } from '@/lib/db';
 import { PageContainer, PageHeader } from '@/components/page-shell';
+import { CenteredMessage } from '@/components/centered-message';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { UploadIcon, LayoutGridIcon } from 'lucide-react';
 
 interface GraderProgress {
   id: number;
@@ -188,6 +190,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       const message = `Filled ${json.assignmentsCompleted} ${stageLabel} assignments with random scores (${json.scoresWritten} scores).`;
       setSimulateMessage(message);
       toast.success('Test scores generated');
+      // Team overview on the admin dashboard caches this endpoint — drop it so
+      // navigating back shows the new progress immediately.
+      invalidateClientFetchCache('/api/admin/dashboard');
       await fetchData();
     } catch (e) {
       const message =
@@ -207,10 +212,12 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   if (error && !data) {
     return (
-      <PageContainer className="space-y-4">
-        <StatusBanner message={error} type="error" />
-        <LoadingButton onClick={() => fetchData()}>Try again</LoadingButton>
-      </PageContainer>
+      <CenteredMessage
+        title="Couldn't load team"
+        description={error}
+        ctaLabel="Try again"
+        onCtaClick={() => fetchData()}
+      />
     );
   }
 
@@ -220,13 +227,13 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   if (!data.round) {
     return (
-      <PageContainer className="space-y-6">
-        <PageHeader
-          title={data.team.name}
-          description="No application round imported yet."
-        />
-        <LoadingButton onClick={() => router.push('/admin/import')}>Import CSV</LoadingButton>
-      </PageContainer>
+      <CenteredMessage
+        icon={UploadIcon}
+        title={data.team.name}
+        description="No application round imported yet."
+        ctaLabel="Import spreadsheet"
+        ctaHref="/admin/import"
+      />
     );
   }
 
@@ -241,39 +248,35 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   if (showApplicationHub && !data.dashboard) {
     return (
-      <PageContainer className="space-y-6">
-        <PageHeader title={data.team.name} description="Application data is not available yet." />
-        <LoadingButton onClick={() => router.push('/admin/import')}>Import CSV</LoadingButton>
-      </PageContainer>
+      <CenteredMessage
+        icon={UploadIcon}
+        title={data.team.name}
+        description="Application data is not available yet."
+        ctaLabel="Import spreadsheet"
+        ctaHref="/admin/import"
+      />
     );
   }
 
   if (!showApplicationHub && !isInterviewPhase) {
     return (
-      <PageContainer size="wide" className="space-y-8">
-        <PageHeader
-          title={data.team.name}
-          description={phaseLabel(roundStatus)}
-        />
-        <TeamStageControls />
-        <p className="text-sm text-muted-foreground">
-          {roundStatus === 'deliberations'
+      <CenteredMessage
+        icon={LayoutGridIcon}
+        title={data.team.name}
+        description={
+          roundStatus === 'deliberations'
             ? 'Use the deliberations board to move candidates toward offers.'
-            : 'Open the Dashboard for Org-Wide Phase Controls and Team Overview.'}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {roundStatus === 'deliberations' && (
-            <LoadingButton
-              onClick={() => router.push(openTeamDeliberationsHref(Number(teamId)))}
-            >
-              Open deliberations
-            </LoadingButton>
-          )}
-          <LoadingButton variant="secondary" onClick={() => router.push('/admin/dashboard')}>
-            Go to dashboard
-          </LoadingButton>
-        </div>
-      </PageContainer>
+            : 'Open the Dashboard for org-wide phase controls and team overview.'
+        }
+        ctaLabel={
+          roundStatus === 'deliberations' ? 'Open deliberations' : 'Go to dashboard'
+        }
+        ctaHref={
+          roundStatus === 'deliberations'
+            ? openTeamDeliberationsHref(Number(teamId))
+            : '/admin/dashboard'
+        }
+      />
     );
   }
 

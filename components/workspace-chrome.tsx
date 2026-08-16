@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { Columns2Icon, XIcon } from 'lucide-react';
+import { NotificationBell } from '@/components/notification-bell';
 import { useWorkspace } from '@/components/workspace-provider';
 import { WorkspaceNewTabMenu } from '@/components/workspace-new-tab-menu';
 import { Button } from '@/components/ui/button';
@@ -195,6 +196,12 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
   };
 
   const splitToggle = <SplitToggleButton split={split} onToggle={toggleSplit} />;
+  const toolbarEnd = (
+    <div className="ml-2 flex shrink-0 items-center gap-0.5">
+      <NotificationBell />
+      {splitToggle}
+    </div>
+  );
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -234,7 +241,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
                 <WorkspaceNewTabMenu currentHref={rightHref} onSelect={openOnRight} />
               }
             />
-            <div className="ml-2 flex shrink-0 items-center">{splitToggle}</div>
+            {toolbarEnd}
           </div>
         </div>
       ) : (
@@ -249,7 +256,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
             onClose={closeTab}
             newTabMenu={<WorkspaceNewTabMenu />}
           />
-          <div className="ml-2 flex shrink-0 items-center">{splitToggle}</div>
+          {toolbarEnd}
         </div>
       )}
 

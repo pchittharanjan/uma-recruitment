@@ -289,6 +289,10 @@ export async function deleteUser(input: DeleteUserInput): Promise<void> {
   await db.batch(
     [
       {
+        sql: 'DELETE FROM notifications WHERE user_id = ?',
+        args: [input.userId],
+      },
+      {
         sql: 'DELETE FROM access_grants WHERE user_id = ?',
         args: [input.userId],
       },

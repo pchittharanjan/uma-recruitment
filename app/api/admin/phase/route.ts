@@ -14,12 +14,22 @@ import { getPhaseChecklistForStatus } from '@/lib/phase-checklist';
 import { PIPELINE_PHASES, type UnlockableStage, UNLOCKABLE_STAGES } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
+import { runWithRequestCache } from '@/lib/request-cache';
+import { withPerfLog } from '@/lib/perf-log';
 
 const PIPELINE_STATUSES = new Set(PIPELINE_PHASES.map((p) => p.status));
 
 function parseChecklistStatus(raw: string | null): RoundStatus | null {
   if (!raw || !PIPELINE_STATUSES.has(raw as RoundStatus)) return null;
   return raw as RoundStatus;
+}
+
+function lightPhasePayload(state: GlobalPipelineState) {
+  return {
+    ...state,
+    phases: PIPELINE_PHASES,
+    pipelineClosed: state.status === 'closed',
+  };
 }
 
 async function enrichPhaseResponse(
@@ -30,24 +40,34 @@ async function enrichPhaseResponse(
   const checklist = await getPhaseChecklistForStatus(statusForChecklist, {
     unlockedStages: state.unlockedStages,
   });
-  return { ...state, checklist, phases: PIPELINE_PHASES, pipelineClosed: state.status === 'closed' };
+  return { ...lightPhasePayload(state), checklist };
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    await initDb();
-    if (!(await requireAuth(req, { roles: ['admin'] }))) return unauthorized();
+  return runWithRequestCache(() =>
+    withPerfLog('GET /api/admin/phase', async () => {
+      try {
+        await initDb();
+        if (!(await requireAuth(req, { roles: ['admin'] }))) return unauthorized();
 
-    const state = await getGlobalPipelineState();
-    const checklistStatus = parseChecklistStatus(
-      req.nextUrl.searchParams.get('checklistStatus'),
-    );
+        const state = await getGlobalPipelineState();
+        const light = req.nextUrl.searchParams.get('light') === '1';
+        const checklistStatus = parseChecklistStatus(
+          req.nextUrl.searchParams.get('checklistStatus'),
+        );
 
-    return NextResponse.json(await enrichPhaseResponse(state, checklistStatus));
-  } catch (e) {
-    console.error('GET /api/admin/phase failed:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+        // Shell / status-only consumers: skip expensive checklist fan-out.
+        if (light && !checklistStatus) {
+          return NextResponse.json(lightPhasePayload(state));
+        }
+
+        return NextResponse.json(await enrichPhaseResponse(state, checklistStatus));
+      } catch (e) {
+        console.error('GET /api/admin/phase failed:', e);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }),
+  );
 }
 
 export async function POST(req: NextRequest) {

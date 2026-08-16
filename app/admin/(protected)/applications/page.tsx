@@ -205,6 +205,9 @@ export default function AdminApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
 
   const [searchInput, setSearchInput] = useState('');
@@ -232,36 +235,51 @@ export default function AdminApplicationsPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchApplications = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      if (searchQuery) params.set('q', searchQuery);
-      if (teamFilter !== 'all') params.set('teamId', teamFilter);
-      if (stageFilter !== 'all') params.set('stage', stageFilter);
+  const fetchApplications = useCallback(
+    async (opts?: { append?: boolean; offset?: number }) => {
+      const append = Boolean(opts?.append);
+      const offset = opts?.offset ?? 0;
+      if (append) setLoadingMore(true);
+      else {
+        setLoading(true);
+        setApplications([]);
+      }
+      setError('');
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('q', searchQuery);
+        if (teamFilter !== 'all') params.set('teamId', teamFilter);
+        if (stageFilter !== 'all') params.set('stage', stageFilter);
+        params.set('limit', '150');
+        params.set('offset', String(offset));
 
-      const res = await fetch(`/api/admin/applications?${params.toString()}`);
-      if (res.status === 401) {
-        router.push('/login');
-        return;
+        const res = await fetch(`/api/admin/applications?${params.toString()}`);
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
+        const json = await res.json();
+        if (!res.ok) {
+          setError(json.error ?? 'Failed to load applications');
+          return;
+        }
+        const nextRows = (json.applications ?? []) as ApplicationRow[];
+        setApplications((prev) => (append ? [...prev, ...nextRows] : nextRows));
+        setTeams(json.teams ?? []);
+        setTotal(typeof json.total === 'number' ? json.total : nextRows.length);
+        setHasMore(Boolean(json.hasMore));
+      } catch {
+        setError('Failed to load applications');
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? 'Failed to load applications');
-        return;
-      }
-      setApplications(json.applications ?? []);
-      setTeams(json.teams ?? []);
-    } catch {
-      setError('Failed to load applications');
-    } finally {
-      setLoading(false);
-    }
-  }, [router, searchQuery, teamFilter, stageFilter]);
+    },
+    [router, searchQuery, teamFilter, stageFilter],
+  );
 
   useEffect(() => {
-    fetchApplications();
+    void fetchApplications({ append: false, offset: 0 });
   }, [fetchApplications]);
 
   const sortedApplications = useMemo(
@@ -329,7 +347,7 @@ export default function AdminApplicationsPage() {
     setSelectedId(null);
     setDetail(null);
     setDeleteOpen(false);
-    await fetchApplications();
+    await fetchApplications({ append: false, offset: 0 });
   };
 
   const sheetApp = detail ?? selectedRow;
@@ -352,7 +370,10 @@ export default function AdminApplicationsPage() {
         <Card>
           <CardHeader className="space-y-4">
             <div>
-              <CardTitle>All applications ({applications.length})</CardTitle>
+              <CardTitle>
+                All applications ({applications.length}
+                {total > applications.length ? ` of ${total}` : ''})
+              </CardTitle>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="relative min-w-[200px] flex-1">
@@ -537,6 +558,21 @@ export default function AdminApplicationsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {hasMore && (
+              <div className="flex justify-center border-t border-border px-4 py-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingMore}
+                  onClick={() =>
+                    void fetchApplications({ append: true, offset: applications.length })
+                  }
+                >
+                  {loadingMore ? 'Loading…' : 'Load more'}
+                </Button>
               </div>
             )}
           </CardContent>

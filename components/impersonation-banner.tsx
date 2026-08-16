@@ -1,31 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LoadingButton from '@/components/loading-button';
-
-interface MeResponse {
-  user: { name: string; email: string; role: string };
-  impersonation: {
-    active: boolean;
-    admin: { name: string; email: string };
-  } | null;
-}
+import { useOptionalShellUser } from '@/components/shell-user-provider';
 
 export function ImpersonationBanner() {
   const router = useRouter();
-  const [state, setState] = useState<MeResponse | null>(null);
+  const shell = useOptionalShellUser();
+  const impersonation = shell?.impersonation ?? null;
+  const user = shell?.user;
   const [stopping, setStopping] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json) setState(json);
-      });
-  }, []);
-
-  if (!state?.impersonation?.active) return null;
+  if (!impersonation?.active || !user) return null;
 
   const handleStop = async () => {
     setStopping(true);
@@ -44,8 +31,8 @@ export function ImpersonationBanner() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="min-w-0 leading-relaxed">
           <span className="font-semibold">Test mode:</span> viewing as{' '}
-          <span className="font-medium">{state.user.name}</span> ({state.user.email}). Admin session
-          saved as {state.impersonation.admin.name}.
+          <span className="font-medium">{user.name}</span> ({user.email}). Admin session saved as{' '}
+          {impersonation.admin.name}.
         </p>
         <LoadingButton
           size="sm"

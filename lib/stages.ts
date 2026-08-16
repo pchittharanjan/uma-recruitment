@@ -256,8 +256,9 @@ export const ADMIN_PHASE_SLUGS: Partial<Record<RoundStatus, string>> = {
 };
 
 const ADMIN_PHASE_PATH_PATTERNS: Partial<Record<RoundStatus, RegExp>> = {
-  pre_application: /^\/(?:admin\/coffee-chats|coffee-chats)(?:\/|$)|^\/admin\/import(?:\/|$)/,
-  application: /^\/admin\/phases\/application(?:\/|$)/,
+  pre_application: /^\/(?:admin\/coffee-chats|coffee-chats)(?:\/|$)/,
+  // CSV import is an Application-phase task (gated to that status in import layout).
+  application: /^\/admin\/(?:phases\/application|import)(?:\/|$)/,
   first_round: /^\/admin\/teams\/\d+\/schedule\/first-round(?:\/|$)/,
   deliberations: /^\/admin\/deliberations(?:\/|$)/,
 };

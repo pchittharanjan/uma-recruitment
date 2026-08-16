@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb, type AssignmentStage } from '@/lib/db';
 import { forbidden, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
+import { isTeamDirector } from '@/lib/directors';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
@@ -46,12 +47,27 @@ async function handleGet(req: NextRequest) {
       ? await getGradingEditLock(teamId, round.id)
       : { locked: false, reason: null, message: '' };
 
+    const allDone = assignments.length > 0 && completed === assignments.length;
+    const canOpenApplicationAdvancement = user.role === 'exec' && stage === 'application';
+    const isDirector =
+      canOpenApplicationAdvancement && (await isTeamDirector(user.id, teamId));
+    const nextStep =
+      allDone && canOpenApplicationAdvancement && !gradingEditLock.locked
+        ? {
+            kind: 'color_recommendations' as const,
+            href: `/team/${teamId}/advancement`,
+            isDirector,
+          }
+        : null;
+
     return NextResponse.json({
       grader: { id: user.id, name: user.name, email: user.email },
       stage,
       assignments,
       progress: { completed, total: assignments.length },
       gradingEditLock,
+      isDirector,
+      nextStep,
     });
   } catch (e) {
     console.error(e);

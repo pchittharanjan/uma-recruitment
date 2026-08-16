@@ -285,6 +285,19 @@ const MIGRATIONS = [
       updated_by INTEGER REFERENCES users(id),
       PRIMARY KEY (team_id, round_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      href TEXT,
+      team_id INTEGER REFERENCES teams(id),
+      read_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+      ON notifications(user_id, created_at DESC)`,
 ];
 
 async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {

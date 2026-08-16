@@ -3,6 +3,7 @@
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { AdminPhaseProvider } from '@/components/admin-phase-provider';
 import { PipelineClosedBanner } from '@/components/pipeline-closed-banner';
+import { ShellUserProvider } from '@/components/shell-user-provider';
 import { WorkspaceFrame } from '@/components/workspace-frame';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { useWorkspaceEmbed } from '@/hooks/use-workspace-embed';
@@ -13,7 +14,7 @@ function AdminShellInner({
   showApplicationsNav = false,
   children,
 }: {
-  user: { name: string; email: string; role: string };
+  user: { id?: number; name: string; email: string; role: string };
   showApplicationsNav?: boolean;
   children: React.ReactNode;
 }) {
@@ -47,13 +48,15 @@ function AdminShellInner({
 }
 
 export function AdminShell(props: {
-  user: { name: string; email: string; role: string };
+  user: { id?: number; name: string; email: string; role: string };
   showApplicationsNav?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <AdminPhaseProvider>
-      <AdminShellInner {...props} />
-    </AdminPhaseProvider>
+    <ShellUserProvider user={props.user} teams={[]}>
+      <AdminPhaseProvider>
+        <AdminShellInner {...props} />
+      </AdminPhaseProvider>
+    </ShellUserProvider>
   );
 }

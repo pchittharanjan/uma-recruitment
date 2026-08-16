@@ -6,7 +6,7 @@ import LoadingButton from '@/components/loading-button';
 import ProgressBar from '@/components/progress-bar';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
-import StatusBanner from '@/components/status-banner';
+import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { AssignmentStage } from '@/lib/db';
@@ -18,6 +18,10 @@ import {
   WORK_STATUS_DISPLAY,
   workStatusBadgeColor,
 } from '@/lib/stages';
+import { MicIcon } from 'lucide-react';
+import { useShellUser } from '@/components/shell-user-provider';
+import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { interviewCompleteGuidance } from '@/lib/next-step-guidance';
 
 interface Assignment {
   applicationId: number;
@@ -31,12 +35,19 @@ interface Assignment {
   groupKey: string | null;
 }
 
+interface InterviewNextStep {
+  kind: 'color_recommendations';
+  href: string;
+  isDirector: boolean;
+}
+
 interface InterviewData {
   grader: { id: number; name: string; email: string };
   stage: AssignmentStage;
   stageLabel: string;
   assignments: Assignment[];
   progress: { completed: number; total: number };
+  nextStep: InterviewNextStep | null;
 }
 
 interface InterviewSession {
@@ -97,18 +108,19 @@ export default function TeamInterviewsPage({
 }) {
   const { teamId, stage } = use(params);
   const router = useRouter();
+  const { teams } = useShellUser();
+  const hasMultipleTeams = teams.length > 1;
   const [data, setData] = useState<InterviewData | null>(null);
   const [error, setError] = useState('');
-  const [hasMultipleTeams, setHasMultipleTeams] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then((me) => setHasMultipleTeams((me.teams?.length ?? 0) > 1));
-
-    fetch(`/api/team/interviews?teamId=${teamId}&stage=${stage}`)
-      .then((r) => r.json())
-      .then((json) => {
+    invalidateClientFetchCache(`/api/team/interviews?teamId=${teamId}&stage=${stage}`);
+    cachedJsonFetch<InterviewData & { error?: string }>(
+      `/api/team/interviews?teamId=${teamId}&stage=${stage}`,
+      { force: true },
+    )
+      .then(({ json }) => {
+        if (!json) return;
         if (json.error) {
           setError(json.error);
           return;
@@ -125,18 +137,14 @@ export default function TeamInterviewsPage({
 
   if (error) {
     return (
-      <PageContainer className="space-y-4">
-        <StatusBanner message={error} type="error" />
-        {hasMultipleTeams ? (
-          <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
-            ← Teams
-          </LoadingButton>
-        ) : (
-          <LoadingButton variant="secondary" onClick={() => router.push(`/team/${teamId}`)}>
-            ← Grading
-          </LoadingButton>
-        )}
-      </PageContainer>
+      <CenteredMessage
+        title="Can't open interviews"
+        description={error}
+        ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
+        onCtaClick={() =>
+          router.push(hasMultipleTeams ? '/team' : `/team/${teamId}`)
+        }
+      />
     );
   }
 
@@ -146,12 +154,37 @@ export default function TeamInterviewsPage({
 
   const firstPending = data.assignments.find((a) => a.status === 'pending');
   const allDone = data.progress.completed === data.progress.total && data.progress.total > 0;
+  const nextStep = data.nextStep;
+  const completeCopy = nextStep ? interviewCompleteGuidance(nextStep.isDirector) : null;
+
+  if (data.progress.total === 0) {
+    return (
+      <CenteredMessage
+        icon={MicIcon}
+        title="No interviews assigned"
+        description="An admin will add you on the schedule grid. Check back once your slots are set."
+        ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
+        onCtaClick={() =>
+          router.push(hasMultipleTeams ? '/team' : `/team/${teamId}`)
+        }
+      />
+    );
+  }
 
   return (
     <PageContainer className="space-y-6">
       <PageHeader
         eyebrow="Interview queue"
         title={data.stageLabel}
+        description={
+          completeCopy
+            ? undefined
+            : allDone
+              ? undefined
+              : stage === 'first_round'
+                ? 'Score each interview. When you finish, you\'ll add color recommendations next.'
+                : 'Score each interview on the rubric.'
+        }
         actions={
           hasMultipleTeams ? (
             <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
@@ -162,6 +195,20 @@ export default function TeamInterviewsPage({
       />
 
       <PageSection>
+        {completeCopy && nextStep && (
+          <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
+            <div className="space-y-1">
+              <CardTitle className="text-base">{completeCopy.title}</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
+                {completeCopy.description}
+              </CardDescription>
+            </div>
+            <LoadingButton className="w-full sm:w-auto" onClick={() => router.push(nextStep.href)}>
+              {completeCopy.ctaLabel}
+            </LoadingButton>
+          </Card>
+        )}
+
         <Card className="p-6">
           <div className="mb-4 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-xl font-bold text-primary">
@@ -177,11 +224,6 @@ export default function TeamInterviewsPage({
             max={data.progress.total}
             label="Interviews completed"
           />
-          {data.progress.total === 0 && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              No interviews to score yet. An admin will add you on the schedule grid.
-            </p>
-          )}
           {!allDone && firstPending && (
             <LoadingButton
               className="mt-4 w-full"

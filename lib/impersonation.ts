@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/auth';
@@ -34,13 +35,14 @@ export async function getImpersonateTargetFromRequest(req: NextRequest): Promise
   return user && canImpersonateUser(user) ? user : null;
 }
 
-export async function getImpersonateTarget(): Promise<User | null> {
+/** Deduped per RSC request so portal layout + team context share one lookup. */
+export const getImpersonateTarget = cache(async function getImpersonateTarget(): Promise<User | null> {
   const cookieStore = await cookies();
   const id = parseUserId(cookieStore.get(IMPERSONATE_AS_COOKIE)?.value);
   if (!id) return null;
   const user = await getUserById(id);
   return user && canImpersonateUser(user) ? user : null;
-}
+});
 
 export function isImpersonatingRequest(req: NextRequest): boolean {
   return Boolean(

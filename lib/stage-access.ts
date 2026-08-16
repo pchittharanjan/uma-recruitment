@@ -149,9 +149,14 @@ export async function canUserAccessTeamStage(
   return granted.includes(stage);
 }
 
+/**
+ * New rounds start with no grader unlocks.
+ * Admins unlock Application (and later stages) from Dashboard → Stage access
+ * after setup is ready — so execs don't see "Start grading" during import.
+ */
 export async function seedDefaultUnlocksForRound(
-  roundId: number,
-  unlockedBy: number,
+  _roundId: number,
+  _unlockedBy: number,
 ): Promise<void> {
-  await unlockRoundStage(roundId, 'application', unlockedBy);
+  // Intentionally empty — unlocks are admin-controlled.
 }

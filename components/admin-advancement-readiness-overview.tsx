@@ -278,7 +278,7 @@ export function AdminAdvancementReadinessOverview({
                   Recommendations
                 </TableHead>
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
-                  Exec recommendations
+                  Recommendors
                 </TableHead>
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
                   Director list

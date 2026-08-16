@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -37,12 +38,13 @@ export async function getSessionUserFromRequest(req: NextRequest): Promise<User 
   return getUserById(id);
 }
 
-export async function getSessionUser(): Promise<User | null> {
+/** Deduped per RSC request so nested layouts share one session lookup. */
+export const getSessionUser = cache(async function getSessionUser(): Promise<User | null> {
   const cookieStore = await cookies();
   const id = parseUserId(cookieStore.get(SESSION_COOKIE)?.value);
   if (!id) return null;
   return getUserById(id);
-}
+});
 
 export async function requireAuth(
   req: NextRequest,

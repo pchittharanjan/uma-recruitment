@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   CheckCircle2Icon,
   InfoIcon,
@@ -61,12 +62,16 @@ export default function StatusBanner({
   type = 'info',
   title,
   dismissKey,
+  actionLabel,
+  actionHref,
 }: {
   message: string;
   type?: Type;
   title?: string;
   /** When set, banner can be dismissed and stays hidden via localStorage. */
   dismissKey?: string;
+  actionLabel?: string;
+  actionHref?: string;
 }) {
   const [dismissed, setDismissed] = useState(() =>
     dismissKey ? readDismissed(dismissKey) : false,
@@ -84,33 +89,48 @@ export default function StatusBanner({
     message
   );
 
+  const hasAction = Boolean(actionLabel && actionHref);
+
   return (
     <Alert
       className={cn(
         'grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-0 border py-2 pr-10 pl-3 text-sm shadow-none',
         styles[type].alert,
-        dismissKey && 'has-data-[slot=alert-action]:pr-10',
+        (dismissKey || hasAction) && 'has-data-[slot=alert-action]:pr-10',
       )}
     >
       <Icon className={cn('mt-0.5 size-3.5 shrink-0', styles[type].icon)} aria-hidden />
       <AlertDescription className="col-start-2 text-sm leading-snug text-foreground">
         {content}
       </AlertDescription>
-      {dismissKey && (
-        <AlertAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Dismiss notification"
-            onClick={() => {
-              persistDismissed(dismissKey);
-              setDismissed(true);
-            }}
-          >
-            <XIcon />
-          </Button>
+      {(dismissKey || hasAction) && (
+        <AlertAction className="flex items-center gap-1">
+          {hasAction ? (
+            <Button
+              nativeButton={false}
+              render={<Link href={actionHref!} />}
+              variant="outline"
+              size="xs"
+              className="h-7"
+            >
+              {actionLabel}
+            </Button>
+          ) : null}
+          {dismissKey ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Dismiss notification"
+              onClick={() => {
+                persistDismissed(dismissKey);
+                setDismissed(true);
+              }}
+            >
+              <XIcon />
+            </Button>
+          ) : null}
         </AlertAction>
       )}
     </Alert>

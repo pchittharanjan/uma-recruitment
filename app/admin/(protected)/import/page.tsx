@@ -44,7 +44,7 @@ import {
   type GraderInput,
 } from '@/lib/grader-parse';
 import { DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
-import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import {
   ImportWizardProgressPlaceholder,
   WIZARD_STEP_IDS,
@@ -377,6 +377,21 @@ export default function UnifiedImportPage() {
     clearCsvWizardState();
   }, [clearCsvWizardState]);
 
+  /** Leave upload without finishing — drop file + derived wizard state. */
+  const abandonUpload = useCallback(() => {
+    clearCsvWizardState();
+  }, [clearCsvWizardState]);
+
+  // Clear draft upload when leaving the page (browser back / close / hard navigation).
+  // Skip setState in effect cleanup — the component is unmounting anyway.
+  useEffect(() => {
+    const onPageHide = () => {
+      clearCsvWizardState();
+    };
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [clearCsvWizardState]);
+
   const handleUploadNext = () => {
     if (!roundLabel.trim()) {
       setError('Enter a round label.');
@@ -638,6 +653,7 @@ export default function UnifiedImportPage() {
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
         title="Import applications"
+        description="Load this cycle’s spreadsheet, map teams, then assign graders. Unlock grading later from the dashboard."
         actions={<EraseTestDataButton onSuccess={resetImportWizard} redirectTo="/admin/import" />}
       />
 
@@ -650,10 +666,16 @@ export default function UnifiedImportPage() {
       <PageSection ref={contentRef} className="space-y-0">
         <StepTransition stepKey={step} direction={stepDirection}>
         {step === 'upload' && (
-          <PageContent width="comfortable">
-            <PagePanel className="space-y-5">
-              <div className="space-y-1">
-                <h2 className="text-base font-semibold">Application CSV</h2>
+          <PageContent width="narrow">
+            <div className="space-y-6 pt-4 sm:pt-6">
+              <div className="space-y-1.5">
+                <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground">
+                  Upload spreadsheet
+                </h2>
+                <p className="max-w-prose text-pretty text-sm leading-relaxed text-muted-foreground">
+                  Export from Google Forms, Excel, or Numbers (as Excel/CSV), then drop the file
+                  here. Next steps split applicants by team and set up graders.
+                </p>
               </div>
 
               <CsvFileUpload
@@ -663,18 +685,27 @@ export default function UnifiedImportPage() {
                 onClear={handleRemoveCsv}
               />
 
-              {uploadReady && csvFile && (
+              {uploadReady && csvFile ? (
                 <p className="text-sm text-muted-foreground">
-                  {allRows.length} rows · {headers.length} columns ready · {roundLabel} cycle
+                  <span className="font-medium text-foreground">
+                    {allRows.length.toLocaleString()} rows
+                  </span>
+                  {' · '}
+                  {headers.length} columns · {roundLabel} cycle
                 </p>
-              )}
+              ) : null}
 
-              <div className="flex justify-end pt-4">
-                <LoadingButton onClick={handleUploadNext} disabled={!uploadReady}>
+              <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-5">
+                <LoadingButton
+                  onClick={handleUploadNext}
+                  disabled={!uploadReady}
+                  className={uploadReady ? 'uma-cta-primary' : undefined}
+                  title={!uploadReady ? 'Upload a CSV first' : undefined}
+                >
                   Continue →
                 </LoadingButton>
               </div>
-            </PagePanel>
+            </div>
           </PageContent>
         )}
 
@@ -735,7 +766,7 @@ export default function UnifiedImportPage() {
               )}
 
               <div className="flex items-center justify-between gap-3 pt-4">
-                <LoadingButton variant="secondary" onClick={() => setStep('upload')}>
+                <LoadingButton variant="secondary" onClick={abandonUpload}>
                   Back
                 </LoadingButton>
                 <LoadingButton onClick={handleTeamsNext}>Continue →</LoadingButton>
@@ -998,100 +1029,172 @@ export default function UnifiedImportPage() {
         )}
 
         {step === 'confirm' && splitSummary && (
-          <PageContent width="comfortable">
-          <PagePanel className="space-y-6">
-            <h2 className="text-lg font-semibold">Confirm import</h2>
-            <div className="divide-y divide-border/40 text-sm">
-              <div className="flex justify-between py-3">
-                <span className="text-muted-foreground">Round</span>
-                <span className="font-medium">{roundLabel}</span>
+          <PageContent width="narrow">
+            <div className="space-y-6">
+              <div className="space-y-1.5">
+                <h2 className="font-heading text-lg font-semibold tracking-tight">
+                  Confirm import
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Double-check the split, then import. This creates applications and grader
+                  assignments for each team.
+                </p>
               </div>
-              <div className="flex justify-between py-3">
-                <span className="text-muted-foreground">Users per application</span>
-                <span className="font-medium">{gradersPerApplication}</span>
-              </div>
-              {teamsWithApps.map((team) => (
-                <div key={team} className="flex justify-between py-3">
-                  <span className="text-muted-foreground">{team}</span>
-                  <span className="font-medium">
-                    {splitSummary[team]} apps · {scoreFieldsByTeam[team].size} questions ·{' '}
-                    {gradersByTeam[team]?.length ?? 0} users
-                  </span>
-                </div>
-              ))}
-            </div>
-            {loading && importProgress && (
-              <div className="display-panel space-y-3 px-4 py-4">
-                <p className="text-sm font-medium">{importProgress.label}</p>
-                {importProgress.team && importProgress.total > 0 && (
-                  <p className="text-sm text-muted-foreground tabular-nums">
-                    {importProgress.team}: {importProgress.current} / {importProgress.total}{' '}
-                    applications
-                  </p>
-                )}
-                {importProgress.overallTotal > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-muted-foreground tabular-nums">
-                      <span>Overall progress</span>
-                      <span>
-                        {importProgress.overallCurrent} / {importProgress.overallTotal}
-                      </span>
-                    </div>
-                    <Progress
-                      value={importProgress.overallCurrent}
-                      max={importProgress.overallTotal}
-                      className="w-full"
-                    />
+
+              <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
+                <dl className="divide-y divide-border/50 text-sm">
+                  <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+                    <dt className="text-muted-foreground">Round</dt>
+                    <dd className="font-medium text-foreground">{roundLabel}</dd>
                   </div>
-                )}
-                {importProgress.teamCount > 1 && importProgress.teamIndex > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Team {importProgress.teamIndex} of {importProgress.teamCount}
-                  </p>
-                )}
+                  <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+                    <dt className="text-muted-foreground">Graders per application</dt>
+                    <dd className="font-medium tabular-nums text-foreground">
+                      {gradersPerApplication}
+                    </dd>
+                  </div>
+                </dl>
               </div>
-            )}
-            <div className="flex justify-between pt-4">
-              <LoadingButton variant="secondary" onClick={() => setStep('graders')}>
-                Back
-              </LoadingButton>
-              <LoadingButton onClick={handleSubmit} loading={loading}>
-                Import all teams →
-              </LoadingButton>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  By team
+                </p>
+                <ul className="grid gap-2 sm:grid-cols-3">
+                  {teamsWithApps.map((team) => (
+                    <li
+                      key={team}
+                      className="rounded-xl border border-border/70 bg-background px-4 py-3"
+                    >
+                      <p className="text-sm font-semibold text-foreground">{team}</p>
+                      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                        {splitSummary[team]}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {scoreFieldsByTeam[team].size} questions ·{' '}
+                        {gradersByTeam[team]?.length ?? 0} users
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {loading && importProgress ? (
+                <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground">{importProgress.label}</p>
+                    {importProgress.teamCount > 1 && importProgress.teamIndex > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Team {importProgress.teamIndex} of {importProgress.teamCount}
+                      </p>
+                    ) : null}
+                  </div>
+                  {importProgress.team && importProgress.total > 0 ? (
+                    <p className="text-sm tabular-nums text-muted-foreground">
+                      {importProgress.team}: {importProgress.current} / {importProgress.total}{' '}
+                      applications
+                    </p>
+                  ) : null}
+                  {importProgress.overallTotal > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between gap-3 text-sm tabular-nums text-muted-foreground">
+                        <span>Overall</span>
+                        <span>
+                          {importProgress.overallCurrent} / {importProgress.overallTotal}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (importProgress.overallCurrent / importProgress.overallTotal) * 100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-5">
+                <LoadingButton
+                  variant="secondary"
+                  onClick={() => setStep('graders')}
+                  disabled={loading}
+                >
+                  Back
+                </LoadingButton>
+                <LoadingButton
+                  onClick={handleSubmit}
+                  loading={loading}
+                  disabled={loading}
+                  className="uma-cta-primary"
+                >
+                  {loading ? 'Importing…' : 'Import all teams →'}
+                </LoadingButton>
+              </div>
             </div>
-          </PagePanel>
           </PageContent>
         )}
 
         {step === 'done' && result && (
-          <PageContent width="comfortable">
-          <PagePanel className="space-y-4">
-            <StatusBanner
-              message="Import complete! Each team has its own users and scoring rubric."
-              type="success"
-            />
-            <ul className="space-y-2 text-sm">
-              {result.teams.map((t) => (
-                <li
-                  key={t.team.name}
-                  className="display-field flex justify-between px-3 py-2"
+          <PageContent width="narrow">
+            <div className="space-y-6">
+              <div className="space-y-1.5">
+                <h2 className="font-heading text-lg font-semibold tracking-tight">
+                  Import complete
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Each team has its applications, users, and scoring setup. Unlock Application
+                  grading from the dashboard when you&apos;re ready.
+                </p>
+              </div>
+
+              <StatusBanner
+                message="Applications imported successfully."
+                type="success"
+              />
+
+              <ul className="overflow-hidden rounded-xl border border-border/70 bg-background">
+                {result.teams.map((t, index) => (
+                  <li
+                    key={t.team.name}
+                    className={cn(
+                      'flex items-center justify-between gap-4 px-4 py-3 text-sm',
+                      index > 0 && 'border-t border-border/50',
+                    )}
+                  >
+                    <span className="font-medium text-foreground">{t.team.name}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {t.applicationCount.toLocaleString()} applications
+                    </span>
+                  </li>
+                ))}
+                {result.unmatchedCount > 0 ? (
+                  <li className="border-t border-border/50 px-4 py-3 text-sm text-amber-800">
+                    {result.unmatchedCount} rows skipped (no team match)
+                  </li>
+                ) : null}
+              </ul>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-5">
+                <LoadingButton
+                  variant="secondary"
+                  onClick={() => router.push('/admin/dashboard#stage-access')}
                 >
-                  <span className="font-medium">{t.team.name}</span>
-                  <span>{t.applicationCount} applications</span>
-                </li>
-              ))}
-              {result.unmatchedCount > 0 && (
-                <li className="text-amber-700">
-                  {result.unmatchedCount} rows skipped (no team match)
-                </li>
-              )}
-            </ul>
-            <div className="flex justify-end pt-4">
-              <LoadingButton onClick={() => router.push('/admin/dashboard')}>
-                Go to dashboard →
-              </LoadingButton>
+                  Stage access
+                </LoadingButton>
+                <LoadingButton
+                  onClick={() => router.push('/admin/dashboard')}
+                  className="uma-cta-primary"
+                >
+                  Go to dashboard →
+                </LoadingButton>
+              </div>
             </div>
-          </PagePanel>
           </PageContent>
         )}
         </StepTransition>

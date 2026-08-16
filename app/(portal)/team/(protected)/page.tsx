@@ -6,20 +6,13 @@ import { useRouter } from 'next/navigation';
 import { ClipboardListIcon } from 'lucide-react';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
+import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { useShellUser } from '@/components/shell-user-provider';
+import { useTeamNav } from '@/components/team-nav-provider';
 import type { RoundStatus } from '@/lib/db';
 import { phaseLabel, teamLandingHref, teamOverviewHref } from '@/lib/stages';
-
-interface MeResponse {
-  user: { id: number; email: string; name: string; role: string };
-  teams: { id: number; name: string }[];
-}
-
-interface NavTeam {
-  id: number;
-  round: { status: RoundStatus } | null;
-}
 
 function phaseOneLiner(status: RoundStatus): string | undefined {
   switch (status) {
@@ -53,68 +46,36 @@ function TeamCard({
 
 export default function TeamHomePage() {
   const router = useRouter();
-  const [data, setData] = useState<MeResponse | null>(null);
-  const [status, setStatus] = useState<RoundStatus>('application');
-  const [navTeams, setNavTeams] = useState<NavTeam[]>([]);
+  const { teams } = useShellUser();
+  const { nav, loading: navLoading } = useTeamNav();
   const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => {
-        if (!res.ok) {
-          router.push('/login');
-          return null;
-        }
-        return res.json();
-      })
-      .then((json) => {
-        if (!json) return;
-        setData(json);
-        if (json.teams?.length === 1) {
-          setRedirecting(true);
-          fetch('/api/team/nav')
-            .then((r) => (r.ok ? r.json() : null))
-            .then((nav) => {
-              const team = json.teams[0];
-              const navTeam = (nav?.teams as NavTeam[] | undefined)?.find((t) => t.id === team.id);
-              const href = navTeam?.round?.status
-                ? teamLandingHref(team.id, navTeam.round.status)
-                : teamOverviewHref(team.id);
-              router.replace(href);
-            })
-            .catch(() => {
-              router.replace(teamOverviewHref(json.teams[0].id));
-            });
-        }
-      });
+    if (navLoading || !nav || teams.length !== 1) return;
+    setRedirecting(true);
+    const team = teams[0];
+    const navTeam = nav.teams.find((t) => t.id === team.id);
+    const href = navTeam?.round?.status
+      ? teamLandingHref(team.id, navTeam.round.status)
+      : teamOverviewHref(team.id);
+    router.replace(href);
+  }, [nav, navLoading, router, teams]);
 
-    fetch('/api/team/nav')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json?.status) setStatus(json.status);
-        if (json?.teams) setNavTeams(json.teams);
-      })
-      .catch(() => {});
-  }, [router]);
-
-  if (!data || redirecting) {
+  if (navLoading || redirecting || (teams.length === 1 && !nav)) {
     return <PageLoading />;
   }
 
+  const status = nav?.status ?? 'application';
   const label = phaseLabel(status);
 
-  if (data.teams.length === 0) {
+  if (teams.length === 0) {
     return (
-      <PageContainer>
-        <PageSection>
-          <PageHeader
-            eyebrow="Team portal"
-            title="Recruitment Hub"
-            description="You don't have team access yet. Ask an Admin to grant access."
-            actions={<StageBadge label={label} color="blue" />}
-          />
-        </PageSection>
-      </PageContainer>
+      <CenteredMessage
+        title="No team access yet"
+        description="Ask an Admin to grant you access to a team, then refresh this page."
+        ctaLabel="Coffee chats"
+        ctaHref="/coffee-chats"
+      />
     );
   }
 
@@ -129,8 +90,8 @@ export default function TeamHomePage() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.teams.map((team) => {
-            const navTeam = navTeams.find((t) => t.id === team.id);
+          {teams.map((team) => {
+            const navTeam = nav?.teams.find((t) => t.id === team.id);
             const href = navTeam?.round?.status
               ? teamLandingHref(team.id, navTeam.round.status)
               : teamOverviewHref(team.id);

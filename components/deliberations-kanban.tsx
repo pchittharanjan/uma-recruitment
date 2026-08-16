@@ -16,7 +16,7 @@ import {
   ApplicantCompareBar,
   ApplicantCompareDialog,
 } from '@/components/applicant-compare';
-import { DeliberationsCandidateDetailPanel } from '@/components/deliberations-candidate-detail';
+import { DeliberationsCandidateDetailPanel, prefetchDeliberationsDetail } from '@/components/deliberations-candidate-detail';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import LoadingButton from '@/components/loading-button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -129,6 +129,7 @@ interface ApplicantCardProps extends Omit<ComponentProps<typeof KanbanItem>, 'va
   isOverlay?: boolean;
   inCompare?: boolean;
   onOpen?: (candidate: DeliberationsCandidate) => void;
+  onPrefetch?: (candidate: DeliberationsCandidate) => void;
   onToggleRejected?: (candidateId: string) => void;
   onToggleCompare?: (candidateId: string) => void;
 }
@@ -139,6 +140,7 @@ function ApplicantCard({
   isOverlay,
   inCompare,
   onOpen,
+  onPrefetch,
   onToggleRejected,
   onToggleCompare,
   ...props
@@ -171,6 +173,12 @@ function ApplicantCard({
       size="sm"
       onPointerDown={handlePointerDown}
       onClick={handleClick}
+      onMouseEnter={() => {
+        if (!isOverlay) onPrefetch?.(candidate);
+      }}
+      onFocus={() => {
+        if (!isOverlay) onPrefetch?.(candidate);
+      }}
       className={cn(
         'overflow-hidden border shadow-sm ring-0 transition-shadow',
         candidate.rejected ? REJECTED_CARD : meta.card,
@@ -290,6 +298,7 @@ interface DelibColumnProps extends Omit<ComponentProps<typeof KanbanColumn>, 'ch
   compareIds?: Set<string>;
   isOverlay?: boolean;
   onOpenCandidate?: (candidate: DeliberationsCandidate) => void;
+  onPrefetchCandidate?: (candidate: DeliberationsCandidate) => void;
   onToggleRejected?: (candidateId: string) => void;
   onToggleCompare?: (candidateId: string) => void;
 }
@@ -301,6 +310,7 @@ function DelibColumn({
   compareIds,
   isOverlay,
   onOpenCandidate,
+  onPrefetchCandidate,
   onToggleRejected,
   onToggleCompare,
   ...props
@@ -367,6 +377,7 @@ function DelibColumn({
               isOverlay={isOverlay}
               inCompare={compareIds?.has(candidate.id)}
               onOpen={onOpenCandidate}
+              onPrefetch={onPrefetchCandidate}
               onToggleRejected={onToggleRejected}
               onToggleCompare={onToggleCompare}
             />
@@ -850,6 +861,9 @@ export function DeliberationsKanban({
                 acceptLimit={acceptLimit}
                 compareIds={compareIdSet}
                 onOpenCandidate={(candidate) => setSelectedId(candidate.id)}
+                onPrefetchCandidate={(candidate) =>
+                  prefetchDeliberationsDetail(detailUrl(candidate.applicationId))
+                }
                 onToggleRejected={toggleRejected}
                 onToggleCompare={toggleCompare}
               />

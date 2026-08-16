@@ -9,20 +9,26 @@ import {
   listUsersWithTeams,
   UserAdminError,
 } from '@/lib/users-admin';
+import { runWithRequestCache } from '@/lib/request-cache';
+import { withPerfLog } from '@/lib/perf-log';
 
 export async function GET(req: NextRequest) {
-  try {
-    await initDb();
-    const admin = await requireAuth(req, { roles: ['admin'] });
-    if (!admin) return unauthorized();
+  return runWithRequestCache(() =>
+    withPerfLog('GET /api/admin/users', async () => {
+      try {
+        await initDb();
+        const admin = await requireAuth(req, { roles: ['admin'] });
+        if (!admin) return unauthorized();
 
-    const [users, teams] = await Promise.all([listUsersWithTeams(), getTeams()]);
+        const [users, teams] = await Promise.all([listUsersWithTeams(), getTeams()]);
 
-    return NextResponse.json({ users, teams });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+        return NextResponse.json({ users, teams });
+      } catch (e) {
+        console.error(e);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }),
+  );
 }
 
 export async function POST(req: NextRequest) {

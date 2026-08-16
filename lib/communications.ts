@@ -297,26 +297,137 @@ export async function markOutcomeNotificationsSent(
   }
 }
 
+/** COUNT-only pass pool — same filters as loadPassRecipients, no candidate rows. */
+async function countPassRecipients(
+  teamId: number,
+  roundId: number,
+  fromStage: OutcomeEmailStage,
+): Promise<number> {
+  const db = getDb();
+
+  if (fromStage === 'application') {
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS count FROM applications app
+            WHERE app.team_id = ? AND app.round_id = ?
+              AND app.stage IN ('first_round', 'final_round', 'deliberations', 'advanced')`,
+      args: [teamId, roundId],
+    });
+    return (result.rows[0]?.count as number) ?? 0;
+  }
+
+  if (fromStage === 'first_round') {
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS count FROM applications app
+            WHERE app.team_id = ? AND app.round_id = ?
+              AND app.stage IN ('final_round', 'deliberations', 'advanced')`,
+      args: [teamId, roundId],
+    });
+    return (result.rows[0]?.count as number) ?? 0;
+  }
+
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) AS count FROM applications app
+          WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'advanced'`,
+    args: [teamId, roundId],
+  });
+  return (result.rows[0]?.count as number) ?? 0;
+}
+
+/** COUNT-only reject pool — same filters as loadRejectRecipients, no candidate rows. */
+async function countRejectRecipients(
+  teamId: number,
+  roundId: number,
+  fromStage: OutcomeEmailStage,
+): Promise<number> {
+  const db = getDb();
+
+  if (fromStage === 'application') {
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS count FROM applications app
+            WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
+              AND NOT EXISTS (
+                SELECT 1 FROM assignments a
+                WHERE a.application_id = app.id AND a.stage = 'first_round'
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM interview_slots s
+                WHERE s.application_id = app.id AND s.stage = 'first_round'
+              )`,
+      args: [teamId, roundId],
+    });
+    return (result.rows[0]?.count as number) ?? 0;
+  }
+
+  if (fromStage === 'first_round') {
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS count FROM applications app
+            WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
+              AND (
+                EXISTS (
+                  SELECT 1 FROM assignments a
+                  WHERE a.application_id = app.id AND a.stage = 'first_round'
+                )
+                OR EXISTS (
+                  SELECT 1 FROM interview_slots s
+                  WHERE s.application_id = app.id AND s.stage = 'first_round'
+                )
+              )`,
+      args: [teamId, roundId],
+    });
+    return (result.rows[0]?.count as number) ?? 0;
+  }
+
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) AS count FROM applications app
+          WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
+            AND (
+              EXISTS (
+                SELECT 1 FROM assignments a
+                WHERE a.application_id = app.id AND a.stage = 'final_round'
+              )
+              OR EXISTS (
+                SELECT 1 FROM interview_slots s
+                WHERE s.application_id = app.id AND s.stage = 'final_round'
+              )
+            )`,
+    args: [teamId, roundId],
+  });
+  return (result.rows[0]?.count as number) ?? 0;
+}
+
+/**
+ * Status for checklist / admin summary — counts + notified timestamps only.
+ * Does not load recipient name/email rows.
+ */
 export async function getOutcomeEmailStatus(
   teamId: number,
   roundId: number,
   fromStage: OutcomeEmailStage = 'application',
 ): Promise<OutcomeEmailStatus> {
-  const data = await getRoundCommunications(teamId, roundId, fromStage);
+  const db = getDb();
+  const [passCount, rejectCount, rowResult] = await Promise.all([
+    countPassRecipients(teamId, roundId, fromStage),
+    countRejectRecipients(teamId, roundId, fromStage),
+    db.execute({
+      sql: `SELECT pass_notified_at, reject_notified_at FROM round_outcome_emails
+            WHERE round_id = ? AND from_stage = ?`,
+      args: [roundId, fromStage],
+    }),
+  ]);
+
+  const row = rowResult.rows[0];
+  const passNotifiedAt = (row?.pass_notified_at as number | null) ?? null;
+  const rejectNotifiedAt = (row?.reject_notified_at as number | null) ?? null;
+
   return {
     teamId,
     roundId,
     fromStage,
-    passCount: data.passRecipients.length,
-    rejectCount: data.rejectRecipients.length,
-    passNotifiedAt: data.passNotifiedAt,
-    rejectNotifiedAt: data.rejectNotifiedAt,
-    complete: outcomeEmailsComplete(
-      data.passRecipients.length,
-      data.rejectRecipients.length,
-      data.passNotifiedAt,
-      data.rejectNotifiedAt,
-    ),
+    passCount,
+    rejectCount,
+    passNotifiedAt,
+    rejectNotifiedAt,
+    complete: outcomeEmailsComplete(passCount, rejectCount, passNotifiedAt, rejectNotifiedAt),
   };
 }
 

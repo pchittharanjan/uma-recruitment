@@ -17,9 +17,10 @@ import type { UnlockableStage } from '@/lib/stages';
 import { UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel, getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { isOrgFinalSelectionComplete } from '@/lib/org-final-selection-status';
+import { withPerfLog } from '@/lib/perf-log';
 
 export async function GET(req: NextRequest) {
-  return runWithRequestCache(() => handleGet(req));
+  return runWithRequestCache(() => withPerfLog('GET /api/team/nav', () => handleGet(req)));
 }
 
 async function handleGet(req: NextRequest) {

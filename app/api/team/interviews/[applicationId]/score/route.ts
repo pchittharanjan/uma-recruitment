@@ -7,6 +7,7 @@ import { requireTeamPortalUser } from '@/lib/impersonation';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { getRoundSettings } from '@/lib/rounds';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
+import { isTeamDirector } from '@/lib/directors';
 import { getGraderAssignmentForUser } from '@/lib/team-dashboard';
 import { getInterviewGroupMembers, getInterviewGuideForRound } from '@/lib/interview-slots';
 import { interviewGuideForApi, interviewScoreFieldsFromGuide } from '@/lib/interview-guide';
@@ -216,8 +217,17 @@ export async function POST(
 
     const nextApplicationId =
       next.rows.length > 0 ? (next.rows[0].application_id as number) : null;
+    const isDirector =
+      nextApplicationId == null &&
+      stage === 'first_round' &&
+      user.role === 'exec' &&
+      (await isTeamDirector(user.id, teamId));
 
-    return NextResponse.json({ success: true, nextApplicationId });
+    return NextResponse.json({
+      success: true,
+      nextApplicationId,
+      isDirector: Boolean(isDirector),
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

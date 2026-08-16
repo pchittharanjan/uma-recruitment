@@ -302,6 +302,10 @@ export function GlobalPhaseControls({
 
       <div id="stage-access" className="scroll-mt-24">
         <p className="uma-section-label mb-3">Stage access (all teams)</p>
+        <p className="mb-3 max-w-2xl text-sm text-muted-foreground">
+          Moving phases only opens admin setup. Unlock a stage here when graders should see it
+          (welcome dialog + scoring).
+        </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {unlockablePhases.map((phase) => {
             const key = phase.unlockKey!;

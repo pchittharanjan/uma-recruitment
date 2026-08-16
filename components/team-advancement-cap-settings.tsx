@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 
 const CAP_INPUT_CLASS =
   'h-9 w-full max-w-[6rem] border-foreground/20 bg-background ';
@@ -99,17 +100,20 @@ export function TeamAdvancementCapSettings() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/advancement-caps');
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? 'Failed to load advancement limits.');
+      const { ok, json } = await cachedJsonFetch<{
+        teams?: TeamCapRow[];
+        error?: string;
+      }>('/api/admin/advancement-caps');
+      if (!ok || !json) {
+        setError(json?.error ?? 'Failed to load advancement limits.');
         return;
       }
-      const teams = (json.teams ?? []).map((team: TeamCapRow) => ({
+      const teams = (json.teams ?? []).map((team) => ({
         ...team,
         applicationAllowOverCap: Boolean(team.applicationAllowOverCap),
         firstRoundAllowOverCap: Boolean(team.firstRoundAllowOverCap),
-        deliberationsAllowOverCap: Boolean(team.deliberationsAllowOverCap)})) as TeamCapRow[];
+        deliberationsAllowOverCap: Boolean(team.deliberationsAllowOverCap),
+      })) as TeamCapRow[];
       setRows(teams);
       setSavedRows(teams);
     } catch {

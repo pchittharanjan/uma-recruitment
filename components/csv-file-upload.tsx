@@ -1,15 +1,16 @@
 'use client';
 
-import { File, FileSpreadsheet, X } from 'lucide-react';
-import Papa from 'papaparse';
+import { FileSpreadsheet, Upload, X } from 'lucide-react';
 import { ChangeEvent, DragEvent, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import {
+  parseSpreadsheetFile,
+  SPREADSHEET_ACCEPT,
+  spreadsheetValidationError,
+} from '@/lib/spreadsheet';
 import { cn } from '@/lib/utils';
-
-const MAX_BYTES = 10 * 1024 * 1024;
 
 export interface CsvParseResult {
   file: File;
@@ -50,174 +51,143 @@ export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUpl
     onClear?.();
   };
 
-  const parseFile = (selected: File) => {
-    if (!selected.name.toLowerCase().endsWith('.csv')) {
-      onError('Please upload a CSV file.');
-      return;
-    }
-    if (selected.size > MAX_BYTES) {
-      onError('File is too large. Max size is 10MB.');
+  const parseFile = async (selected: File | undefined) => {
+    if (!selected) return;
+
+    const validation = spreadsheetValidationError(selected);
+    if (validation) {
+      onError(validation);
       return;
     }
 
     setFile(selected);
     setParsing(true);
-    setProgress(0);
+    setProgress(15);
 
-    const reader = new FileReader();
-
-    reader.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setProgress(Math.min(90, Math.round((e.loaded / e.total) * 90)));
-      }
-    };
-
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      setProgress(95);
-
-      const parsed = Papa.parse<Record<string, string>>(text, {
-        header: true,
-        skipEmptyLines: true,
-      });
-
-      if (parsed.errors.length > 0 && parsed.data.length === 0) {
-        onError('Could not read this CSV. Check the file format.');
-        resetLocal();
-        return;
-      }
-
-      const headers = parsed.meta.fields ?? [];
-      if (headers.length === 0) {
-        onError('CSV has no columns.');
-        resetLocal();
-        return;
-      }
-
+    try {
+      setProgress(55);
+      const parsed = await parseSpreadsheetFile(selected);
       setProgress(100);
       setParsing(false);
-      onParsed({ file: selected, headers, rows: parsed.data });
-    };
-
-    reader.onerror = () => {
-      onError('Failed to read file.');
+      onParsed({ file: selected, headers: parsed.headers, rows: parsed.rows });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not read this spreadsheet.';
+      onError(message);
       resetLocal();
-    };
-
-    reader.readAsText(selected);
+    }
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    parseFile(event.target.files?.[0] as File);
+    void parseFile(event.target.files?.[0]);
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
-    parseFile(event.dataTransfer.files?.[0]);
+    void parseFile(event.dataTransfer.files?.[0]);
   };
 
   return (
-    <div className="w-full">
-      <div
-        className={cn(
-          'mt-2 flex justify-center rounded-md border border-dashed px-6 py-12 transition-colors',
-          dragOver
-            ? 'border-primary bg-primary/8'
-            : 'border-input bg-transparent hover:border-primary/40 hover:bg-muted/40',
-        )}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            setDragOver(false);
-          }
-        }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <div className="text-center">
-          <File
+    <div className="w-full space-y-3">
+      <input
+        id="import-csv-upload"
+        ref={fileInputRef}
+        type="file"
+        className="sr-only"
+        accept={SPREADSHEET_ACCEPT}
+        onChange={handleFileChange}
+        disabled={parsing}
+      />
+
+      {!file ? (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Upload applications spreadsheet"
+          className={cn(
+            'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            dragOver
+              ? 'border-primary bg-primary/10'
+              : 'border-border/80 bg-background hover:border-primary/50 hover:bg-muted/30',
+          )}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setDragOver(false);
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <span
             className={cn(
-              'mx-auto h-12 w-12 transition-colors',
-              dragOver ? 'text-primary' : 'text-muted-foreground',
-            )}
-            aria-hidden
-          />
-          <div
-            className={cn(
-              'mt-3 flex flex-wrap justify-center text-sm leading-6 transition-colors',
-              dragOver ? 'font-medium text-primary' : 'text-muted-foreground',
+              'mb-4 flex size-12 items-center justify-center rounded-2xl ring-1',
+              dragOver
+                ? 'bg-primary/15 text-primary ring-primary/25'
+                : 'bg-muted text-muted-foreground ring-border/60',
             )}
           >
-            {dragOver ? (
-              <span>Drop CSV to upload</span>
-            ) : (
-              <>
-                <span>Drag and Drop or</span>
-                <label
-                  htmlFor="import-csv-upload"
-                  className="cursor-pointer rounded-sm pl-1 font-medium text-primary hover:underline hover:underline-offset-4"
-                >
-                  <span>choose file</span>
-                  <input
-                    id="import-csv-upload"
-                    ref={fileInputRef}
-                    type="file"
-                    className="sr-only"
-                    accept=".csv"
-                    onChange={handleFileChange}
-                    disabled={parsing}
-                  />
-                </label>
-                <span className="pl-1">to upload</span>
-              </>
-            )}
-          </div>
+            <Upload className="size-5" aria-hidden />
+          </span>
+          <p className="text-sm font-medium text-foreground">
+            {dragOver ? 'Drop file to upload' : 'Drop your applications spreadsheet here'}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            or{' '}
+            <span className="font-medium text-primary underline-offset-4 hover:underline">
+              browse files
+            </span>
+          </p>
+          <p className="mt-4 text-xs text-muted-foreground">CSV, Excel, or ODS · up to 10MB</p>
         </div>
-      </div>
-
-      <p className="mt-2 flex flex-wrap items-center justify-between gap-1 text-sm leading-5 text-muted-foreground">
-        <span>Accepted: CSV files</span>
-        <span>Max size: 10MB</span>
-      </p>
-
-      {file && (
-        <Card className="relative mt-6 gap-4 bg-muted p-4 shadow-none">
+      ) : (
+        <div className="relative rounded-xl border border-border/70 bg-background px-4 py-4 shadow-none">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="absolute right-1 top-1 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
             aria-label="Remove file"
             onClick={handleRemove}
             disabled={parsing}
           >
-            <X className="h-5 w-5 shrink-0" aria-hidden />
+            <X className="size-4 shrink-0" aria-hidden />
           </Button>
 
-          <div className="flex items-center gap-2.5 pr-8">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-card">
-              <FileSpreadsheet className="h-5 w-5 text-foreground" aria-hidden />
+          <div className="flex items-center gap-3 pr-8">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20">
+              <FileSpreadsheet className="size-5" aria-hidden />
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {parsing ? 'Reading file…' : formatFileSize(file.size)}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Progress value={progress} className="min-w-0 flex-1 gap-0">
-              <span className="sr-only">Upload progress</span>
-            </Progress>
-            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-              {progress}%
-            </span>
-          </div>
-        </Card>
+          {parsing ? (
+            <div className="mt-4 flex items-center gap-3">
+              <Progress value={progress} className="min-w-0 flex-1 gap-0">
+                <span className="sr-only">Upload progress</span>
+              </Progress>
+              <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                {progress}%
+              </span>
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );

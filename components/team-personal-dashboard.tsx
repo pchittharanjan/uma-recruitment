@@ -35,6 +35,7 @@ import {
   workStatusBadgeColor,
   yourWorkCardLabel,
 } from '@/lib/stages';
+import { gradingCompleteGuidance } from '@/lib/next-step-guidance';
 
 function workStageForPhase(status: RoundStatus): AssignmentStage | null {
   if (status === 'application' || status === 'first_round' || status === 'final_round') {
@@ -133,6 +134,25 @@ function personalSummary(data: TeamOverviewData): string {
     return `The team is in ${phase.phaseLabel}. You don't have any ${emptyNoun} yet — check back when work is assigned to you.`;
   }
   if (scopedSummary.totalPending === 0) {
+    const adv = data.advancement;
+    const gradingLocked = data.gradingEditLock?.locked ?? false;
+    const interviewLocked = data.interviewEditLock?.locked ?? false;
+    if (
+      adv &&
+      !adv.readOnly &&
+      adv.submissionStatus == null &&
+      ((currentStage === 'application' && !gradingLocked) ||
+        (currentStage === 'first_round' && adv.fromStage === 'first_round' && !interviewLocked))
+    ) {
+      if (adv.isDirector) {
+        return currentStage === 'first_round'
+          ? `You're done scoring interviews. Next: set color recommendations, then meet with your PMs to decide who advances.`
+          : `You're done grading. Next: set color recommendations, then meet with your PMs to decide who advances.`;
+      }
+      return currentStage === 'first_round'
+        ? `You're done scoring interviews. Next: set color recommendations on who should move forward.`
+        : `You're done grading. Next: set color recommendations on who should move forward.`;
+    }
     const noun = currentStage
       ? workItemNoun(currentStage, scopedSummary.totalAssigned)
       : scopedSummary.totalAssigned === 1
@@ -154,6 +174,8 @@ type DashboardNotice = {
   dismissKey: string;
   type: 'info' | 'success' | 'warning';
   message: string;
+  actionLabel?: string;
+  actionHref?: string;
 };
 
 function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNotice[] {
@@ -203,13 +225,49 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
       type: 'info',
       message: `Advancement list (${adv.topN} applicant${adv.topN === 1 ? '' : 's'}) is waiting for Admin approval.`,
     });
-  } else if (adv && adv.incompleteCount > 0) {
-    const pendingLabel = pendingWorkLabel(adv.fromStage);
-    notices.push({
-      dismissKey: `${prefix}:advancement-incomplete`,
-      type: 'warning',
-      message: `${adv.incompleteCount} ${pendingLabel}${adv.incompleteCount === 1 ? '' : 's'} still pending before Directors can submit the advancement list.`,
-    });
+  } else {
+    const appWork = data.work.find((w) => w.stage === 'application');
+    const interviewWork = data.work.find((w) => w.stage === 'first_round');
+    const personalGradingDone =
+      adv?.fromStage === 'application' &&
+      appWork != null &&
+      appWork.progress.total > 0 &&
+      appWork.pendingCount === 0 &&
+      !adv.readOnly &&
+      !(lock?.locked);
+    const personalInterviewsDone =
+      adv?.fromStage === 'first_round' &&
+      interviewWork != null &&
+      interviewWork.progress.total > 0 &&
+      interviewWork.pendingCount === 0 &&
+      !adv.readOnly &&
+      !(data.interviewEditLock?.locked);
+
+    if (personalGradingDone || personalInterviewsDone) {
+      const guide = gradingCompleteGuidance(adv!.isDirector);
+      notices.push({
+        dismissKey: `${prefix}:${personalInterviewsDone ? 'interview' : 'grading'}-next-recommendations`,
+        type: 'info',
+        message: adv!.isDirector
+          ? personalInterviewsDone
+            ? 'Interviews scored. Next: set color recommendations, then meet with your PMs to decide who advances.'
+            : 'Grading done. Next: set color recommendations, then meet with your PMs to decide who advances.'
+          : personalInterviewsDone
+            ? 'Interviews scored. Next: set color recommendations on who you think should move forward.'
+            : 'Grading done. Next: set color recommendations on who you think should move forward.',
+        actionLabel: guide.ctaLabel,
+        actionHref: adv!.href,
+      });
+    }
+
+    if (adv && adv.incompleteCount > 0) {
+      const pendingLabel = pendingWorkLabel(adv.fromStage);
+      notices.push({
+        dismissKey: `${prefix}:advancement-incomplete`,
+        type: 'warning',
+        message: `${adv.incompleteCount} ${pendingLabel}${adv.incompleteCount === 1 ? '' : 's'} still pending before Directors can submit the advancement list.`,
+      });
+    }
   }
 
   return notices;
@@ -260,6 +318,8 @@ export function TeamPersonalDashboard({
               type={notice.type}
               message={notice.message}
               dismissKey={notice.dismissKey}
+              actionLabel={notice.actionLabel}
+              actionHref={notice.actionHref}
             />
           ))}
         </div>
@@ -387,6 +447,28 @@ export function TeamPersonalDashboard({
                         View all
                       </LoadingButton>
                     )}
+                    {showWorkDetails &&
+                      allDone &&
+                      area.stage === 'application' &&
+                      data.advancement &&
+                      !data.advancement.readOnly &&
+                      !gradingLocked &&
+                      data.advancement.submissionStatus == null && (
+                        <LoadingButton onClick={() => router.push(data.advancement!.href)}>
+                          {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
+                        </LoadingButton>
+                      )}
+                    {showWorkDetails &&
+                      allDone &&
+                      area.stage === 'first_round' &&
+                      data.advancement?.fromStage === 'first_round' &&
+                      !data.advancement.readOnly &&
+                      !interviewLocked &&
+                      data.advancement.submissionStatus == null && (
+                        <LoadingButton onClick={() => router.push(data.advancement!.href)}>
+                          {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
+                        </LoadingButton>
+                      )}
                     {showWorkDetails &&
                       area.gradeHref &&
                       area.pendingCount > 0 &&
