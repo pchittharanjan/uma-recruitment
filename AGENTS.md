@@ -18,9 +18,9 @@ Read `SPEC.md` and `SCHEMA.sql` first. This file covers enforcement rules that a
 
 ## Auth mechanism
 
-**Decided end-state: Google OAuth, restricted to `@berkeley.edu` email addresses.** On sign-in, verify the OAuth email domain server-side and reject non-`@berkeley.edu` accounts before creating or matching a `users` row. This maps a signed-in Google account to a `users.email` row — the `users` table itself is still the source of truth for `role` and team assignment, not the OAuth provider.
+**Decided end-state: Google OAuth, restricted to `@berkeley.edu` email addresses.** On sign-in, verify the OAuth email domain server-side and reject non-`@berkeley.edu` accounts before matching a `users` row. This maps a signed-in Google account to a `users.email` row — the `users` table itself is still the source of truth for `role` and team assignment, not the OAuth provider. Do not auto-create `users` from Google; admins add emails first.
 
-**For now (see `TODAY.md`): build a temporary shared-password placeholder instead** — one token per role, same pattern as v1.0's `admin_token`. Wire role/team logic to the `users.role` row itself, not to *how* someone authenticated, so swapping in real Google OAuth later doesn't require touching the rest of the app. Don't build Google OAuth until `TODAY.md` (or a later instruction) explicitly says to.
+**Shared role passwords remain as a backup** (`ADMIN_AUTH_TOKEN` / `TEAM_EXEC_AUTH_TOKEN`) when Google env vars are unset or for break-glass access. Wire role/team logic to the `users.role` row itself, not to *how* someone authenticated.
 
 ## Migration from v1.0
 

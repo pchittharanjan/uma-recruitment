@@ -79,9 +79,17 @@ export interface LoginInput {
   password: string;
 }
 
-export async function authenticateLogin(input: LoginInput): Promise<User> {
-  const email = normalizeEmail(input.email);
-  const password = input.password;
+/** Where to send someone after a successful login. */
+export function postLoginPath(role: UserRole): string {
+  return role === 'admin' ? '/admin/dashboard' : '/team';
+}
+
+/**
+ * Resolve a login-eligible user by email. Used by password and Google OAuth —
+ * identity proof differs; role/access always come from the `users` row.
+ */
+export async function resolveLoginUser(emailInput: string): Promise<User> {
+  const email = normalizeEmail(emailInput);
 
   if (!isBerkeleyEmail(email)) {
     throw new AuthError('Use your @berkeley.edu email address.');
@@ -95,6 +103,13 @@ export async function authenticateLogin(input: LoginInput): Promise<User> {
   if (user.role !== 'admin' && !isExecRole(user.role)) {
     throw new AuthError('This account cannot sign in here.');
   }
+
+  return user;
+}
+
+export async function authenticateLogin(input: LoginInput): Promise<User> {
+  const user = await resolveLoginUser(input.email);
+  const password = input.password;
 
   const roleForToken: LoginRole = user.role === 'admin' ? 'admin' : 'exec';
   const expectedToken = getSharedTokenForRole(roleForToken);

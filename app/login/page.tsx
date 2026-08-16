@@ -1,7 +1,26 @@
+import { Suspense } from 'react';
 import Image from 'next/image';
 import { LoginForm } from '@/components/login-form';
+import { isGoogleOAuthConfigured } from '@/lib/google-oauth';
+
+function LoginFormFallback() {
+  return (
+    <div
+      className="flex min-h-[22rem] flex-col justify-center gap-4"
+      aria-hidden
+    >
+      <div className="h-8 w-40 rounded bg-muted/60" />
+      <div className="h-11 w-full rounded-full bg-muted/50" />
+      <div className="h-11 w-full rounded-md bg-muted/40" />
+      <div className="h-11 w-full rounded-md bg-muted/40" />
+      <div className="h-11 w-full rounded-full bg-muted/50" />
+    </div>
+  );
+}
 
 export default function LoginPage() {
+  const googleEnabled = isGoogleOAuthConfigured();
+
   return (
     <div className="relative min-h-svh overflow-hidden bg-[#faf8f5]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -66,7 +85,9 @@ export default function LoginPage() {
 
         <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-16 2xl:px-20">
           <div className="w-full max-w-md">
-            <LoginForm />
+            <Suspense fallback={<LoginFormFallback />}>
+              <LoginForm googleEnabled={googleEnabled} />
+            </Suspense>
           </div>
         </section>
       </div>

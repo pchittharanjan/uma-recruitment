@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,17 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 
 const BERKELEY_DOMAIN = 'berkeley.edu';
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  google_not_configured:
+    'Google sign-in is not configured yet. Ask an admin to set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
+  access_denied: 'Google sign-in was cancelled.',
+  not_berkeley: 'Use your @berkeley.edu Google account.',
+  no_access: "You don't have access yet. Ask an admin to add your email.",
+  invalid_role: 'This account cannot sign in here.',
+  email_unverified: 'Verify your Google email, then try again.',
+  oauth_failed: 'Google sign-in failed. Try again, or use your role password.',
+};
 
 function isBerkeleyEmail(email: string): boolean {
   return email.trim().toLowerCase().endsWith(`@${BERKELEY_DOMAIN}`);
@@ -48,21 +59,58 @@ function handleFieldEnterKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
   e.currentTarget.form?.requestSubmit();
 }
 
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden
+      focusable="false"
+    >
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
+
 export function LoginForm({
+  googleEnabled = false,
   className,
   ...props
-}: React.ComponentProps<'form'>) {
+}: React.ComponentProps<'form'> & { googleEnabled?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const loadingRef = useRef(false);
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
+
+  useEffect(() => {
+    const code = searchParams.get('error');
+    if (!code) return;
+    setError(OAUTH_ERROR_MESSAGES[code] ?? OAUTH_ERROR_MESSAGES.oauth_failed);
+  }, [searchParams]);
 
   const domainSuggestion = getBerkeleyDomainSuggestion(email);
   const showDomainSuggestion =
@@ -79,10 +127,17 @@ export function LoginForm({
     if (emailError) setEmailError('');
   };
 
+  const handleGoogleSignIn = () => {
+    if (googleLoading || loadingRef.current) return;
+    setError('');
+    setGoogleLoading(true);
+    window.location.href = '/api/auth/google';
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // data-loading keeps the wipe filled until auth resolves (or error resets it).
-    if (loadingRef.current) return;
+    if (loadingRef.current || googleLoading) return;
 
     setError('');
 
@@ -165,6 +220,10 @@ export function LoginForm({
     handleFieldEnterKeyDown(e);
   };
 
+  const helperText = googleEnabled
+    ? 'Sign in with your @berkeley.edu Google account, or use a role password.'
+    : 'Use your @berkeley.edu email and role password.';
+
   return (
     <form
       className={cn('login-form flex flex-col gap-6', className)}
@@ -192,12 +251,57 @@ export function LoginForm({
                 {error}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Use your @berkeley.edu email and role password.
-              </p>
+              <p className="text-sm text-muted-foreground">{helperText}</p>
             )}
           </div>
         </div>
+
+        {googleEnabled ? (
+          <>
+            <Field>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-busy={googleLoading}
+                data-loading={googleLoading ? 'true' : undefined}
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="login-signin-button h-11 w-full rounded-full text-base font-medium"
+              >
+                <span className="login-signin-button__label">
+                  <span
+                    className={cn(
+                      'login-signin-button__label-state inline-flex items-center justify-center gap-2',
+                      googleLoading && 'invisible',
+                    )}
+                    aria-hidden={googleLoading}
+                  >
+                    <GoogleMark className="size-4 shrink-0" />
+                    Continue with Google
+                  </span>
+                  <span
+                    className={cn(
+                      'login-signin-button__label-state login-signin-button__label-state--loading inline-flex items-center justify-center gap-2',
+                      !googleLoading && 'invisible',
+                    )}
+                    aria-hidden={!googleLoading}
+                  >
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Redirecting…
+                  </span>
+                </span>
+              </Button>
+            </Field>
+
+            <div className="login-form-divider flex items-center gap-3" role="separator">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                or password
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        ) : null}
 
         <Field data-invalid={emailError ? true : undefined}>
           <FieldLabel htmlFor="email" required>
@@ -285,29 +389,48 @@ export function LoginForm({
             variant="ghost"
             aria-busy={loading}
             data-loading={loading ? 'true' : undefined}
-            className="login-signin-button h-11 w-full rounded-full text-base font-medium"
+            disabled={googleLoading}
+            className={cn(
+              'h-11 w-full rounded-full text-base font-medium',
+              googleEnabled
+                ? 'border border-border bg-background text-foreground hover:bg-muted/60'
+                : 'login-signin-button',
+            )}
           >
-            <span className="login-signin-button__label">
-              <span
-                className={cn(
-                  'login-signin-button__label-state inline-flex items-center justify-center gap-2',
-                  loading && 'invisible',
+            {googleEnabled ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Signing in…
+                  </>
+                ) : (
+                  'Sign in with password'
                 )}
-                aria-hidden={loading}
-              >
-                Sign in
               </span>
-              <span
-                className={cn(
-                  'login-signin-button__label-state login-signin-button__label-state--loading inline-flex items-center justify-center gap-2',
-                  !loading && 'invisible',
-                )}
-                aria-hidden={!loading}
-              >
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Signing in…
+            ) : (
+              <span className="login-signin-button__label">
+                <span
+                  className={cn(
+                    'login-signin-button__label-state inline-flex items-center justify-center gap-2',
+                    loading && 'invisible',
+                  )}
+                  aria-hidden={loading}
+                >
+                  Sign in
+                </span>
+                <span
+                  className={cn(
+                    'login-signin-button__label-state login-signin-button__label-state--loading inline-flex items-center justify-center gap-2',
+                    !loading && 'invisible',
+                  )}
+                  aria-hidden={!loading}
+                >
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Signing in…
+                </span>
               </span>
-            </span>
+            )}
           </Button>
         </Field>
       </FieldGroup>

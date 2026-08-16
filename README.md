@@ -22,7 +22,9 @@ cp .env.local.example .env.local
 Fill in:
 
 - `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` — Turso credentials
-- `ADMIN_AUTH_TOKEN` / `TEAM_EXEC_AUTH_TOKEN` — shared passwords for placeholder auth (one per role)
+- `ADMIN_AUTH_TOKEN` / `TEAM_EXEC_AUTH_TOKEN` — shared passwords (backup auth, one per role)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional; enables **Continue with Google**
+- `AUTH_URL` — optional public app origin (e.g. `http://localhost:3001`); used for the OAuth redirect URI
 
 ### 3. Run
 
@@ -47,7 +49,26 @@ That only frees port 3001 for this app — it does not kill other projects' `nex
 
 ### Login
 
-Sign in at `/login` with the shared password for your role (`admin` or `team_exec`). Sessions map to a `users` row; role and team access come from the database, not from how you authenticated.
+Sign in at `/login`:
+
+1. **Google** (preferred once configured) — `@berkeley.edu` only. Your email must already exist in `users` (admin adds people; Google does not auto-create accounts).
+2. **Role password** (backup) — email + shared password for your role (`ADMIN_AUTH_TOKEN` or `TEAM_EXEC_AUTH_TOKEN`).
+
+Sessions map to a `users` row; role and team access come from the database, not from how you authenticated.
+
+#### Set up Google sign-in (once)
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → create/select a project.
+2. **APIs & Services → OAuth consent screen** — External (or Internal if on Workspace). Add your app name; scopes need email/profile/openid.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** — Application type **Web application**.
+4. Under **Authorized redirect URIs**, add:
+   - Local: `http://localhost:3001/api/auth/google/callback`
+   - Production: `https://YOUR_DOMAIN/api/auth/google/callback`
+5. Copy the client ID and secret into `.env.local` (and Vercel env for deploy):
+   - `GOOGLE_CLIENT_ID=...`
+   - `GOOGLE_CLIENT_SECRET=...`
+   - Local tip: `AUTH_URL=http://localhost:3001`
+6. Restart `npm run dev`. The login page shows **Continue with Google**.
 
 ### Admin (`/admin/...`)
 
@@ -81,7 +102,10 @@ Members can log coffee chats at `/coffee-chats` (separate from the admin/team pi
    - `TURSO_AUTH_TOKEN`
    - `ADMIN_AUTH_TOKEN`
    - `TEAM_EXEC_AUTH_TOKEN`
-4. Deploy
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (for Google sign-in)
+   - `AUTH_URL` = your production URL (e.g. `https://your-app.vercel.app`)
+4. Add the same production callback URL in Google Cloud (step above)
+5. Deploy
 
 The DB schema is applied on first request via `initDb()` — see `SCHEMA.sql`.
 
