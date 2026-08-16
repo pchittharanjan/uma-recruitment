@@ -638,7 +638,6 @@ export default function UnifiedImportPage() {
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
         title="Import applications"
-        description="Upload one CSV with every applicant. We split it into Strategy, Events, and Design for you."
         actions={<EraseTestDataButton onSuccess={resetImportWizard} redirectTo="/admin/import" />}
       />
 
@@ -655,10 +654,6 @@ export default function UnifiedImportPage() {
             <PagePanel className="space-y-5">
               <div className="space-y-1">
                 <h2 className="text-base font-semibold">Application CSV</h2>
-                <p className="text-sm text-muted-foreground">
-                  One file for all teams. Remove it with the X and upload a different file anytime
-                  before you finish import.
-                </p>
               </div>
 
               <CsvFileUpload
@@ -674,7 +669,7 @@ export default function UnifiedImportPage() {
                 </p>
               )}
 
-              <div className="flex justify-end border-t border-border/40 pt-4">
+              <div className="flex justify-end pt-4">
                 <LoadingButton onClick={handleUploadNext} disabled={!uploadReady}>
                   Continue →
                 </LoadingButton>
@@ -739,7 +734,7 @@ export default function UnifiedImportPage() {
                 </p>
               )}
 
-              <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-4">
+              <div className="flex items-center justify-between gap-3 pt-4">
                 <LoadingButton variant="secondary" onClick={() => setStep('upload')}>
                   Back
                 </LoadingButton>
@@ -773,7 +768,7 @@ export default function UnifiedImportPage() {
             <div className="overflow-x-auto -mx-5 sm:-mx-8">
               <table className="w-full min-w-[720px] table-fixed text-sm">
                 <thead>
-                  <tr className="border-b border-border/50 text-left">
+                  <tr className="text-left">
                     <th className="w-[50%] px-5 py-3 font-medium sm:px-8">Question</th>
                     <th className="w-[11%] px-3 py-3 font-medium">To whom</th>
                     {teamsWithApps.map((team) => (
@@ -838,7 +833,7 @@ export default function UnifiedImportPage() {
               </table>
             </div>
 
-            <div className="border-t border-border/40 pt-4">
+            <div className="pt-4">
               <button
                 type="button"
                 onClick={() => setShowContextEditor((v) => !v)}
@@ -848,7 +843,7 @@ export default function UnifiedImportPage() {
                 <span className="text-muted-foreground">{showContextEditor ? 'Hide' : 'Show'}</span>
               </button>
               {showContextEditor && (
-                <div className="space-y-1 border-t border-border/40 pt-3">
+                <div className="space-y-1 pt-3">
                   <p className="mb-2 text-sm text-muted-foreground">
                     Name, email, year, GPA, and similar fields stay out of the grader view. Move a
                     question here if it should not be scored. Graders only see columns you check as
@@ -890,10 +885,6 @@ export default function UnifiedImportPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Users per team</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Users with team access under People are loaded automatically. Add more manually,
-                  pick from the user list, or paste a spreadsheet.
-                </p>
                 {hasSimulatedGraders && (
                   <p className="mt-1 text-sm text-muted-foreground">
                     Simulated users use @berkeley.edu test emails — they are created automatically
@@ -959,7 +950,7 @@ export default function UnifiedImportPage() {
                 </NativeSelect>
               </div>
               <p className="pb-2 text-sm text-muted-foreground md:whitespace-nowrap">
-                Each application needs this many users; list at least that many per team.
+                Graders per application
               </p>
             </div>
 
@@ -997,7 +988,7 @@ export default function UnifiedImportPage() {
                   ))}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-4">
+            <div className="flex items-center justify-between gap-3 pt-4">
               <LoadingButton variant="secondary" onClick={() => setStep('scoring')}>
                 Back
               </LoadingButton>
@@ -1060,7 +1051,7 @@ export default function UnifiedImportPage() {
                 )}
               </div>
             )}
-            <div className="flex justify-between border-t border-border/40 pt-4">
+            <div className="flex justify-between pt-4">
               <LoadingButton variant="secondary" onClick={() => setStep('graders')}>
                 Back
               </LoadingButton>
@@ -1095,7 +1086,7 @@ export default function UnifiedImportPage() {
                 </li>
               )}
             </ul>
-            <div className="flex justify-end border-t border-border/40 pt-4">
+            <div className="flex justify-end pt-4">
               <LoadingButton onClick={() => router.push('/admin/dashboard')}>
                 Go to dashboard →
               </LoadingButton>

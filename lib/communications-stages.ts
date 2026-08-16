@@ -63,15 +63,8 @@ export function outcomeEmailPhaseEyebrow(stage: OutcomeEmailStage): string {
   }
 }
 
-export function outcomeEmailPageDescription(stage: OutcomeEmailStage): string {
-  switch (stage) {
-    case 'application':
-      return 'After advancement lists are approved, email each applicant whether they advanced to First Round Interview or not.';
-    case 'first_round':
-      return 'After first-round advancement lists are approved, email each applicant whether they advanced to Final Round Interview or not.';
-    case 'final_round':
-      return 'After final decisions, email each applicant whether they received an offer or not.';
-  }
+export function outcomeEmailPageDescription(_stage: OutcomeEmailStage): string {
+  return '';
 }
 
 export function outcomeEmailPassCardTitle(stage: OutcomeEmailStage): string {

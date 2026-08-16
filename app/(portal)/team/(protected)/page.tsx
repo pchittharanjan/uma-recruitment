@@ -7,7 +7,7 @@ import { ClipboardListIcon } from 'lucide-react';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import type { RoundStatus } from '@/lib/db';
 import { phaseLabel, teamLandingHref, teamOverviewHref } from '@/lib/stages';
 
@@ -21,21 +21,12 @@ interface NavTeam {
   round: { status: RoundStatus } | null;
 }
 
-function phaseOneLiner(status: RoundStatus): string {
+function phaseOneLiner(status: RoundStatus): string | undefined {
   switch (status) {
-    case 'pre_application':
-      return 'Log Coffee Chats and Prepare for Applications.';
-    case 'application':
-      return 'Grade applications assigned to you.';
-    case 'first_round':
-    case 'final_round':
-      return 'Complete interview scoring for your slots.';
-    case 'deliberations':
-      return 'Explore placements — only admin can save & advance.';
     case 'closed':
       return 'This recruitment cycle is closed.';
     default:
-      return 'Pick a team to get started.';
+      return undefined;
   }
 }
 
@@ -48,16 +39,13 @@ function TeamCard({
 }) {
   return (
     <Link href={href} className="block">
-      <Card className="h-full transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
+      <Card className="h-full transition-colors hover:bg-primary/[0.05]">
         <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80 ring-1 ring-border/50">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80">
             <ClipboardListIcon className="size-4 text-muted-foreground" />
           </div>
           <CardTitle className="text-base">{team.name}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Open current phase</p>
-        </CardContent>
       </Card>
     </Link>
   );

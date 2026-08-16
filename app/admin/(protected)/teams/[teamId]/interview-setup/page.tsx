@@ -57,7 +57,6 @@ export default function TeamInterviewSetupPage({
       <PageHeader
         eyebrow={data.team.name}
         title="Setup interview"
-        description="Questions and case studies for Interviewers."
       />
 
       <PageSection>

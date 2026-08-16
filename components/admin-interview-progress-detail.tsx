@@ -316,7 +316,7 @@ function SectionHeader({
   children: ReactNode;
 }) {
   return (
-    <div className="mb-2.5 flex items-center gap-2 border-b border-border/50 pb-2">
+    <div className="mb-2.5 flex items-center gap-2 pb-2">
       <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <h4 className="text-sm font-semibold tracking-tight text-foreground">{children}</h4>
     </div>
@@ -448,7 +448,7 @@ function InterviewerProgressCard({ interviewer }: { interviewer: InterviewerProg
   const done = interviewer.pending === 0 && interviewer.total > 0;
 
   return (
-    <div className="rounded-md border border-border/60 px-3 py-2.5">
+    <div className="rounded-md bg-muted/35 px-3 py-2.5">
       <p className="truncate text-sm font-medium text-foreground">{interviewer.name}</p>
       <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm">
         <span
@@ -606,7 +606,7 @@ function TimeBlockTimelineRow({
       </div>
 
       <div className="min-w-0 flex-1 overflow-x-auto">
-        <div className="flex min-w-full flex-col divide-y divide-border/30 border-t border-border/30 sm:flex-row sm:divide-x sm:divide-y-0 sm:border-t-0">
+        <div className="flex min-w-full flex-col divide-y divide-border/30 sm:flex-row sm:divide-x sm:divide-y-0 sm:border-t-0">
           {block.sessions.map((session, index) => (
             <SessionInterviewCell key={session.key} session={session} index={index} />
           ))}
@@ -903,11 +903,11 @@ function SessionTimeline({ sessions }: { sessions: SessionGroup[] }) {
   let blockIndex = 0;
 
   return (
-    <div className="overflow-hidden rounded-md border border-border/50 bg-card/50">
+    <div className="overflow-hidden rounded-md bg-muted/35">
       {dayGroups.map((day) => (
         <div key={day.dayKey}>
           {showDayHeaders ? (
-            <div className="flex items-center gap-2 border-b border-border/40 bg-muted/25 px-3 py-2">
+            <div className="flex items-center gap-2 bg-muted/25 px-3 py-2">
               <CalendarDaysIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <p className="text-sm font-medium text-foreground">{day.dayLabel}</p>
             </div>
@@ -1050,7 +1050,7 @@ export function AdminInterviewProgressDetail({
   const body = (
     <div className="space-y-4">
       <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-border/60 bg-muted/50 px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/60">
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-muted/45 px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/60">
           <span>Detailed breakdown</span>
           <ChevronDownIcon
             className={cn(

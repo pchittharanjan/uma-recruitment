@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const CAP_INPUT_CLASS =
-  'h-9 w-full max-w-[6rem] border-foreground/20 bg-background shadow-xs';
+  'h-9 w-full max-w-[6rem] border-foreground/20 bg-background ';
 
 type CapField = 'applicationCap' | 'firstRoundCap' | 'deliberationsCap';
 type OverCapField =
@@ -109,8 +109,7 @@ export function TeamAdvancementCapSettings() {
         ...team,
         applicationAllowOverCap: Boolean(team.applicationAllowOverCap),
         firstRoundAllowOverCap: Boolean(team.firstRoundAllowOverCap),
-        deliberationsAllowOverCap: Boolean(team.deliberationsAllowOverCap),
-      })) as TeamCapRow[];
+        deliberationsAllowOverCap: Boolean(team.deliberationsAllowOverCap)})) as TeamCapRow[];
       setRows(teams);
       setSavedRows(teams);
     } catch {
@@ -222,9 +221,7 @@ export function TeamAdvancementCapSettings() {
             deliberationsCap: row.deliberationsCap,
             applicationAllowOverCap: row.applicationAllowOverCap,
             firstRoundAllowOverCap: row.firstRoundAllowOverCap,
-            deliberationsAllowOverCap: row.deliberationsAllowOverCap,
-          }),
-        });
+            deliberationsAllowOverCap: row.deliberationsAllowOverCap})});
         const json = await res.json();
         if (!res.ok) {
           throw new Error(json.error ?? `Failed to save limits for ${row.teamName}.`);
@@ -233,8 +230,7 @@ export function TeamAdvancementCapSettings() {
       setSavedRows(rows);
       if (loweredCapWarnings.length > 0) {
         toast.success('Advancement limits saved', {
-          description: loweredCapWarnings[0],
-        });
+          description: loweredCapWarnings[0]});
       } else {
         toast.success('Advancement limits saved');
       }
@@ -251,13 +247,8 @@ export function TeamAdvancementCapSettings() {
     <Card>
       <CardHeader className="gap-2 px-6">
         <CardTitle className="text-base">Team advancement limits</CardTitle>
-        <CardDescription>
-          Each team advances exactly this many people at each step. Bump a number if you want them
-          to take more, or check Can go over when they need to exceed the posted limit without
-          changing it. The last column is how many offers they can make after deliberations.
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 overflow-hidden border-t border-border/60 px-6 pt-4">
+      <CardContent className="space-y-3 overflow-hidden px-6 pt-4">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {loweredCapWarnings.length > 0 && isDirty && !loading ? (
           <p className="text-sm text-amber-800 dark:text-amber-200">

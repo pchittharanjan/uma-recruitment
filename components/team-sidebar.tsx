@@ -57,7 +57,7 @@ export function TeamSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="shrink-0 gap-1 border-b border-sidebar-border/60 p-2 pb-3">
+      <SidebarHeader className="shrink-0 gap-1 p-2 pb-3">
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:hidden">
           <SidebarMenu className="min-w-0 flex-1">
             <SidebarMenuItem>

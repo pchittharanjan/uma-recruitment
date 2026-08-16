@@ -27,7 +27,7 @@ import {
 export interface PhaseChecklistStep {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   completed: boolean;
   actionLabel: string;
   href: string;
@@ -141,7 +141,6 @@ async function buildPreApplicationChecklist(): Promise<PhaseChecklistStep[]> {
     {
       id: 'coffee-dates',
       title: 'Set coffee chat window',
-      description: 'Set the org-wide coffee chat window before applications open.',
       completed: orgDatesDone,
       actionLabel: 'Set dates',
       href: '/admin/coffee-chats',
@@ -150,7 +149,6 @@ async function buildPreApplicationChecklist(): Promise<PhaseChecklistStep[]> {
     {
       id: 'coffee-notes',
       title: 'Collect coffee chat notes',
-      description: 'Review coffee chat notes submitted by members across all teams.',
       completed: coffeeChatCount > 0,
       actionLabel: 'View submissions',
       href: '/admin/coffee-chats',
@@ -193,8 +191,6 @@ async function buildApplicationChecklist(
     {
       id: 'import-apps',
       title: 'Upload Application CSV',
-      description:
-        'Start here in Application phase: upload one CSV with all applicants. We split it into Strategy, Events, and Design and create grader assignments. Remove and re-upload anytime before you finish import.',
       completed: teamCount > 0 && importedCount === teamCount,
       actionLabel: 'Open import flow',
       href: '/admin/import',
@@ -203,7 +199,6 @@ async function buildApplicationChecklist(
     {
       id: 'rubric',
       title: 'Configure grading rubric',
-      description: 'Set which CSV columns each team scores during blind review.',
       completed: teamCount > 0 && rubricCount === teamCount,
       actionLabel: 'Team setup',
       href: '/admin/dashboard',
@@ -212,7 +207,6 @@ async function buildApplicationChecklist(
     {
       id: 'assignments',
       title: 'Generate grader assignments',
-      description: 'Confirm each team has graders assigned to imported applications.',
       completed: teamCount > 0 && assignedCount === teamCount,
       actionLabel: 'View assignments',
       href: '/admin/dashboard',
@@ -221,8 +215,6 @@ async function buildApplicationChecklist(
     {
       id: 'grading',
       title: 'Finish Application grading',
-      description:
-        'All assigned application reviews should be scored before Directors submit advancement lists.',
       completed: totalAssignments > 0 && completedAssignments === totalAssignments,
       actionLabel: 'Track progress',
       href: adminPhaseHref('application'),
@@ -231,8 +223,6 @@ async function buildApplicationChecklist(
     {
       id: 'advance-submit',
       title: 'Directors submit advancement lists',
-      description:
-        'Each team\'s Director selects who advances to First Round Interview and submits the list to Admin.',
       completed: teamCount > 0 && submittedTeams === teamCount,
       actionLabel: 'View submissions',
       href: '/admin/advancements',
@@ -241,8 +231,6 @@ async function buildApplicationChecklist(
     {
       id: 'advance-approve',
       title: 'Approve advancement lists',
-      description:
-        'Review each team\'s submitted list and approve advancing applicants to First Round Interview.',
       completed: teamCount > 0 && approvedTeams === teamCount && pending.length === 0,
       actionLabel: 'Review queue',
       href: '/admin/advancements',
@@ -254,8 +242,6 @@ async function buildApplicationChecklist(
     {
       id: 'email-outcomes',
       title: 'Email applicants',
-      description:
-        'Email each applicant whether they advanced to First Round Interview. Templates are pre-filled for your email client.',
       completed:
         teamCount > 0 &&
         approvedTeams === teamCount &&
@@ -289,7 +275,6 @@ async function buildInterviewChecklist(
     {
       id: `${stage}-schedule`,
       title: `Schedule ${label}`,
-      description: 'Assign every advancing applicant to an interview slot before interviewers score.',
       completed: teamCount > 0 && teamsScheduled === teamCount,
       actionLabel: 'Schedule interviews',
       href: scheduleHref,
@@ -305,8 +290,6 @@ async function buildInterviewChecklist(
     steps.push({
       id: `${stage}-move-teams`,
       title: 'Move all teams into First Round Interview',
-      description:
-        "Advance every team's pipeline into First Round Interview so interviewers can score.",
       completed: teamCount > 0 && teamsOnStage === teamCount,
       actionLabel: 'Move teams',
       // Keep First Round view (bare /admin/dashboard falls back to live pipeline = Application).
@@ -320,7 +303,6 @@ async function buildInterviewChecklist(
     steps.push({
       id: `${stage}-score-${team.teamId}`,
       title: `${team.teamName} interviews scored`,
-      description: `All ${label} interview assignments for ${team.teamName} should be scored.`,
       completed: team.scoringComplete,
       actionLabel: 'Track scoring',
       href: dashboardHref,
@@ -347,7 +329,6 @@ async function buildInterviewChecklist(
       {
         id: `${stage}-advance-submit`,
         title: 'Directors submit advancement lists',
-        description: `Each team's Director selects who advances to ${nextLabel} and submits the list to Admin.`,
         completed: teamCount > 0 && allScoringDone && submittedTeams === teamCount,
         actionLabel: 'View submissions',
         href: '/admin/advancements',
@@ -358,7 +339,6 @@ async function buildInterviewChecklist(
       {
         id: `${stage}-advance-approve`,
         title: 'Approve advancement lists',
-        description: `Review each team's submitted list and approve advancing applicants to ${nextLabel}.`,
         completed:
           teamCount > 0 &&
           allScoringDone &&
@@ -375,7 +355,6 @@ async function buildInterviewChecklist(
       {
         id: `${stage}-email-outcomes`,
         title: 'Email applicants',
-        description: `Email each applicant whether they advanced to ${nextLabel}.`,
         completed:
           teamCount > 0 &&
           allScoringDone &&
@@ -410,8 +389,6 @@ async function buildDeliberationsChecklist(
     {
       id: 'delib-unlock',
       title: 'Turn on Deliberations for execs',
-      description:
-        'Execs cannot open their team boards until Deliberations is checked under Stage access on the dashboard.',
       completed: delibsUnlocked,
       actionLabel: 'Go to dashboard',
       href: `${adminPhaseHref('deliberations')}#stage-access`,
@@ -419,8 +396,6 @@ async function buildDeliberationsChecklist(
     {
       id: 'delib-teams',
       title: 'Complete final selection',
-      description:
-        'Lock each team’s Accept column into offers. Remaining applicants are marked not selected.',
       completed: teamCount > 0 && finalizedTeams === teamCount,
       actionLabel: 'Open Deliberations',
       href: openDeliberationsHref,
@@ -440,7 +415,6 @@ async function buildClosedChecklist(
     {
       id: 'closed-final-selection',
       title: 'View final selection',
-      description: 'See who received offers across all teams.',
       completed: true,
       actionLabel: 'View offers',
       href: '/admin/final-selection',
@@ -448,7 +422,6 @@ async function buildClosedChecklist(
     {
       id: 'closed-email-outcomes',
       title: 'Email final outcomes',
-      description: 'Email final offers and rejections.',
       completed: teamCount > 0 && emailedTeams === teamCount,
       actionLabel: 'Send emails',
       href: communicationsHref('final_round'),
@@ -457,7 +430,6 @@ async function buildClosedChecklist(
     {
       id: 'closed-export',
       title: 'Export final results',
-      description: 'Download final outcomes from each team dashboard if needed.',
       completed: false,
       actionLabel: 'Open dashboard',
       href: '/admin/dashboard',

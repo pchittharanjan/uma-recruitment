@@ -81,7 +81,7 @@ export function LoginForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Keep the button hoverable while loading so :disabled doesn't reset the wipe.
+    // data-loading keeps the wipe filled until auth resolves (or error resets it).
     if (loadingRef.current) return;
 
     setError('');
@@ -172,7 +172,7 @@ export function LoginForm({
       onSubmit={handleSubmit}
       noValidate
     >
-      <FieldGroup className="gap-4">
+      <FieldGroup>
         <div className="login-form-header space-y-1">
           <p className="text-xs font-medium uppercase tracking-[0.2em] uma-gradient-text">
             Welcome back
@@ -236,11 +236,11 @@ export function LoginForm({
               autoComplete="email"
             />
           </div>
-          <div className="login-form-field-error-slot">
-            {emailError ? (
+          {emailError ? (
+            <div className="login-form-field-error-slot">
               <FieldError id="email-error">{emailError}</FieldError>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </Field>
 
         <Field data-invalid={passwordError ? true : undefined}>
@@ -272,11 +272,11 @@ export function LoginForm({
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-          <div className="login-form-field-error-slot">
-            {passwordError ? (
+          {passwordError ? (
+            <div className="login-form-field-error-slot">
               <FieldError id="password-error">{passwordError}</FieldError>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </Field>
 
         <Field>

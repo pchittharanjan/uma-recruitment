@@ -38,7 +38,7 @@ function TeamClosedBanner() {
 
 function ClosedBannerMessage({ message }: { message: string }) {
   return (
-    <div className="border-b border-border/60 px-5 py-2 sm:px-8">
+    <div className="px-5 py-2 sm:px-8">
       <StatusBanner type="info" message={message} />
     </div>
   );

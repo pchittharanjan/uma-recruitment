@@ -71,7 +71,7 @@ export function PageContent({
   return <div className={cn(widths[width], className)}>{children}</div>;
 }
 
-/** Raised section surface — soft border, no heavy shadow. */
+/** Soft inset section surface — tone shift only, no outline. */
 export function PagePanel({
   children,
   className,

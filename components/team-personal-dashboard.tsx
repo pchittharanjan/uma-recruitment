@@ -326,7 +326,7 @@ export function TeamPersonalDashboard({
                 <CardHeader className="gap-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80 ring-1 ring-border/50">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80">
                         <Icon className="size-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
@@ -344,7 +344,7 @@ export function TeamPersonalDashboard({
                 </CardHeader>
 
                 {showWorkDetails && (
-                  <CardContent className="space-y-4 border-t border-border/60 pt-5">
+                  <CardContent className="space-y-4 pt-5">
                     <ProgressBar
                       value={area.progress.completed}
                       max={area.progress.total}
@@ -361,7 +361,7 @@ export function TeamPersonalDashboard({
                     )}
 
                     {area.recentPending.length > 0 && (
-                      <ul className="divide-y divide-border/60 rounded-lg border border-border/60">
+                      <ul className="divide-y divide-border/40 rounded-lg bg-background/50">
                         {area.recentPending.map((item) => (
                           <li
                             key={item.applicationId}
@@ -381,7 +381,7 @@ export function TeamPersonalDashboard({
                 )}
 
                 {showFooter && (
-                  <CardFooter className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
+                  <CardFooter className="flex flex-wrap items-center justify-end gap-2 pt-4">
                     {userHadWork && (
                       <LoadingButton variant="secondary" onClick={() => router.push(area.href)}>
                         View all

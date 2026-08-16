@@ -101,7 +101,7 @@ export function ApplicationAdvancementDetailPanel({
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Your scores
           </p>
-          <div className="min-w-0 divide-y divide-border/40 rounded-md border border-border/60 bg-muted/50">
+          <div className="min-w-0 divide-y divide-border/40 rounded-md bg-muted/45">
             {scoreFields.map((field) => {
               const score = data.existingScores[field];
               if (score === undefined) return null;

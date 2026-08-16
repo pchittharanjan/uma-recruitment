@@ -141,7 +141,6 @@ function AdminDashboardContent() {
         <PageHeader
           eyebrow="Admin"
           title={firstName ? `Welcome back, ${firstName}` : 'Welcome back'}
-          description="Overall status across all teams"
           actions={
             <EraseTestDataButton
               redirectTo="/admin/dashboard"

@@ -157,7 +157,7 @@ export default function AdminGraderPreviewPage({
                   <span className="italic text-muted-foreground">No response</span>
                 )}
               </p>
-              <div className="border-t border-border/60 pt-4">
+              <div className="pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector value={null} onChange={() => {}} disabled />
               </div>
@@ -170,7 +170,7 @@ export default function AdminGraderPreviewPage({
                 {field}
                 <RequiredAsterisk className="ml-0.5" />
               </p>
-              <div className="border-t border-border/60 pt-4">
+              <div className="pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector value={null} onChange={() => {}} disabled />
               </div>

@@ -36,7 +36,7 @@ export function ApplicationFieldsList({
       {Object.entries(fields).map(([key, value]) => (
         <div
           key={key}
-          className="min-w-0 rounded-md border border-border bg-card px-3 py-3 shadow-sm sm:px-4"
+          className="min-w-0 rounded-md bg-muted/40 px-3 py-3 shadow-sm sm:px-4"
         >
           <p className="min-w-0 break-words text-sm font-semibold text-foreground/80">
             {key}

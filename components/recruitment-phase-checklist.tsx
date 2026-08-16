@@ -134,22 +134,16 @@ export function RecruitmentPhaseChecklist({
 
   return (
     <Collapsible open={panelOpen} onOpenChange={handlePanelOpenChange}>
-      <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+      <div className="overflow-hidden">
         <CollapsibleTrigger
-          className="flex w-full cursor-pointer items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full cursor-pointer items-center justify-between gap-3 py-2 text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-controls={panelId}
         >
           <div className="min-w-0">
             <h3 className="font-heading text-sm font-semibold text-foreground">{title}</h3>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {preview
-                ? 'Preview — tasks for this phase before you advance.'
-                : panelOpen
-                  ? 'Complete these before advancing to the next phase.'
-                  : allDone
-                    ? 'All tasks complete — expand to review.'
-                    : `${completedCount} of ${steps.length} tasks complete.`}
-            </p>
+            {preview && (
+              <p className="mt-0.5 text-sm text-muted-foreground">Preview</p>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -170,37 +164,32 @@ export function RecruitmentPhaseChecklist({
 
         <CollapsibleContent
           id={panelId}
-          className="border-t border-border/60 px-4 pb-4 pt-2 [overflow-anchor:none]"
+          className="pb-1 pt-1 [overflow-anchor:none]"
         >
           <div className="space-y-0 [overflow-anchor:none]">
             {steps.map((step, index) => {
               const isOpen = openStepId === step.id;
-              const hasDescription = step.description.trim().length > 0;
+              const hasDescription = Boolean(step.description?.trim());
               const isFirst = index === 0;
               const prevStep = steps[index - 1];
               const isPrevOpen = prevStep && openStepId === prevStep.id;
-              const showBorderTop = !(isFirst || isOpen || isPrevOpen);
+              const showDivider = !(isFirst || isOpen || isPrevOpen);
 
               return (
                 <div
-                  className={cn('group', isOpen && 'rounded-lg', showBorderTop && 'border-t border-border')}
+                  className={cn('group', showDivider && 'mt-0.5')}
                   key={step.id}
                 >
-                  <div
-                    className={cn(
-                      'relative overflow-hidden rounded-lg transition-colors',
-                      isOpen && 'border border-border bg-muted/40',
-                    )}
-                  >
+                  <div className="relative overflow-hidden rounded-lg transition-colors">
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full cursor-pointer items-center justify-between gap-3 pr-2 pl-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        'flex w-full cursor-pointer items-center justify-between gap-3 pr-1 pl-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                         isOpen
                           ? hasDescription
-                            ? 'py-2.5'
-                            : 'pt-2.5 pb-1'
-                          : 'py-2.5',
+                            ? 'py-2'
+                            : 'pt-2 pb-1'
+                          : 'py-2',
                       )}
                       onClick={(event) => {
                         event.currentTarget.focus({ preventScroll: true });
@@ -235,14 +224,14 @@ export function RecruitmentPhaseChecklist({
                     </button>
 
                     {isOpen && (
-                      <div className="px-3 pb-3 pl-11">
+                      <div className="px-1 pb-2 pl-10">
                         {hasDescription && (
                           <p className="max-w-prose text-pretty text-sm text-muted-foreground">
                             {step.description}
                           </p>
                         )}
                         <Button
-                          className={cn(hasDescription ? 'mt-2' : 'mt-1')}
+                          className={cn(hasDescription ? 'mt-2' : 'mt-0')}
                           size="sm"
                           nativeButton={false}
                           render={<Link href={step.href} />}

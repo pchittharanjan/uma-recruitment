@@ -8,7 +8,7 @@ import LoadingButton from '@/components/loading-button';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -35,8 +35,7 @@ import {
   parseBulkPasteRows,
   validateBulkPasteRows,
   type BulkPasteParsedRow,
-  type BulkPasteSourceRow,
-} from '@/lib/user-bulk-paste';
+  type BulkPasteSourceRow} from '@/lib/user-bulk-paste';
 import {
   handleBulkRowEnterKeyDown,
   handleSingleLineEnterKeyDown,
@@ -375,9 +374,7 @@ export default function AdminNewUserPage() {
               ? []
               : role === 'director'
                 ? Array.from(selectedTeams)
-                : Array.from(directorTeams),
-        }),
-      });
+                : Array.from(directorTeams)})});
       const json = await res.json();
       if (!res.ok) {
         const message = json.error ?? 'Failed to add user';
@@ -423,8 +420,7 @@ export default function AdminNewUserPage() {
       const res = await fetch('/api/admin/users/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rowsToSubmit }),
-      });
+        body: JSON.stringify({ rows: rowsToSubmit })});
       const json = await res.json();
       if (!res.ok) {
         const message = json.error ?? 'Bulk create failed.';
@@ -500,7 +496,6 @@ export default function AdminNewUserPage() {
       <PageHeader
         eyebrow="Admin"
         title="Add users"
-        description="Create one account or paste many rows at once."
         actions={
           <Button variant="outline" onClick={() => router.push('/admin/users')}>
             <ArrowLeftIcon className="size-4" />
@@ -513,13 +508,12 @@ export default function AdminNewUserPage() {
 
       <PageSection>
         <Card className="overflow-hidden">
-          <CardHeader className="border-b border-border/60">
+          <CardHeader>
             <CardTitle className="select-text">Choose input mode</CardTitle>
-            <CardDescription className="select-text">Use Single for one person, or Bulk paste for many rows.</CardDescription>
           </CardHeader>
           <CardContent className="min-w-0 p-0">
             <Tabs value={addMode} onValueChange={(value) => setAddMode(value as AddMode)} className="min-h-0">
-              <div className="border-b border-border/60 px-6 py-4">
+              <div className="px-6 py-4">
                 <TabsList>
                   <TabsTrigger value="single">Single</TabsTrigger>
                   <TabsTrigger value="bulk">Bulk paste</TabsTrigger>
@@ -543,7 +537,7 @@ export default function AdminNewUserPage() {
                     onToggleDirector={toggleDirectorTeam}
                   />
                   {formError && <StatusBanner message={formError} type="error" />}
-                  <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-border/60 bg-background/95 pt-4 backdrop-blur">
+                  <div className="sticky bottom-0 flex items-center justify-end gap-2 bg-background/95 pt-4 backdrop-blur">
                     <Button type="button" variant="outline" onClick={() => router.push('/admin/users')}>
                       Cancel
                     </Button>
@@ -569,7 +563,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                       onChange={(e) => setBulkPaste(e.target.value)}
                       rows={8}
                       placeholder="Paste spreadsheet rows here..."
-                      className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-lg bg-muted/30 px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <p className="select-text text-sm text-muted-foreground">You can paste: First Name, Last Name, Berkeley email</p>
                     <Field className="w-44">
@@ -585,8 +579,8 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                     </Field>
                   </div>
 
-                  <div className="min-w-0 border-t border-border/60">
-                    <div className="border-b border-border/60 bg-muted/20 px-6 py-4">
+                  <div className="min-w-0">
+                    <div className="bg-muted/20 px-6 py-4">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="space-y-2">
                           <p className="select-text text-sm font-medium">Apply teams to selected rows</p>
@@ -698,8 +692,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                                     onChange={(e) =>
                                       updateBulkRow(row.rowNumber, (source) => ({
                                         ...source,
-                                        berkeleyEmail: e.target.value,
-                                      }))
+                                        berkeleyEmail: e.target.value}))
                                     }
                                     onKeyDown={(e) => handleBulkRowEnterKeyDown(e, row.rowNumber, 'email')}
                                     placeholder="name@berkeley.edu"
@@ -733,8 +726,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                                     <MultiPickerDropdown
                                       options={teams.map((team) => ({
                                         value: team.id,
-                                        label: team.name,
-                                      }))}
+                                        label: team.name}))}
                                       selectedValues={row.source.teamIds}
                                       onToggleValue={(teamId) =>
                                         updateBulkRow(row.rowNumber, (source) => {
@@ -747,8 +739,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                                           return {
                                             ...source,
                                             teamIds: Array.from(nextTeamIds),
-                                            invalidTeamNames: [],
-                                          };
+                                            invalidTeamNames: []};
                                         })
                                       }
                                       disabled={row.normalizedRole === 'admin'}
@@ -778,7 +769,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                     </div>
                   </div>
 
-                  <div className="sticky bottom-0 left-0 right-0 z-20 flex w-full min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-background/95 px-6 py-4 backdrop-blur">
+                  <div className="sticky bottom-0 left-0 right-0 z-20 flex w-full min-w-0 flex-wrap items-center justify-between gap-3 bg-background/95 px-6 py-4 backdrop-blur">
                     <div className="select-text text-sm text-muted-foreground">
                       {bulkRows.length} parsed rows · {validBulkRows.length} ready to create
                     </div>

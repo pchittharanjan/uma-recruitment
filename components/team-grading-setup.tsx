@@ -190,10 +190,6 @@ export function TeamGradingSetup({
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div className="min-w-0">
             <CardTitle className="text-base">Grader instructions</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Shown at the top of every application. Criteria are org-wide — saving updates all
-              teams.
-            </p>
           </div>
           <LoadingButton
             variant="secondary"
@@ -218,15 +214,12 @@ export function TeamGradingSetup({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Scored questions (CSV columns)</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Graders score each selected column on a 1–5 scale.
-          </p>
         </CardHeader>
         <CardContent className="space-y-2">
           {rubric.csvHeaders.map((header) => (
             <label
               key={header}
-              className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/60 p-3 hover:bg-muted/30"
+              className="flex cursor-pointer items-start gap-3 rounded-lg bg-muted/35 p-3 hover:bg-muted/30"
             >
               <input
                 type="checkbox"
@@ -244,9 +237,6 @@ export function TeamGradingSetup({
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div className="min-w-0">
             <CardTitle className="text-base">Custom score questions</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Extra criteria beyond the CSV (also scored 1–5).
-            </p>
           </div>
           <Button
             type="button"

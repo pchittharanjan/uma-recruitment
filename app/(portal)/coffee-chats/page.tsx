@@ -379,7 +379,7 @@ export default function CoffeeChatsPage() {
                   myChats.map((chat) => (
                     <div
                       key={chat.id}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border/60 p-3"
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-muted/35 p-3"
                     >
                       <div className="min-w-0 space-y-1">
                         <p className="font-medium">

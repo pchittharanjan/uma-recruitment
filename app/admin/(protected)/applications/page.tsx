@@ -17,7 +17,7 @@ import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -124,8 +124,7 @@ function compareApplications(
       break;
     case 'stage':
       cmp = applicationStageLabel(a.stage).localeCompare(applicationStageLabel(b.stage), undefined, {
-        sensitivity: 'base',
-      });
+        sensitivity: 'base'});
       break;
     case 'score':
       cmp = (a.finalScore ?? -1) - (b.finalScore ?? -1);
@@ -320,8 +319,7 @@ export default function AdminApplicationsPage() {
     const res = await fetch(`/api/admin/applications/${detail.id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId: detail.teamId }),
-    });
+      body: JSON.stringify({ teamId: detail.teamId })});
     const json = await res.json();
     if (!res.ok) {
       toast.error(json.error ?? 'Delete failed');
@@ -355,7 +353,6 @@ export default function AdminApplicationsPage() {
           <CardHeader className="space-y-4">
             <div>
               <CardTitle>All applications ({applications.length})</CardTitle>
-              <CardDescription>Search by App ID, name, email, or list #.</CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="relative min-w-[200px] flex-1">

@@ -191,7 +191,6 @@ export default function AdminAdvancementsPage() {
       <PageHeader
         eyebrow="Admin"
         title="Team advancement submissions"
-        description="Track each team's scoring and color signals, then approve Director-submitted advancement lists to move applicants forward."
       />
 
       {approveError && <StatusBanner type="error" message={approveError} />}
@@ -216,7 +215,7 @@ export default function AdminAdvancementsPage() {
             <CardHeader className="gap-2">
               <CardTitle className="text-base">Submission log</CardTitle>
             </CardHeader>
-            <CardContent className="border-t border-border/60 pt-5">
+            <CardContent className="pt-5">
               <AdvancementActivityLog entries={activity} hideHeader />
             </CardContent>
           </Card>
@@ -233,7 +232,7 @@ export default function AdminAdvancementsPage() {
                 review and approve.
               </CardDescription>
             </CardHeader>
-            <CardContent className="border-t border-border/60 py-6 text-center text-sm text-muted-foreground">
+            <CardContent className="py-6 text-center text-sm text-muted-foreground">
               No pending submissions right now.
             </CardContent>
           </Card>

@@ -164,23 +164,6 @@ function overviewTitle(status: RoundStatus): string {
   }
 }
 
-function overviewDescription(status: RoundStatus): string | null {
-  switch (status) {
-    case 'application':
-      return 'Blind application review progress per team.';
-    case 'first_round':
-      return 'Scheduling and scoring summary per team. Open a team for session-by-session detail.';
-    case 'final_round':
-      return 'Final-round scheduling and scoring per team. Open a team for session-by-session detail.';
-    case 'deliberations':
-      return 'Teams merge scores and finalize offers.';
-    case 'pre_application':
-      return 'Current status by team.';
-    default:
-      return null;
-  }
-}
-
 export function AdminPhaseTeamOverview({
   viewPhase,
   teams,
@@ -193,18 +176,15 @@ export function AdminPhaseTeamOverview({
   }
 
   const title = overviewTitle(viewPhase);
-  const description = overviewDescription(viewPhase);
   const isInterviewView = viewPhase === 'first_round' || viewPhase === 'final_round';
 
   if (viewPhase === 'closed') {
     return (
-      <div className="uma-inset-surface rounded-xl px-4 py-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          This recruitment cycle is closed. Team members are view-only. Use the phase stepper or
-          sidebar to browse Application through Deliberations — you can still edit and send outcome
-          emails.
-          <br />
-          Open Final selection for offers.
+      <div className="space-y-1">
+        <p className="uma-section-label">Team overview</p>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Cycle closed — teams are view-only. Browse phases in the sidebar; edits and outcome emails
+          still work. Open Final selection for offers.
         </p>
       </div>
     );
@@ -217,10 +197,9 @@ export function AdminPhaseTeamOverview({
         <h2 className="font-heading text-lg font-medium tracking-tight text-foreground">
           {title}
         </h2>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-[0_1px_0_rgba(26,24,22,0.03)]">
+      <div className="overflow-hidden rounded-xl bg-muted/35">
         <Table>
           <TableHeader>
             <TableRow className="border-border/50 bg-muted/25 hover:bg-muted/25">

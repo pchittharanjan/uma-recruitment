@@ -130,8 +130,7 @@ const PANEL_CONFIG: Record<
     description: '',
     readOnlyMessage: 'The Application phase is complete. This advancement list is read-only.',
     pendingLabel: pendingWorkLabel('application'),
-    blindDescription:
-      'Applicants show as numbers only — names stay hidden during application review.',
+    blindDescription: null,
   },
   first_round: {
     title: 'Advance to Final Round Interview',
@@ -925,7 +924,7 @@ export function TeamAdvancementPanel({
                 )}
             </CardHeader>
             {canSubmitAdvancement && canMarkVerdicts && (
-              <CardContent className="space-y-4 border-t border-border/60 pt-4">
+              <CardContent className="space-y-4 pt-4">
                 {usesFinalSelection ? (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <LoadingButton
@@ -1039,14 +1038,9 @@ export function TeamAdvancementPanel({
                 {canMarkVerdicts && config.blindDescription && !canSubmitList && (
                   <CardDescription>{config.blindDescription}</CardDescription>
                 )}
-                {showApplicationView && canSubmitList && (
-                  <CardDescription>
-                    Open View to re-read the application before selecting who advances.
-                  </CardDescription>
-                )}
               </div>
               {isFirstRound && myIntervieweeCount > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-lg bg-muted/35 px-3 py-2">
                   <Checkbox
                     id="filter-my-interviewees"
                     checked={Boolean(filterMyInterviewees)}
@@ -1059,7 +1053,7 @@ export function TeamAdvancementPanel({
               )}
             </div>
           </CardHeader>
-          <CardContent className="overflow-visible border-t border-border/60 pt-5">
+          <CardContent className="overflow-visible pt-5">
             {isFirstRound && filterMyInterviewees && visibleRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No completed interviews found for you. Turn off the filter to see the full ranked
@@ -1077,14 +1071,14 @@ export function TeamAdvancementPanel({
                   return (
                     <div
                       key={group.key}
-                      className="overflow-visible rounded-lg border border-border/80 bg-card"
+                      className="overflow-visible rounded-lg bg-muted/40"
                     >
-                      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/50 px-4 py-2">
+                      <div className="flex flex-wrap items-center gap-2 bg-muted/50 px-4 py-2">
                         <p className="text-sm font-medium">
                           {group.isUnscheduled ? 'No slot assigned' : timeLabel}
                         </p>
                         {sectionBadge && (
-                          <span className="rounded border border-border/60 bg-background px-1.5 py-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          <span className="rounded bg-muted/30 px-1.5 py-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {sectionBadge}
                           </span>
                         )}
@@ -1386,7 +1380,7 @@ export function TeamAdvancementPanel({
             <CardHeader className="gap-2">
               <CardTitle className="text-base">Submission log</CardTitle>
             </CardHeader>
-            <CardContent className="border-t border-border/60 pt-5">
+            <CardContent className="pt-5">
               <AdvancementActivityLog entries={data.history} hideHeader />
             </CardContent>
           </Card>

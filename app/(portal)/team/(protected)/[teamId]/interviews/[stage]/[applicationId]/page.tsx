@@ -4,7 +4,7 @@ import React, { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import PageLoading from '@/components/page-loading';
-import { PageContainer, PageContent } from '@/components/page-shell';
+import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -118,7 +118,7 @@ function ScoreFieldsForm({
             {field}
             <RequiredAsterisk className="ml-0.5" />
           </p>
-          <div className="border-t border-border/60 pt-3">
+          <div className="pt-3">
             <p className="mb-2 text-sm text-muted-foreground">Score (1 = poor, 5 = excellent)</p>
             <ScoreSelector
               value={draft.scores[field] ?? null}
@@ -134,7 +134,7 @@ function ScoreFieldsForm({
             {field}
             <RequiredAsterisk className="ml-0.5" />
           </p>
-          <div className="border-t border-border/60 pt-3">
+          <div className="pt-3">
             <p className="mb-2 text-sm text-muted-foreground">Score (1 = poor, 5 = excellent)</p>
             <ScoreSelector
               value={draft.scores[field] ?? null}
@@ -331,17 +331,11 @@ export default function TeamInterviewScorePage({
 
   if (error) {
     return (
-      <PageContainer className="flex min-h-[60vh] items-center justify-center">
-        <Card className="w-full max-w-sm p-8 text-center">
-          <p className="mb-4 text-4xl">❌</p>
-          <p>{error}</p>
-          <LoadingButton
-            className="mt-4"
-            onClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}
-          >
-            ← Back
-          </LoadingButton>
-        </Card>
+      <PageContainer className="space-y-6">
+        <PageHeader title="Couldn't load interview" description={error} />
+        <LoadingButton onClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}>
+          Back
+        </LoadingButton>
       </PageContainer>
     );
   }
@@ -471,7 +465,7 @@ export default function TeamInterviewScorePage({
 
             {submitError && <StatusBanner message={submitError} type="error" />}
 
-            <div className="flex items-center justify-between gap-4 border-t border-border pt-6">
+            <div className="flex items-center justify-between gap-4 pt-6">
               <div className="flex-1">
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div

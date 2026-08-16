@@ -880,9 +880,6 @@ export function TeamInterviewScheduleEditor({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-medium">Interview day</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Date, start time, and block length for {data.team.name} only.
-          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -993,7 +990,7 @@ export function TeamInterviewScheduleEditor({
             </div>
           </CardHeader>
           {allSlots.length > 0 && (
-            <div className="border-b border-border/40 px-4 py-3">
+            <div className="px-4 py-3">
               <p className="mb-2 text-sm font-medium text-muted-foreground">
                 Unassigned Applicants ({unassignedApplicants.length})
               </p>
@@ -1041,7 +1038,7 @@ export function TeamInterviewScheduleEditor({
                   <col style={{ width: '10%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="border-b border-border/40 bg-muted/40">
+                  <tr className="bg-muted/40">
                     <SortableColumnHeader
                       label="Time"
                       column="time"
@@ -1153,7 +1150,7 @@ export function TeamInterviewScheduleEditor({
           {allSlots.length > 0 && (
             <div
               ref={scheduleBottomRef}
-              className="flex flex-wrap items-center justify-end gap-2 border-t border-border/40 px-4 py-3"
+              className="flex flex-wrap items-center justify-end gap-2 px-4 py-3"
             >
               <Button type="button" variant="outline" size="sm" onClick={addSession}>
                 Add interview slot

@@ -126,7 +126,6 @@ export default function ApplicationPhasePage() {
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
         title="Grading progress"
-        description="Blind application review across teams."
         actions={
           hasAnyApplications ? (
             <Button
@@ -160,7 +159,7 @@ export default function ApplicationPhasePage() {
       )}
 
       <PageSection>
-        <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs">
+        <div className="overflow-hidden rounded-xl bg-muted/40">
           <Table>
             <TableHeader>
               <TableRow className="border-border/60 hover:bg-transparent">

@@ -158,7 +158,7 @@ export function ApplicantCompareDialog({
                 {visible.map((candidate) => (
                   <div
                     key={candidate.id}
-                    className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                    className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-muted/40"
                   >
                     <div className="border-b border-border px-3 py-2.5">
                       <p className="truncate text-sm font-semibold text-foreground">
@@ -183,7 +183,7 @@ export function ApplicantCompareDialog({
                 {visible.map((candidate) => (
                   <div
                     key={candidate.id}
-                    className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                    className="flex min-h-0 flex-col overflow-hidden rounded-xl bg-muted/40"
                   >
                     <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2.5">
                       <div className="min-w-0">
@@ -239,7 +239,7 @@ export function ApplicantCompareBar({
   if (count === 0) return null
 
   return (
-    <div className="sticky top-0 z-20 flex w-full max-w-full flex-wrap items-center gap-2 rounded-xl border border-border bg-popover/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+    <div className="sticky top-0 z-20 flex w-full max-w-full flex-wrap items-center gap-2 rounded-xl bg-popover/95 px-3 py-2 shadow-md backdrop-blur-sm">
       <Columns2Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <p className="text-sm font-medium text-foreground">
         {count} selected for compare

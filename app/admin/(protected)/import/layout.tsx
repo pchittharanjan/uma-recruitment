@@ -2,24 +2,22 @@ import { initDb } from '@/lib/db';
 import { anyTeamHasActivePipeline } from '@/lib/rounds';
 import { ImportBlocked } from '@/components/import-blocked';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
-import { phaseLabel } from '@/lib/stages';
 
 export default async function ImportLayout({ children }: { children: React.ReactNode }) {
   await initDb();
   const pipeline = await getGlobalPipelineState();
   if (pipeline.status === 'closed') {
-    return (
-      <ImportBlocked message="Recruitment is closed. This cycle is view-only — imports are disabled." />
-    );
+    return <ImportBlocked message="Recruitment is closed. Imports are disabled for this cycle." />;
   }
   if (await anyTeamHasActivePipeline()) {
     return <ImportBlocked />;
   }
   if (pipeline.status !== 'application') {
-    const current = pipeline.status ? phaseLabel(pipeline.status) : 'Coffee Chats';
     return (
       <ImportBlocked
-        message={`CSV import opens in Application phase. Current phase: ${current}. Close coffee chats and move to Application when ready.`}
+        message="Import is only available in the Application phase. On the Dashboard, use Move All teams to Application."
+        ctaLabel="Move All teams to Application →"
+        ctaHref="/admin/dashboard#move-all-teams"
       />
     );
   }

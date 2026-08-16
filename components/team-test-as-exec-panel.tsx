@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRoundIcon } from 'lucide-react';
 import LoadingButton from '@/components/loading-button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface TeamUser {
   id: number;
@@ -42,8 +42,7 @@ export function TeamTestAsExecPanel({ teamId }: { teamId: string }) {
       const res = await fetch('/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
+        body: JSON.stringify({ userId })});
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? 'Failed to start test mode.');
@@ -64,9 +63,6 @@ export function TeamTestAsExecPanel({ teamId }: { teamId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Test as Exec</CardTitle>
-        <CardDescription>
-          Walk through grading as an Exec on this team. Directors submit advancement lists separately.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {error && <p className="text-sm text-destructive">{error}</p>}

@@ -92,7 +92,6 @@ export default function TeamApplicationGradingPage({
       <PageHeader
         eyebrow={teamName || 'Your team'}
         title="Application grading"
-        description="All applications assigned to you for blind review."
         actions={
           <LoadingButton variant="secondary" onClick={() => router.push(`/team/${teamId}`)}>
             ← Overview

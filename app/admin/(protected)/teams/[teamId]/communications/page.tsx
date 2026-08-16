@@ -18,7 +18,6 @@ import {
   type RoundCommunicationsTemplates,
 } from '@/lib/communication-templates';
 import {
-  outcomeEmailPageDescription,
   outcomeEmailPassCardTitle,
   parseOutcomeEmailStage,
   type OutcomeEmailStage,
@@ -210,7 +209,6 @@ export default function TeamCommunicationsPage({
       <PageHeader
         eyebrow={data.team.name}
         title="Applicant outcome emails"
-        description={outcomeEmailPageDescription(fromStage)}
       />
 
       {error && <StatusBanner message={error} type="error" />}

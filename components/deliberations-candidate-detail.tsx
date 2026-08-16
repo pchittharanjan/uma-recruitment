@@ -84,7 +84,7 @@ function ReviewsSection({
         {reviews.map((review, index) => (
           <div
             key={`${review.reviewerName}-${index}`}
-            className="rounded-md border border-border bg-card px-3 py-3 shadow-sm"
+            className="rounded-md bg-muted/40 px-3 py-3 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -98,7 +98,7 @@ function ReviewsSection({
               </p>
             </div>
             {Object.keys(review.scores).length > 0 && (
-              <div className="mt-2 divide-y divide-border rounded-md border border-border bg-muted/30">
+              <div className="mt-2 divide-y divide-border rounded-md bg-muted/40">
                 {Object.entries(review.scores).map(([field, score]) => (
                   <div key={field} className="flex items-start gap-3 px-2.5 py-2">
                     <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground/80">

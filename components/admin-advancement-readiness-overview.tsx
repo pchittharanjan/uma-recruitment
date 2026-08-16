@@ -10,7 +10,7 @@ import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialo
 import { advancementFromStageLabel } from '@/lib/advancement-submissions-types';
 import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import type { AdvancementOutcomeLabel } from '@/lib/advancement-admin';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AvgScoreHeader } from '@/components/avg-score-header';
 import {
   Table,
@@ -149,7 +149,7 @@ function TeamOutcomePanel({
   }
 
   return (
-    <div className="space-y-4 border-t border-border/60 bg-muted/20 px-4 py-4">
+    <div className="space-y-4 bg-muted/20 px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {team.outcome.advancedCount} advancing to {advancedLabel},{' '}
@@ -170,7 +170,7 @@ function TeamOutcomePanel({
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border/60 bg-background">
+      <div className="overflow-hidden rounded-lg bg-muted/30">
           <Table className="w-full table-fixed">
             <colgroup>
               <col style={{ width: '10%' }} />
@@ -248,13 +248,9 @@ export function AdminAdvancementReadinessOverview({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Submission Status</CardTitle>
-        <CardDescription className="leading-relaxed">
-          Exec score and recommend (Green/Yellow/Red). Directors submit who advances. Expand a team
-          to review or revert.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-hidden rounded-lg border border-border/60">
+        <div className="overflow-hidden rounded-lg bg-muted/35">
           <Table className="w-full table-fixed">
             {/*
               Balanced proportional columns across the full card — no flexible

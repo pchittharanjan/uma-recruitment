@@ -16,7 +16,6 @@ export default function TeamDeliberationsPage({
     <PageContainer className="space-y-4">
       <PageHeader
         title="Deliberations"
-        description="Explore placements with your team. Only an admin can save the shared board or advance offers."
       />
       <DeliberationsTeamBoard
         teamId={teamId}

@@ -206,7 +206,7 @@ export default function GraderTeamColumn({
         {graders.map((grader, index) => (
           <div
             key={index}
-            className="flex gap-2 rounded-lg border border-border/60 bg-card p-2.5"
+            className="flex gap-2 rounded-lg bg-muted/40 p-2.5"
           >
             <div className="min-w-0 flex-1 space-y-2">
               <Input

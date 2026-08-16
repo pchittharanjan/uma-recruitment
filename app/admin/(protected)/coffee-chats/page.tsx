@@ -68,7 +68,6 @@ export default function AdminCoffeeChatsPage() {
       <PageHeader
         eyebrow={phasePageEyebrow('pre_application')}
         title="Intake submissions"
-        description="Notes from all members."
         actions={
           <Link
             href="/coffee-chats"

@@ -108,22 +108,6 @@ export function InterviewScheduleSettings({
       >
         <div className="space-y-1">
           <p className="text-sm font-medium">{roundLabel} Interview day</p>
-          {!loading && config ? (
-            <p className="text-sm text-muted-foreground">
-              {isFirstRound ? (
-                <>
-                  All teams interview on the same first-round day and use group blocks (up to{' '}
-                  {config.groupSize} per group; often 3–4). Parallel groups at the same hour are set
-                  per team on schedule pages.
-                </>
-              ) : (
-                <>
-                  All teams interview on the same final-round day. Every team uses individual{' '}
-                  {config.blockMinutes}-minute slots.
-                </>
-              )}
-            </p>
-          ) : null}
         </div>
         <ChevronDownIcon
           className={cn(
@@ -137,7 +121,7 @@ export function InterviewScheduleSettings({
         <div className="mt-4 space-y-4">
           {loading || !config ? (
             <div className="space-y-4" role="status" aria-label="Loading">
-              <div className="grid gap-4 rounded-md border border-border/50 p-3 sm:grid-cols-2">
+              <div className="grid gap-4 rounded-md bg-muted/30 p-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-28" />
                   <Skeleton className="h-9 w-full" />

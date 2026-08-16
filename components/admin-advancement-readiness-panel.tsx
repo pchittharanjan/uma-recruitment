@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import StageBadge from '@/components/stage-badge';
 import { advancementFromStageLabel } from '@/lib/advancement-submissions-types';
 import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -107,11 +107,6 @@ export function AdminAdvancementReadinessPanel({
           <CardTitle className={cn(compact && 'text-base')}>
             {fromStage === 'application' ? 'Color signals' : 'Interview signals'}
           </CardTitle>
-          <CardDescription>
-            {fromStage === 'application'
-              ? 'Exec panel colors before Directors submit the advancement list.'
-              : `Panel signals before Directors submit (${advancementFromStageLabel(fromStage)}).`}
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2" role="status" aria-label="Loading">
@@ -142,11 +137,6 @@ export function AdminAdvancementReadinessPanel({
             <CardTitle className={cn(compact && 'text-base')}>
               {fromStage === 'application' ? 'Color signals' : 'Interview signals'}
             </CardTitle>
-            <CardDescription>
-              {fromStage === 'application'
-                ? 'Exec panel colors before Directors submit the advancement list.'
-                : `Panel signals before Directors submit (${stageLabel}).`}
-            </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {submissionBadge(data.submission.status)}
@@ -184,7 +174,7 @@ export function AdminAdvancementReadinessPanel({
             No grader assignments yet for this stage.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border/60">
+          <div className="overflow-hidden rounded-lg bg-muted/35">
             <Table className="table-fixed">
               <colgroup>
                 <col style={{ width: showBreakdown ? '36%' : '50%' }} />

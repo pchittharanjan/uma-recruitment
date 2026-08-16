@@ -45,12 +45,12 @@ export function RecruitmentPhaseStepper({
           const isFuture = phaseIdx > currentIdx;
 
           const pillClassName = cn(
-            'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-            isSelected && 'border-primary/50 bg-primary/10 text-primary ring-1 ring-primary/15',
-            !isSelected && isPipelineCurrent && 'border-primary/40 bg-primary/[0.06] text-primary',
-            !isSelected && isPast && 'border-border/70 bg-muted/40 text-muted-foreground',
-            !isSelected && isFuture && 'border-dashed border-border/70 text-muted-foreground/70',
-            interactive && 'cursor-pointer hover:border-primary/45 hover:bg-muted/50',
+            'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+            isSelected && 'bg-primary/12 text-primary',
+            !isSelected && isPipelineCurrent && 'bg-primary/[0.07] text-primary',
+            !isSelected && isPast && 'bg-muted/55 text-muted-foreground',
+            !isSelected && isFuture && 'text-muted-foreground/70',
+            interactive && 'cursor-pointer hover:bg-muted/60',
           );
 
           const content = (

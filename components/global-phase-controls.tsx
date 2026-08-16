@@ -215,7 +215,7 @@ export function GlobalPhaseControls({
           </div>
         </div>
 
-        <div className="border-t border-border/50 pt-5">
+        <div>
           <p className="uma-section-label mb-3">Phase progression</p>
           <RecruitmentPhaseStepper
             currentStatus={fallbackStatus}
@@ -227,14 +227,14 @@ export function GlobalPhaseControls({
         </div>
 
         {checklistLoading ? (
-          <div className="space-y-2 border-t border-border/50 pt-5" role="status" aria-label="Loading">
+          <div className="space-y-2" role="status" aria-label="Loading">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-3/4" />
           </div>
         ) : (
           hasChecklist && (
-            <div className="border-t border-border/50 pt-5">
+            <div>
               <RecruitmentPhaseChecklist
                 title={`${phaseLabel(activeView)} checklist`}
                 steps={viewingChecklist}
@@ -258,17 +258,16 @@ export function GlobalPhaseControls({
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <StageBadge label={phaseLabel(state.status)} color="blue" />
-            <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              {state.statusDrift
-                ? `Most teams are here; ${state.driftedTeams.map((t) => t.teamName).join(', ')} ${state.driftedTeams.length === 1 ? 'is' : 'are'} behind.`
-                : 'All active teams are officially in this phase.'}
-            </p>
+            {state.statusDrift && (
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                {`Most teams are here; ${state.driftedTeams.map((t) => t.teamName).join(', ')} ${state.driftedTeams.length === 1 ? 'is' : 'are'} behind.`}
+              </p>
+            )}
           </div>
           {state.nextStatus && state.status !== 'closed' && (
-            <div className="flex min-w-[14rem] flex-col items-stretch gap-2 rounded-lg border border-primary/20 bg-gradient-to-br from-primary/[0.07] to-accent/[0.04] px-3.5 py-3 sm:items-end sm:text-right">
-              <p className="text-sm text-muted-foreground">
-                Ready for the next phase?{' '}
-                <span className="font-medium text-foreground">{phaseLabel(state.nextStatus)}</span>
+            <div className="flex min-w-[14rem] flex-col items-stretch gap-2 rounded-lg bg-gradient-to-br from-primary/[0.07] to-accent/[0.04] px-3.5 py-3 sm:items-end sm:text-right">
+              <p className="text-sm font-medium text-foreground">
+                {phaseLabel(state.nextStatus)}
               </p>
               <LoadingButton
                 variant="primary"
@@ -286,8 +285,7 @@ export function GlobalPhaseControls({
           {state.status === 'closed' && (
             <div className="flex flex-col items-stretch gap-2 sm:items-end sm:text-right">
               <p className="max-w-sm text-sm text-muted-foreground">
-                Recruitment is closed for this cycle. Team members are view-only; you can still send
-                outcome emails and make admin changes.
+                Team members are view-only; you can still send outcome emails and make admin changes.
               </p>
               <Button
                 variant="outline"
@@ -302,13 +300,8 @@ export function GlobalPhaseControls({
         </div>
       </div>
 
-      <div id="stage-access" className="scroll-mt-24 border-t border-border/50 pt-5">
-        <p className="uma-section-label mb-1">Stage access (all teams)</p>
-        <p className="mb-3 text-sm text-muted-foreground">
-          {state.status === 'closed'
-            ? 'Cycle is closed — teams are view-only. All prior stages stay open for you to browse and edit.'
-            : 'Check a stage to let graders and execs work in it. Uncheck to lock editing for everyone.'}
-        </p>
+      <div id="stage-access" className="scroll-mt-24">
+        <p className="uma-section-label mb-3">Stage access (all teams)</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {unlockablePhases.map((phase) => {
             const key = phase.unlockKey!;
@@ -317,10 +310,10 @@ export function GlobalPhaseControls({
               <div
                 key={key}
                 className={cn(
-                  'flex min-w-0 items-center justify-between gap-2 rounded-lg border px-2.5 py-2 transition-colors',
+                  'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-2 transition-colors',
                   open
-                    ? 'border-primary/25 bg-primary/[0.04]'
-                    : 'border-border/60 bg-muted/30',
+                    ? 'bg-primary/[0.07]'
+                    : 'bg-muted/55',
                 )}
               >
                 <Label
@@ -350,7 +343,7 @@ export function GlobalPhaseControls({
         </div>
       </div>
 
-      <div className="border-t border-border/50 pt-5">
+      <div>
         <p className="uma-section-label mb-3">Phase progression</p>
         <RecruitmentPhaseStepper
           currentStatus={state.status}
@@ -362,14 +355,14 @@ export function GlobalPhaseControls({
       </div>
 
       {checklistLoading ? (
-        <div className="space-y-2 border-t border-border/50 pt-5" role="status" aria-label="Loading">
+        <div className="space-y-2" role="status" aria-label="Loading">
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-3/4" />
         </div>
       ) : (
         viewingChecklist.length > 0 && (
-          <div className="border-t border-border/50 pt-5">
+          <div>
             <RecruitmentPhaseChecklist
               title={`${phaseLabel(activeView)} checklist`}
               steps={viewingChecklist}
@@ -380,11 +373,8 @@ export function GlobalPhaseControls({
       )}
 
       {showGlobalImportAction && (
-        <div className="rounded-lg border border-border/60 bg-muted/25 px-4 py-3">
+        <div className="rounded-lg bg-muted/55 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Application setup starts with CSV upload. Complete import before reviewing the Applications tab.
-            </p>
             <Button
               variant="outline"
               size="sm"
@@ -400,7 +390,7 @@ export function GlobalPhaseControls({
       )}
 
       {(state.statusDrift || state.unlockDrift || state.teamsWithoutRound.length > 0) && (
-        <div className="space-y-1 rounded-lg border border-amber-500/35 bg-amber-500/[0.06] px-3 py-2.5 text-sm text-amber-950 dark:text-amber-200">
+        <div className="space-y-1 rounded-lg bg-amber-500/[0.08] px-3 py-2.5 text-sm text-amber-950 dark:text-amber-200">
           {state.statusDrift && (
             <p>
               Phase drift:{' '}

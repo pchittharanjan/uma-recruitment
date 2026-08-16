@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/table';
 import {
   communicationsHref,
-  outcomeEmailPageDescription,
   outcomeEmailPhaseEyebrow,
   outcomeEmailTargetLabel,
   parseOutcomeEmailStage,
@@ -105,7 +104,6 @@ export default function AdminCommunicationsPage() {
       <PageHeader
         eyebrow={outcomeEmailPhaseEyebrow(resolvedStage)}
         title="Applicant outcome emails"
-        description={outcomeEmailPageDescription(resolvedStage)}
       />
 
       {error && <StatusBanner type="error" message={error} />}
@@ -119,7 +117,7 @@ export default function AdminCommunicationsPage() {
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs">
+        <div className="overflow-hidden rounded-xl bg-muted/40">
           <Table>
             <TableHeader>
               <TableRow className="border-border/60 hover:bg-transparent">

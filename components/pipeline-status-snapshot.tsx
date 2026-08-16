@@ -23,7 +23,6 @@ export function PipelineStatusSnapshot({
         <div className="mt-3 space-y-2">
           <StageBadge label={phaseLabel(status)} color="blue" />
           <p className="text-sm leading-relaxed text-muted-foreground">
-            All active teams are officially in this phase.{' '}
             <Link
               href="/admin/dashboard"
               className="font-medium text-primary underline-offset-2 hover:underline"
@@ -35,7 +34,7 @@ export function PipelineStatusSnapshot({
       </div>
 
       {showStepper && (
-        <div className="border-t border-border/50 pt-5">
+        <div>
           <p className="uma-section-label mb-3">Phase progression</p>
           <RecruitmentPhaseStepper
             currentStatus={status}

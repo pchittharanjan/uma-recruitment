@@ -152,7 +152,6 @@ export default function TeamInterviewsPage({
       <PageHeader
         eyebrow="Interview queue"
         title={data.stageLabel}
-        description="You only see applicants assigned to you. Application content and prior scores stay hidden."
         actions={
           hasMultipleTeams ? (
             <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
@@ -215,10 +214,10 @@ export default function TeamInterviewsPage({
               return (
                 <div
                   key={session.key}
-                  className="overflow-hidden rounded-lg border border-border/80 bg-card"
+                  className="overflow-hidden rounded-lg bg-muted/40"
                 >
                   {(timeLabel || session.location) && (
-                    <div className="border-b border-border/60 bg-muted px-4 py-2.5">
+                    <div className="bg-muted px-4 py-2.5">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {isGroup ? 'Group interview' : 'Interview slot'}
                       </p>
@@ -238,7 +237,7 @@ export default function TeamInterviewsPage({
                           </li>
                         ))}
                       </ul>
-                      <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
+                      <div className="flex items-center justify-between px-4 py-3">
                         {sessionStatus && (
                           <StageBadge
                             label={WORK_STATUS_DISPLAY[sessionStatus]}

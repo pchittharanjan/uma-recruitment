@@ -191,7 +191,6 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
       <PageHeader
         eyebrow={data.team.name}
         title="Edit assignments"
-        description="Reassign pending applications between Graders."
       />
 
       <PageSection>
@@ -214,7 +213,7 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {data.graders.map((grader) => (
             <Card key={grader.id} className="overflow-hidden">
-              <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{grader.name}</p>
                   <p className="truncate text-sm text-muted-foreground">{grader.email}</p>

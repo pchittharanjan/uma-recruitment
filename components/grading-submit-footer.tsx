@@ -31,7 +31,7 @@ export function GradingSubmitFooter({
   return (
     <div
       className={cn(
-        'sticky bottom-0 z-10 -mx-1 border-t border-border/60 bg-background/95 pt-3 backdrop-blur',
+        'sticky bottom-0 z-10 -mx-1 bg-background/95 pt-3 backdrop-blur',
         className,
       )}
     >

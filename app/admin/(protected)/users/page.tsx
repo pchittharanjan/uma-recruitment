@@ -18,7 +18,7 @@ import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -123,8 +123,7 @@ function compareUsers(a: UserRow, b: UserRow, key: SortKey, dir: SortDir): numbe
       if (cmp !== 0) return dir === 'asc' ? cmp : -cmp;
       // Secondary: always A→Z by first name within each role group
       const byFirst = firstNameToken(a.name).localeCompare(firstNameToken(b.name), undefined, {
-        sensitivity: 'base',
-      });
+        sensitivity: 'base'});
       if (byFirst !== 0) return byFirst;
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     }
@@ -504,9 +503,7 @@ export default function AdminUsersPage() {
               ? []
               : editRole === 'director'
                 ? Array.from(editTeams)
-                : Array.from(editDirectorTeams),
-        }),
-      });
+                : Array.from(editDirectorTeams)})});
       const json = await res.json();
       if (!res.ok) {
         const message = json.error ?? 'Failed to update user';
@@ -552,8 +549,7 @@ export default function AdminUsersPage() {
       const res = await fetch('/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      });
+        body: JSON.stringify({ userId: user.id })});
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? 'Failed to start test mode.');
@@ -587,9 +583,7 @@ export default function AdminUsersPage() {
               ? []
               : role === 'director'
                 ? Array.from(selectedTeams)
-                : Array.from(directorTeams),
-        }),
-      });
+                : Array.from(directorTeams)})});
       const json = await res.json();
       if (!res.ok) {
         const message = json.error ?? 'Failed to add user';
@@ -636,8 +630,7 @@ export default function AdminUsersPage() {
       const res = await fetch('/api/admin/users/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rowsToSubmit }),
-      });
+        body: JSON.stringify({ rows: rowsToSubmit })});
       const json = await res.json();
       if (!res.ok) {
         const message = json.error ?? 'Bulk create failed.';
@@ -683,7 +676,6 @@ export default function AdminUsersPage() {
       <PageHeader
         eyebrow="Admin"
         title="Users"
-        description="Add Admin and Exec users so they can sign in."
         actions={
           <Button onClick={() => router.push('/admin/users/new')}>
             <PlusIcon className="size-4" />
@@ -698,7 +690,6 @@ export default function AdminUsersPage() {
         <Card className="pb-0">
           <CardHeader>
             <CardTitle>Everyone ({users.length})</CardTitle>
-            <CardDescription>People who can sign in to the platform.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {users.length === 0 ? (
@@ -706,7 +697,7 @@ export default function AdminUsersPage() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="h-11 border-b border-border/60 bg-muted/40 hover:bg-muted/40">
+                  <TableRow className="h-11 bg-muted/40 hover:bg-muted/40">
                     <SortableHeader
                       label="Name"
                       sortKey="name"
@@ -742,7 +733,7 @@ export default function AdminUsersPage() {
                 </TableHeader>
                 <TableBody>
                   {sortedUsers.map((user) => (
-                    <TableRow key={user.id} className="h-12 border-b border-border/60 hover:bg-muted/20">
+                    <TableRow key={user.id} className="h-12 hover:bg-muted/20">
                       <TableCell className="px-4 py-2 align-middle font-medium">
                         <div className="flex h-full items-center leading-tight">{user.name}</div>
                       </TableCell>

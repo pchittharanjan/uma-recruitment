@@ -3,7 +3,7 @@
 import React, { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
-import { PageContainer, PageContent } from '@/components/page-shell';
+import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
@@ -158,14 +158,9 @@ export default function TeamGradingScorePage({
 
   if (error) {
     return (
-      <PageContainer className="flex min-h-[60vh] items-center justify-center">
-        <Card className="w-full max-w-sm p-8 text-center">
-          <p className="mb-4 text-4xl">❌</p>
-          <p>{error}</p>
-          <LoadingButton className="mt-4" onClick={() => router.push(`/team/${teamId}`)}>
-            ← Back
-          </LoadingButton>
-        </Card>
+      <PageContainer className="space-y-6">
+        <PageHeader title="Couldn't load application" description={error} />
+        <LoadingButton onClick={() => router.push(`/team/${teamId}`)}>Back</LoadingButton>
       </PageContainer>
     );
   }
@@ -301,7 +296,7 @@ export default function TeamGradingScorePage({
                   <span className="italic text-muted-foreground">No response</span>
                 )}
               </p>
-              <div className="border-t border-border/60 pt-4">
+              <div className="pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector
                   value={scores[field] ?? null}
@@ -325,7 +320,7 @@ export default function TeamGradingScorePage({
                 {field}
                 <RequiredAsterisk className="ml-0.5" />
               </p>
-              <div className="border-t border-border/60 pt-4">
+              <div className="pt-4">
                 <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
                 <ScoreSelector
                   value={scores[field] ?? null}
