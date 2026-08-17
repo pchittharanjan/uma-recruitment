@@ -63,12 +63,14 @@ async function handleGet(
 
     const db = getDb();
     const scoresResult = await db.execute({
-      sql: 'SELECT field_name, score FROM scores WHERE assignment_id = ?',
+      sql: 'SELECT field_name, score, note FROM scores WHERE assignment_id = ?',
       args: [assignment.assignmentId],
     });
     const existingScores: Record<string, number> = {};
+    const existingNotes: Record<string, string> = {};
     for (const row of scoresResult.rows) {
       existingScores[row.field_name as string] = row.score as number;
+      existingNotes[row.field_name as string] = (row.note as string | null) ?? '';
     }
 
     const progressResult = await db.execute({
@@ -110,6 +112,7 @@ async function handleGet(
           applicationId: number;
           candidateName: string;
           existingScores: Record<string, number>;
+          existingNotes: Record<string, string>;
           existingComment: string;
           isComplete: boolean;
         }>
@@ -127,18 +130,21 @@ async function handleGet(
         if (!memberAssignment) continue;
 
         const memberScoresResult = await db.execute({
-          sql: 'SELECT field_name, score FROM scores WHERE assignment_id = ?',
+          sql: 'SELECT field_name, score, note FROM scores WHERE assignment_id = ?',
           args: [memberAssignment.assignmentId],
         });
         const memberScores: Record<string, number> = {};
+        const memberNotes: Record<string, string> = {};
         for (const row of memberScoresResult.rows) {
           memberScores[row.field_name as string] = row.score as number;
+          memberNotes[row.field_name as string] = (row.note as string | null) ?? '';
         }
 
         groupEntries.push({
           applicationId: member.applicationId,
           candidateName: member.candidateName,
           existingScores: memberScores,
+          existingNotes: memberNotes,
           existingComment: memberAssignment.comment,
           isComplete: memberAssignment.status === 'completed',
         });
@@ -168,6 +174,7 @@ async function handleGet(
       candidateName: assignment.candidateName,
       stage,
       existingScores,
+      existingNotes,
       existingComment: assignment.comment,
       slot,
       interviewGuide,

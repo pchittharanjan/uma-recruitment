@@ -166,7 +166,7 @@ function TeamOutcomePanel({
             Revert advancement
           </LoadingButton>
         ) : team.outcome.revertBlockedReason ? (
-          <p className="max-w-sm text-sm text-muted-foreground">{team.outcome.revertBlockedReason}</p>
+          <p className="text-sm text-muted-foreground">{team.outcome.revertBlockedReason}</p>
         ) : null}
       </div>
 

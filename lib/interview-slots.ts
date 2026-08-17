@@ -1,5 +1,6 @@
-import { getDb, type AssignmentStage } from '@/lib/db';
+import { getDb, getRoundById, getTeamById, type AssignmentStage } from '@/lib/db';
 import {
+  applyTeamInterviewGuideDefaults,
   emptyInterviewGuides,
   parseInterviewGuides,
   serializeInterviewGuides,
@@ -152,10 +153,14 @@ export async function getInterviewGuidesForRound(
 ): Promise<InterviewGuidesRecord> {
   const settings = await getRoundSettings(roundId);
   if (!settings) return emptyInterviewGuides();
-  return parseInterviewGuides(
+  const guides = parseInterviewGuides(
     settings.interview_guides,
     settings.interview_script_first_round,
   );
+  const round = await getRoundById(roundId);
+  if (!round) return guides;
+  const team = await getTeamById(round.team_id);
+  return applyTeamInterviewGuideDefaults(team?.name ?? '', guides);
 }
 
 export async function getInterviewGuideForRound(

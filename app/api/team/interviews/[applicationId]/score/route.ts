@@ -18,6 +18,7 @@ const INTERVIEW_STAGES: AssignmentStage[] = ['first_round', 'final_round'];
 interface ScoreEntry {
   applicationId: number;
   scores: Record<string, number>;
+  notes?: Record<string, string>;
   comment?: string;
 }
 
@@ -37,20 +38,28 @@ function validateScores(
   return null;
 }
 
+function noteForField(notes: Record<string, string> | undefined, field: string): string | null {
+  const value = notes?.[field]?.trim();
+  return value ? value : null;
+}
+
 async function saveInterviewScore(
   assignmentId: number,
   userId: number,
   scoreFields: string[],
   scores: Record<string, number>,
+  notes: Record<string, string> | undefined,
   comment: string,
 ): Promise<void> {
   const db = getDb();
   await db.batch(
     [
       ...scoreFields.map((field) => ({
-        sql: `INSERT INTO scores (assignment_id, field_name, score) VALUES (?, ?, ?)
-              ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
-        args: [assignmentId, field, scores[field]],
+        sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, ?, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET
+                score = excluded.score,
+                note = excluded.note`,
+        args: [assignmentId, field, scores[field], noteForField(notes, field)],
       })),
       {
         sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
@@ -185,6 +194,7 @@ export async function POST(
           user.id,
           scoreFields,
           entry.scores,
+          entry.notes,
           (entry.comment as string | undefined) ?? '',
         );
       }
@@ -193,6 +203,7 @@ export async function POST(
     }
 
     const scores = body.scores as Record<string, number>;
+    const notes = (body.notes as Record<string, string> | undefined) ?? {};
     const comment = (body.comment as string | undefined) ?? '';
 
     const validationError = validateScores(scores, scoreFields);
@@ -200,7 +211,7 @@ export async function POST(
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    await saveInterviewScore(assignment.assignmentId, user.id, scoreFields, scores, comment);
+    await saveInterviewScore(assignment.assignmentId, user.id, scoreFields, scores, notes, comment);
 
     const db = getDb();
     const next = await db.execute({

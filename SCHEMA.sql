@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS scores (
   assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
   field_name TEXT NOT NULL,
   score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
+  note TEXT,
   UNIQUE (assignment_id, field_name)
 );
 CREATE INDEX IF NOT EXISTS idx_scores_assignment ON scores(assignment_id);

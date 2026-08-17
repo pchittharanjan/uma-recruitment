@@ -182,7 +182,7 @@ export function AdminPhaseTeamOverview({
     return (
       <div className="space-y-1">
         <p className="uma-section-label">Team overview</p>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Cycle closed — teams are view-only. Browse phases in the sidebar; edits and outcome emails
           still work. Open Final selection for offers.
         </p>

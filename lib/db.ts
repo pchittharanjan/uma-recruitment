@@ -298,6 +298,7 @@ const MIGRATIONS = [
     )`,
     `CREATE INDEX IF NOT EXISTS idx_notifications_user_created
       ON notifications(user_id, created_at DESC)`,
+    'ALTER TABLE scores ADD COLUMN note TEXT',
 ];
 
 async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
@@ -646,6 +647,7 @@ export interface Score {
   assignment_id: number;
   field_name: string;
   score: number;
+  note: string | null;
 }
 
 export interface Flag {
@@ -749,6 +751,7 @@ export function rowToScore(row: Row): Score {
     assignment_id: row.assignment_id as number,
     field_name: row.field_name as string,
     score: row.score as number,
+    note: (row.note as string | null) ?? null,
   };
 }
 

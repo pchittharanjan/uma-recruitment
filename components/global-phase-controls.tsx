@@ -259,7 +259,7 @@ export function GlobalPhaseControls({
           <div className="space-y-2">
             <StageBadge label={phaseLabel(state.status)} color="blue" />
             {state.statusDrift && (
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {`Most teams are here; ${state.driftedTeams.map((t) => t.teamName).join(', ')} ${state.driftedTeams.length === 1 ? 'is' : 'are'} behind.`}
               </p>
             )}
@@ -284,7 +284,7 @@ export function GlobalPhaseControls({
           )}
           {state.status === 'closed' && (
             <div className="flex flex-col items-stretch gap-2 sm:items-end sm:text-right">
-              <p className="max-w-sm text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Team members are view-only; you can still send outcome emails and make admin changes.
               </p>
               <Button
@@ -302,11 +302,11 @@ export function GlobalPhaseControls({
 
       <div id="stage-access" className="scroll-mt-24">
         <p className="uma-section-label mb-3">Stage access (all teams)</p>
-        <p className="mb-3 max-w-2xl text-sm text-muted-foreground">
+        <p className="mb-3 text-sm text-muted-foreground">
           Moving phases only opens admin setup. Unlock a stage here when graders should see it
           (welcome dialog + scoring).
         </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="flex flex-wrap gap-2">
           {unlockablePhases.map((phase) => {
             const key = phase.unlockKey!;
             const open = state.unlockedStages.includes(key);
@@ -314,7 +314,7 @@ export function GlobalPhaseControls({
               <div
                 key={key}
                 className={cn(
-                  'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-2 transition-colors',
+                  'flex items-center gap-2 rounded-lg px-2.5 py-2 transition-colors',
                   open
                     ? 'bg-primary/[0.07]'
                     : 'bg-muted/55',
@@ -322,7 +322,7 @@ export function GlobalPhaseControls({
               >
                 <Label
                   htmlFor={`global-unlock-${key}`}
-                  className="truncate text-sm font-normal"
+                  className="whitespace-nowrap text-sm font-normal"
                   title={open ? 'Open for Grading' : 'Locked'}
                 >
                   {phase.label}

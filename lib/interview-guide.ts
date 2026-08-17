@@ -1,9 +1,13 @@
-export type InterviewGuideFormat = 'questions' | 'case_study';
+import { strategyDefaultGuides } from '@/lib/strategy-interview';
+
+export type InterviewGuideFormat = 'questions' | 'case_study' | 'case_and_behavioral';
 export type InterviewGuideStage = 'first_round' | 'final_round';
 
 export interface InterviewGuide {
   format: InterviewGuideFormat;
   intro?: string;
+  /** Public path to the case PDF shown during scoring, e.g. `/interview-cases/strategy-group.pdf`. */
+  casePdfUrl?: string;
   questions?: string[];
   caseStudy?: {
     title?: string;
@@ -14,7 +18,14 @@ export interface InterviewGuide {
 
 export type InterviewGuidesRecord = Record<InterviewGuideStage, InterviewGuide | null>;
 
+export type InterviewScoreFieldGroup = {
+  key: 'case' | 'behavioral' | 'questions' | 'overall';
+  label: string;
+  fields: string[];
+};
+
 const STAGES: InterviewGuideStage[] = ['first_round', 'final_round'];
+const FORMATS: InterviewGuideFormat[] = ['questions', 'case_study', 'case_and_behavioral'];
 
 export function emptyInterviewGuides(): InterviewGuidesRecord {
   return { first_round: null, final_round: null };
@@ -25,6 +36,38 @@ function trimOptional(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function trimList(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+}
+
+function isGuideFormat(value: unknown): value is InterviewGuideFormat {
+  return typeof value === 'string' && FORMATS.includes(value as InterviewGuideFormat);
+}
+
+export function normalizeCasePdfUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('/interview-cases/')) return undefined;
+  if (trimmed.includes('..') || trimmed.includes('//', 1)) return undefined;
+  return trimmed;
+}
+
+function normalizeCaseStudy(raw: unknown): InterviewGuide['caseStudy'] | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as { title?: unknown; prompt?: unknown; discussionPoints?: unknown };
+  const prompt = typeof obj.prompt === 'string' ? obj.prompt.trim() : '';
+  if (!prompt) return null;
+  const discussionPoints = trimList(obj.discussionPoints);
+  return {
+    title: trimOptional(typeof obj.title === 'string' ? obj.title : undefined),
+    prompt,
+    discussionPoints: discussionPoints.length > 0 ? discussionPoints : undefined,
+  };
+}
+
 /** Normalize raw API/client input into a validated guide shape (may still fail validateInterviewGuide). */
 export function normalizeGuideInput(raw: unknown): InterviewGuide | null {
   return normalizeGuide(raw);
@@ -33,39 +76,26 @@ export function normalizeGuideInput(raw: unknown): InterviewGuide | null {
 function normalizeGuide(raw: unknown): InterviewGuide | null {
   if (!raw || typeof raw !== 'object') return null;
   const obj = raw as Partial<InterviewGuide>;
-  if (obj.format !== 'questions' && obj.format !== 'case_study') return null;
+  if (!isGuideFormat(obj.format)) return null;
 
   const intro = trimOptional(obj.intro);
+  const casePdfUrl = normalizeCasePdfUrl(obj.casePdfUrl);
 
   if (obj.format === 'questions') {
-    const questions = (obj.questions ?? [])
-      .map((q) => (typeof q === 'string' ? q.trim() : ''))
-      .filter(Boolean);
+    const questions = trimList(obj.questions);
     if (questions.length === 0) return null;
-    return { format: 'questions', intro, questions };
+    return { format: 'questions', intro, casePdfUrl, questions };
   }
 
-  const caseStudyRaw = obj.caseStudy;
-  if (!caseStudyRaw || typeof caseStudyRaw !== 'object') return null;
-  const prompt =
-    typeof caseStudyRaw.prompt === 'string' ? caseStudyRaw.prompt.trim() : '';
-  if (!prompt) return null;
+  const caseStudy = normalizeCaseStudy(obj.caseStudy);
+  if (!caseStudy) return null;
 
-  const discussionPoints = (caseStudyRaw.discussionPoints ?? [])
-    .map((p) => (typeof p === 'string' ? p.trim() : ''))
-    .filter(Boolean);
+  if (obj.format === 'case_study') {
+    return { format: 'case_study', intro, casePdfUrl, caseStudy };
+  }
 
-  return {
-    format: 'case_study',
-    intro,
-    caseStudy: {
-      title: trimOptional(
-        typeof caseStudyRaw.title === 'string' ? caseStudyRaw.title : undefined,
-      ),
-      prompt,
-      discussionPoints: discussionPoints.length > 0 ? discussionPoints : undefined,
-    },
-  };
+  const questions = trimList(obj.questions);
+  return { format: 'case_and_behavioral', intro, casePdfUrl, caseStudy, questions };
 }
 
 export function parseInterviewGuides(
@@ -100,38 +130,29 @@ export function serializeInterviewGuides(guides: InterviewGuidesRecord): string 
 }
 
 export function validateInterviewGuide(guide: InterviewGuide): string | null {
-  if (guide.format === 'questions') {
+  if (guide.format === 'questions' || guide.format === 'case_and_behavioral') {
     const questions = (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
     if (questions.length === 0) {
-      return 'Add at least one interview question.';
+      return guide.format === 'case_and_behavioral'
+        ? 'Add at least one behavioral question.'
+        : 'Add at least one interview question.';
     }
-    return null;
   }
 
-  const prompt = guide.caseStudy?.prompt?.trim();
-  if (!prompt) {
-    return 'Case study prompt is required.';
+  if (guide.format === 'case_study' || guide.format === 'case_and_behavioral') {
+    const prompt = guide.caseStudy?.prompt?.trim();
+    if (!prompt) {
+      return 'Case study prompt is required.';
+    }
   }
+
   return null;
 }
 
-export function formatInterviewGuideForDisplay(guide: InterviewGuide): string {
+function formatCaseStudyLines(guide: InterviewGuide): string[] {
   const lines: string[] = [];
-
-  if (guide.intro?.trim()) {
-    lines.push(guide.intro.trim());
-    lines.push('');
-  }
-
-  if (guide.format === 'questions') {
-    const questions = (guide.questions ?? []).filter((q) => q.trim());
-    questions.forEach((q, i) => {
-      lines.push(`${i + 1}. ${q.trim()}`);
-    });
-    return lines.join('\n').trim();
-  }
-
-  const cs = guide.caseStudy!;
+  const cs = guide.caseStudy;
+  if (!cs) return lines;
   if (cs.title?.trim()) {
     lines.push(cs.title.trim());
     lines.push('');
@@ -144,6 +165,40 @@ export function formatInterviewGuideForDisplay(guide: InterviewGuide): string {
       if (point.trim()) lines.push(`• ${point.trim()}`);
     }
   }
+  return lines;
+}
+
+function formatQuestionLines(questions: string[] | undefined): string[] {
+  return (questions ?? [])
+    .filter((q) => q.trim())
+    .map((q, i) => `${i + 1}. ${q.trim()}`);
+}
+
+export function formatInterviewGuideForDisplay(guide: InterviewGuide): string {
+  const lines: string[] = [];
+
+  if (guide.intro?.trim()) {
+    lines.push(guide.intro.trim());
+    lines.push('');
+  }
+
+  if (guide.format === 'questions') {
+    lines.push(...formatQuestionLines(guide.questions));
+    return lines.join('\n').trim();
+  }
+
+  if (guide.format === 'case_and_behavioral') {
+    lines.push('Part 1 — Case');
+    lines.push('');
+    lines.push(...formatCaseStudyLines(guide));
+    lines.push('');
+    lines.push('Part 2 — Behavioral');
+    lines.push('');
+    lines.push(...formatQuestionLines(guide.questions));
+    return lines.join('\n').trim();
+  }
+
+  lines.push(...formatCaseStudyLines(guide));
   return lines.join('\n').trim();
 }
 
@@ -155,22 +210,147 @@ export function interviewGuideForApi(
   return normalizeGuide(guide);
 }
 
-/** Scoreable rubric fields for live interview scoring (not application CSV columns). */
-export function interviewScoreFieldsFromGuide(guide: InterviewGuide | null): string[] {
-  if (!guide) return ['Overall assessment'];
-
-  if (guide.format === 'questions') {
-    const questions = (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
-    return questions.length > 0 ? questions : ['Overall assessment'];
-  }
-
+function caseScoreFields(guide: InterviewGuide): string[] {
   const points = (guide.caseStudy?.discussionPoints ?? [])
     .map((p) => p.trim())
     .filter(Boolean);
   if (points.length > 0) return points;
-
   const title = guide.caseStudy?.title?.trim();
   if (title) return [title];
+  return ['Case assessment'];
+}
 
-  return ['Case study assessment'];
+function questionScoreFields(questions: string[] | undefined, fallback: string): string[] {
+  const list = (questions ?? []).map((q) => q.trim()).filter(Boolean);
+  return list.length > 0 ? list : [fallback];
+}
+
+function uniquifyAgainst(existing: string[], fields: string[]): string[] {
+  const taken = new Set(existing);
+  return fields.map((field) => {
+    if (!taken.has(field)) {
+      taken.add(field);
+      return field;
+    }
+    let suffix = 2;
+    let next = `${field} (${suffix})`;
+    while (taken.has(next)) {
+      suffix += 1;
+      next = `${field} (${suffix})`;
+    }
+    taken.add(next);
+    return next;
+  });
+}
+
+export function interviewScoreFieldGroups(
+  guide: InterviewGuide | null,
+): InterviewScoreFieldGroup[] {
+  if (!guide) {
+    return [{ key: 'overall', label: '', fields: ['Overall assessment'] }];
+  }
+
+  if (guide.format === 'questions') {
+    return [
+      {
+        key: 'questions',
+        label: '',
+        fields: questionScoreFields(guide.questions, 'Overall assessment'),
+      },
+    ];
+  }
+
+  if (guide.format === 'case_study') {
+    return [{ key: 'case', label: '', fields: caseScoreFields(guide) }];
+  }
+
+  const caseFields = caseScoreFields(guide);
+  const behavioralFields = uniquifyAgainst(
+    caseFields,
+    questionScoreFields(guide.questions, 'Behavioral assessment'),
+  );
+  return [
+    { key: 'case', label: 'Part 1 — Case', fields: caseFields },
+    { key: 'behavioral', label: 'Part 2 — Behavioral', fields: behavioralFields },
+  ];
+}
+
+/** Scoreable rubric fields for live interview scoring (not application CSV columns). */
+export function interviewScoreFieldsFromGuide(guide: InterviewGuide | null): string[] {
+  return interviewScoreFieldGroups(guide).flatMap((group) => group.fields);
+}
+
+export function defaultInterviewGuideFormat(
+  teamName: string,
+  stage: InterviewGuideStage,
+): InterviewGuideFormat {
+  if (teamName === 'Strategy') {
+    return stage === 'first_round' ? 'case_study' : 'case_and_behavioral';
+  }
+  return 'questions';
+}
+
+export function applyTeamInterviewGuideDefaults(
+  teamName: string,
+  guides: InterviewGuidesRecord,
+): InterviewGuidesRecord {
+  if (teamName !== 'Strategy') return guides;
+
+  const defaults = strategyDefaultGuides();
+
+  return {
+    first_round: mergeGuideWithDefault(guides.first_round, defaults.first_round),
+    final_round: mergeGuideWithDefault(guides.final_round, defaults.final_round),
+  };
+}
+
+function mergeGuideWithDefault(
+  saved: InterviewGuide | null,
+  fallback: InterviewGuide | null,
+): InterviewGuide | null {
+  if (!fallback) return saved;
+  if (!saved) return fallback;
+
+  const savedPoints = (saved.caseStudy?.discussionPoints ?? []).filter((p) => p.trim());
+  const savedQuestions = (saved.questions ?? []).filter((q) => q.trim());
+  const missingCaseQuestions =
+    (fallback.format === 'case_study' || fallback.format === 'case_and_behavioral') &&
+    savedPoints.length === 0;
+  const missingBehavioral =
+    fallback.format === 'case_and_behavioral' && savedQuestions.length === 0;
+
+  if (missingCaseQuestions || missingBehavioral) {
+    return {
+      ...fallback,
+      intro: saved.intro ?? fallback.intro,
+      casePdfUrl: saved.casePdfUrl ?? fallback.casePdfUrl,
+    };
+  }
+
+  if (!saved.casePdfUrl && fallback.casePdfUrl) {
+    return { ...saved, casePdfUrl: fallback.casePdfUrl };
+  }
+  return saved;
+}
+
+export function interviewStageSetupCopy(
+  teamName: string,
+  stage: InterviewGuideStage,
+): { label: string; hint: string | null } {
+  if (teamName === 'Strategy') {
+    if (stage === 'first_round') {
+      return {
+        label: 'First Round (Group)',
+        hint: 'Group casing — case only.',
+      };
+    }
+    return {
+      label: 'Final Round (Individual)',
+      hint: 'Case (part 1), then behavioral questions (part 2).',
+    };
+  }
+  return {
+    label: stage === 'first_round' ? 'First Round Interview' : 'Final Round Interview',
+    hint: null,
+  };
 }
