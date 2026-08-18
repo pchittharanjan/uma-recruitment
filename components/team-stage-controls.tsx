@@ -2,33 +2,33 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PipelineStatusSnapshot } from '@/components/pipeline-status-snapshot';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { RoundStatus } from '@/lib/db';
 import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
-import type { UnlockableStage } from '@/lib/stages';
 
-interface GlobalPhaseSnapshot {
+interface TeamPhaseSnapshot {
+  teamName: string;
   status: RoundStatus | null;
-  unlockedStages: UnlockableStage[];
 }
 
-export function TeamStageControls() {
-  const [state, setState] = useState<GlobalPhaseSnapshot | null>(null);
+export function TeamStageControls({ teamId }: { teamId: number }) {
+  const [state, setState] = useState<TeamPhaseSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/phase?light=1');
+      const res = await fetch(`/api/admin/teams/${teamId}/phase`);
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? 'Failed to load phase.');
         return;
       }
       setState({
-        status: json.status,
-        unlockedStages: json.unlockedStages ?? [],
+        teamName: json.team?.name ?? 'Team',
+        status: json.round?.status ?? null,
       });
       setError('');
     } catch {
@@ -36,7 +36,7 @@ export function TeamStageControls() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [teamId]);
 
   useEffect(() => {
     load();
@@ -50,24 +50,14 @@ export function TeamStageControls() {
 
   if (loading) {
     return (
-      <div className="display-panel space-y-5 p-5 sm:p-6" role="status" aria-label="Loading">
-        <div>
-          <p className="uma-section-label">Global status</p>
-          <div className="mt-3 space-y-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-full max-w-md" />
+      <Card role="status" aria-label="Loading">
+        <CardHeader className="border-b border-border">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <CardTitle>Pipeline status</CardTitle>
+            <Skeleton className="h-7 w-44 rounded-lg" />
           </div>
-        </div>
-        <Skeleton className="h-12 w-full" />
-      </div>
-    );
-  }
-
-  if (!state?.status) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {error || 'Global status is not available yet.'}
-      </p>
+        </CardHeader>
+      </Card>
     );
   }
 
@@ -75,10 +65,13 @@ export function TeamStageControls() {
     return <p className="text-sm text-destructive">{error}</p>;
   }
 
-  return (
-    <PipelineStatusSnapshot
-      status={state.status}
-      unlockedStages={state.unlockedStages}
-    />
-  );
+  if (!state?.status) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No active recruiting cycle for this team yet. Advance from the dashboard when ready.
+      </p>
+    );
+  }
+
+  return <PipelineStatusSnapshot teamName={state.teamName} status={state.status} />;
 }

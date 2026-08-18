@@ -21,31 +21,31 @@ const VERDICT_OPTIONS: Array<{
     value: 'green',
     indicatorClassName: 'bg-green-500',
     activeClass:
-      'border-green-600 bg-green-500 text-white shadow-sm dark:border-green-500 dark:bg-green-600',
+      'border-green-600 bg-green-500 text-white dark:border-green-500 dark:bg-green-600',
   },
   {
     value: 'high_yellow',
     indicatorClassName: 'bg-yellow-400',
     activeClass:
-      'border-yellow-500 bg-yellow-400 text-yellow-950 shadow-sm dark:border-yellow-500 dark:bg-yellow-500',
+      'border-yellow-500 bg-yellow-400 text-yellow-950 dark:border-yellow-500 dark:bg-yellow-500',
   },
   {
     value: 'yellow',
     indicatorClassName: 'bg-amber-400',
     activeClass:
-      'border-amber-500 bg-amber-400 text-amber-950 shadow-sm dark:border-amber-500 dark:bg-amber-500',
+      'border-amber-500 bg-amber-400 text-amber-950 dark:border-amber-500 dark:bg-amber-500',
   },
   {
     value: 'low_yellow',
     indicatorClassName: 'bg-orange-400',
     activeClass:
-      'border-orange-500 bg-orange-400 text-orange-950 shadow-sm dark:border-orange-500 dark:bg-orange-500',
+      'border-orange-500 bg-orange-400 text-orange-950 dark:border-orange-500 dark:bg-orange-500',
   },
   {
     value: 'red',
     indicatorClassName: 'bg-red-500',
     activeClass:
-      'border-red-600 bg-red-500 text-white shadow-sm dark:border-red-500 dark:bg-red-600',
+      'border-red-600 bg-red-500 text-white dark:border-red-500 dark:bg-red-600',
   },
 ];
 
@@ -151,7 +151,7 @@ export function PanelVerdictSummary({
   }
 
   if (counts.size === 0) {
-    return <span className="text-sm text-muted-foreground">—</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
 
   return (
@@ -238,7 +238,7 @@ export function AdvancementVerdictSelector({
         title={readOnlyHint}
         aria-label={readOnlyHint}
       >
-        —
+        -
       </span>
     );
   }

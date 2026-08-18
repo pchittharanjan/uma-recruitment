@@ -65,6 +65,32 @@ export function normalizeWorkspaceHref(href: string): string {
   }
 }
 
+/** Whether a stored workspace tab refers to the same page as the current URL. */
+export function workspaceTabMatches(storedHref: string, currentHref: string): boolean {
+  const stored = normalizeWorkspaceHref(storedHref);
+  const current = normalizeWorkspaceHref(currentHref);
+  if (stored === current) return true;
+
+  const { pathname: storedPath } = splitHrefParts(stored);
+  const { pathname: currentPath } = splitHrefParts(current);
+  if (storedPath !== currentPath) return false;
+
+  // Deliberations mutates ?tabs/?active via replaceState — one outer tab.
+  if (storedPath === '/admin/deliberations') return true;
+
+  // Dashboard phase hub: ?view= swaps content on the same tab.
+  if (storedPath === '/admin/dashboard') return true;
+
+  // Team hub root: ?view= swaps phase preview on the same tab.
+  if (/^\/admin\/teams\/\d+$/.test(storedPath)) return true;
+
+  return false;
+}
+
+export function findWorkspaceTabIndex(tabs: WorkspaceTab[], href: string): number {
+  return tabs.findIndex((tab) => workspaceTabMatches(tab.href, href));
+}
+
 function splitHrefParts(hrefOrPathname: string): { pathname: string; search: string } {
   try {
     const url = new URL(hrefOrPathname, 'http://local.invalid');
@@ -78,58 +104,98 @@ function splitHrefParts(hrefOrPathname: string): { pathname: string; search: str
   }
 }
 
-export function workspaceTitle(hrefOrPathname: string): string {
+export type WorkspaceTitleContext = {
+  teamNames?: Record<string, string>;
+};
+
+function titleCase(value: string): string {
+  if (!value) return 'Page';
+  return value.replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function resolveTeamName(teamId: string, context: WorkspaceTitleContext): string {
+  return context.teamNames?.[teamId] ?? `Team ${teamId}`;
+}
+
+function teamTabTitle(teamId: string, page: string, context: WorkspaceTitleContext): string {
+  return `${resolveTeamName(teamId, context)} · ${page}`;
+}
+
+function adminTeamPageLabel(rest: string): string {
+  if (rest.startsWith('communications')) return 'Emails';
+  if (rest.startsWith('interview-setup')) return 'Interview Setup';
+  if (rest.startsWith('interview-preview')) return 'Preview';
+  if (rest.startsWith('interview-results')) return 'Results';
+  if (rest.startsWith('assignments')) return 'Assignments';
+  if (rest.startsWith('finalize')) return 'Finalize';
+  if (rest.startsWith('schedule/first-round')) return 'First Round Schedule';
+  if (rest.startsWith('schedule/final-round')) return 'Final Round Schedule';
+  if (rest.includes('schedule')) return 'Schedule';
+  if (rest.startsWith('grader-preview')) return 'Grader Preview';
+  return titleCase((rest.split('/')[0] ?? '').replace(/-/g, ' '));
+}
+
+function teamPortalPageLabel(rest: string): string {
+  if (rest.startsWith('grade')) return 'Grading';
+  if (rest.startsWith('advancement')) return 'Advancement';
+  if (rest.startsWith('deliberations')) return 'Deliberations';
+  if (rest.startsWith('final-selection')) return 'Final Selection';
+  if (rest.includes('interviews/first_round')) {
+    return /\/\d+/.test(rest) ? 'Interview' : 'First Round';
+  }
+  if (rest.includes('interviews/final_round')) {
+    return /\/\d+/.test(rest) ? 'Interview' : 'Final Round';
+  }
+  if (rest.startsWith('interviews')) return 'Interviews';
+  return titleCase((rest.split('/')[0] ?? '').replace(/-/g, ' '));
+}
+
+export function workspaceTitle(
+  hrefOrPathname: string,
+  context: WorkspaceTitleContext = {},
+): string {
   const { pathname, search } = splitHrefParts(hrefOrPathname);
   const view = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('view');
 
   if (pathname === '/admin/dashboard' || pathname === '/admin') {
-    if (view === 'first-round') return 'First Round Interview';
-    if (view === 'final-round') return 'Final Round Interview';
+    if (view === 'first-round') return 'First Round';
+    if (view === 'final-round') return 'Final Round';
     if (view === 'deliberations') return 'Deliberations';
     return 'Dashboard';
   }
   if (pathname === '/admin/advancements') return 'Advancements';
   if (pathname === '/admin/applications') return 'Applications';
   if (pathname === '/admin/users') return 'Users';
-  if (pathname === '/admin/users/new') return 'New user';
+  if (pathname === '/admin/users/new') return 'New User';
   if (pathname === '/admin/coffee-chats' || pathname === '/coffee-chats') return 'Coffee Chats';
   if (pathname === '/admin/import') return 'Import';
   if (pathname === '/admin/communications') return 'Emails';
   if (pathname === '/admin/phases/application') return 'Application';
   if (pathname === '/admin/final-selection' || pathname.startsWith('/admin/final-selection/')) {
-    return 'Final selection';
+    return 'Final Selection';
   }
   if (pathname.startsWith('/admin/deliberations')) return 'Deliberations';
-  if (pathname === '/team') return 'Home';
-  if (pathname === '/team/final-selection') return 'Final selection';
+  if (pathname === '/team') return 'Your Teams';
+  if (pathname === '/team/final-selection') return 'Final Selection';
 
   const adminTeam = pathname.match(/^\/admin\/teams\/(\d+)(?:\/(.+))?$/);
   if (adminTeam) {
+    const teamId = adminTeam[1]!;
     const rest = adminTeam[2] ?? '';
-    if (!rest) return 'Team';
-    if (rest.startsWith('communications')) return 'Team emails';
-    if (rest.startsWith('interview-setup')) return 'Interview setup';
-    if (rest.startsWith('interview-results')) return 'Interview results';
-    if (rest.startsWith('assignments')) return 'Assignments';
-    if (rest.startsWith('finalize')) return 'Finalize';
-    if (rest.includes('schedule')) return 'Schedule';
-    return rest.split('/')[0]?.replace(/-/g, ' ') ?? 'Team';
+    if (!rest) return resolveTeamName(teamId, context);
+    return teamTabTitle(teamId, adminTeamPageLabel(rest), context);
   }
 
   const teamPath = pathname.match(/^\/team\/(\d+)(?:\/(.+))?$/);
   if (teamPath) {
+    const teamId = teamPath[1]!;
     const rest = teamPath[2] ?? '';
-    if (!rest) return 'Overview';
-    if (rest.startsWith('grade')) return 'Grading';
-    if (rest.startsWith('advancement')) return 'Advancement';
-    if (rest.startsWith('deliberations')) return 'Deliberations';
-    if (rest.includes('interviews/first')) return 'First Round';
-    if (rest.includes('interviews/final')) return 'Final Round';
-    return rest.split('/')[0]?.replace(/-/g, ' ') ?? 'Team';
+    if (!rest) return resolveTeamName(teamId, context);
+    return teamTabTitle(teamId, teamPortalPageLabel(rest), context);
   }
 
   const last = pathname.split('/').filter(Boolean).pop() ?? 'Page';
-  return last.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+  return titleCase(last.replace(/-/g, ' '));
 }
 
 export function isInternalWorkspaceHref(href: string): boolean {
@@ -161,7 +227,7 @@ const ADMIN_WORKSPACE_DESTINATIONS: WorkspaceDestination[] = [
   { title: 'Users', href: '/admin/users' },
   { title: 'Import', href: '/admin/import' },
   { title: 'Emails', href: '/admin/communications' },
-  { title: 'Final selection', href: '/admin/final-selection' },
+  { title: 'Final Selection', href: '/admin/final-selection' },
 ];
 
 /** Sidebar-style pages available for the workspace "+" menu (derived from current route). */

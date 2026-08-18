@@ -3,17 +3,10 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
-import {
-  advanceGlobalPipeline,
-  getGlobalPipelineState,
-  lockGlobalStage,
-  unlockGlobalStage,
-  type GlobalPipelineState,
-} from '@/lib/pipeline-phase';
+import { getGlobalPipelineState, type GlobalPipelineState } from '@/lib/pipeline-phase';
 import { getPhaseChecklistForStatus } from '@/lib/phase-checklist';
-import { PIPELINE_PHASES, type UnlockableStage, UNLOCKABLE_STAGES } from '@/lib/stages';
+import { PIPELINE_PHASES } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
-import { assertPipelineWritable } from '@/lib/pipeline-writable';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { withPerfLog } from '@/lib/perf-log';
 
@@ -68,47 +61,4 @@ export async function GET(req: NextRequest) {
       }
     }),
   );
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    await initDb();
-    const closed = await assertPipelineWritable();
-    if (closed) return closed;
-    const admin = await requireAuth(req, { roles: ['admin'] });
-    if (!admin) return unauthorized();
-
-    const body = (await req.json()) as {
-      action: 'unlock' | 'lock' | 'advance';
-      stage?: UnlockableStage;
-    };
-
-    let result;
-    if (body.action === 'unlock') {
-      if (!body.stage || !UNLOCKABLE_STAGES.includes(body.stage)) {
-        return NextResponse.json({ error: 'Invalid stage.' }, { status: 400 });
-      }
-      result = await unlockGlobalStage(body.stage, admin.id);
-    } else if (body.action === 'lock') {
-      if (!body.stage || !UNLOCKABLE_STAGES.includes(body.stage)) {
-        return NextResponse.json({ error: 'Invalid stage.' }, { status: 400 });
-      }
-      result = await lockGlobalStage(body.stage);
-    } else if (body.action === 'advance') {
-      result = await advanceGlobalPipeline(admin.id);
-    } else {
-      return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      ...(await enrichPhaseResponse(result)),
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Internal server error';
-    if (message.includes('No active rounds') || message.includes('final phase')) {
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-    console.error(e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
 }

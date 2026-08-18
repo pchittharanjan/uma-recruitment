@@ -24,7 +24,7 @@ function AdminClosedBanner() {
   const { phase } = useAdminPhase();
   if (!phase?.pipelineClosed) return null;
   return (
-    <ClosedBannerMessage message="This recruitment cycle is closed. Team members are view-only — you can still send outcome emails and make admin changes." />
+    <ClosedBannerMessage message="This recruitment cycle is closed. Team members are view-only, and you can still send outcome emails and make admin changes." />
   );
 }
 
@@ -32,7 +32,7 @@ function TeamClosedBanner() {
   const { nav } = useTeamNav();
   if (!nav?.pipelineClosed) return null;
   return (
-    <ClosedBannerMessage message="This recruitment cycle is closed. Everything is view-only — no scores, notes, schedules, or decisions can be changed." />
+    <ClosedBannerMessage message="This recruitment cycle is closed. Everything is view-only. No scores, notes, schedules, or decisions can be changed." />
   );
 }
 

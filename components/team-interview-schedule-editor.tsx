@@ -8,7 +8,7 @@ import LoadingButton from '@/components/loading-button';
 import PageLoading from '@/components/page-loading';
 import { SchedulePersonInput, type PersonOption } from '@/components/schedule-person-input';
 import StatusBanner from '@/components/status-banner';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 function formatLabel(format: 'group' | 'individual'): string {
-  return format === 'group' ? 'Group interviews' : 'Individual interviews';
+  return format === 'group' ? 'Group Interviews' : 'Individual Interviews';
 }
 
 interface Interviewer {
@@ -293,6 +293,21 @@ function sessionsToSlots(
   return Array.from(byApp.values());
 }
 
+const SCHEDULE_FIELD_CLASS =
+  'border-border bg-popover text-foreground placeholder:text-muted-foreground';
+
+const SCHEDULE_SECTION_LABEL_CLASS = 'text-sm font-medium text-secondary-foreground';
+
+const SCHEDULE_STATUS_TEXT_CLASS = 'text-sm text-secondary-foreground';
+
+function SavedIndicator() {
+  return (
+    <span className="inline-flex h-8 items-center px-1 text-sm font-medium text-success">
+      Saved
+    </span>
+  );
+}
+
 function PersonSlotList({
   values,
   getOptions,
@@ -322,7 +337,7 @@ function PersonSlotList({
         type="button"
         variant="ghost"
         size="sm"
-        className="h-8 justify-start px-2 text-muted-foreground"
+        className="h-8 justify-start px-2 text-primary hover:bg-primary/5 hover:text-primary-hover"
         onClick={onAdd}
         disabled={atMax}
       >
@@ -347,7 +362,7 @@ function PersonSlotList({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 shrink-0 px-2 text-muted-foreground"
+            className="h-8 shrink-0 px-2 text-muted-foreground hover:text-destructive"
             onClick={() => onRemove(idx)}
           >
             ×
@@ -359,7 +374,7 @@ function PersonSlotList({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 justify-start px-2 text-muted-foreground"
+          className="h-8 justify-start px-2 text-primary hover:bg-primary/5 hover:text-primary-hover"
           onClick={onAdd}
         >
           {addLabel}
@@ -388,17 +403,17 @@ function SortableColumnHeader({
     : ArrowUpDownIcon;
 
   return (
-    <th className="p-3 text-left font-medium text-muted-foreground">
+    <th className="h-10 px-4 py-3 text-left text-xs font-medium tracking-wide text-secondary-foreground">
       <button
         type="button"
         onClick={() => onSort(column)}
         className={cn(
-          'inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground',
+          'inline-flex items-center gap-1 rounded-sm text-secondary-foreground transition-colors hover:text-foreground',
           active && 'text-foreground',
         )}
       >
         {label}
-        <SortIcon className={cn('size-3.5 shrink-0', !active && 'opacity-40')} />
+        <SortIcon className={cn('size-3.5 shrink-0', !active && 'opacity-70')} />
       </button>
     </th>
   );
@@ -858,13 +873,13 @@ export function TeamInterviewScheduleEditor({
         title={title}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{formatLabel(interviewFormat)}</Badge>
             <Link
               href={`/admin/teams/${data.team.id}/interview-setup`}
               className="text-sm font-medium text-primary underline-offset-4 hover:underline"
             >
-              Setup interview →
+              Interview Setup →
             </Link>
-            <Badge variant="secondary">{formatLabel(interviewFormat)}</Badge>
           </div>
         }
       />
@@ -873,40 +888,42 @@ export function TeamInterviewScheduleEditor({
       {data.round.status === 'closed' && (
         <StatusBanner
           type="info"
-          message="Recruitment is closed. Teams are view-only — you can still edit this schedule."
+          message="Recruitment is closed. Teams are view-only, and you can still edit this schedule."
         />
       )}
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">Interview day</CardTitle>
+        <CardHeader className="border-b border-border/50 pb-3">
+          <CardTitle className="text-foreground">Interview Day</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="interview-date" required>
+              <Label htmlFor="interview-date" className="text-foreground" required>
                 Date
               </Label>
               <Input
                 id="interview-date"
                 type="date"
+                className={SCHEDULE_FIELD_CLASS}
                 value={dayDate}
                 onChange={(e) => setDayDate(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interview-start" required>
+              <Label htmlFor="interview-start" className="text-foreground" required>
                 First block starts
               </Label>
               <Input
                 id="interview-start"
                 type="time"
+                className={SCHEDULE_FIELD_CLASS}
                 value={dayStartTime}
                 onChange={(e) => setDayStartTime(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="block-minutes" required>
+              <Label htmlFor="block-minutes" className="text-foreground" required>
                 Block length (minutes)
               </Label>
               <Input
@@ -915,6 +932,7 @@ export function TeamInterviewScheduleEditor({
                 min={15}
                 max={120}
                 step={5}
+                className={SCHEDULE_FIELD_CLASS}
                 value={blockMinutes}
                 onChange={(e) =>
                   setBlockMinutes(Number.parseInt(e.target.value, 10) || 30)
@@ -922,35 +940,42 @@ export function TeamInterviewScheduleEditor({
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border/50 pt-3">
             {interviewDate && timeBlocks.length > 0 && (
-              <p className="mr-auto text-sm text-muted-foreground">
+              <p className={cn('mr-auto', SCHEDULE_STATUS_TEXT_CLASS)}>
                 {assignedCount}/{allSlots.length} applicants scheduled
               </p>
             )}
-            <LoadingButton
-              size="sm"
-              variant={daySettingsDirty ? 'primary' : 'secondary'}
-              loading={savingDaySettings}
-              disabled={!daySettingsDirty || savingDaySettings}
-              onClick={() => void saveDaySettings()}
-            >
-              {saveButtonLabel(savingDaySettings, daySettingsDirty, 'Save interview day')}
-            </LoadingButton>
+            {daySettingsDirty || savingDaySettings ? (
+              <LoadingButton
+                size="sm"
+                variant="primary"
+                loading={savingDaySettings}
+                disabled={!daySettingsDirty || savingDaySettings}
+                onClick={() => void saveDaySettings()}
+              >
+                {saveButtonLabel(savingDaySettings, daySettingsDirty, 'Save interview day')}
+              </LoadingButton>
+            ) : (
+              <SavedIndicator />
+            )}
           </div>
         </CardContent>
       </Card>
 
       <PageSection className="space-y-6">
         <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-base font-medium">
-              Schedule ({allSlots.length} Applicant{allSlots.length === 1 ? '' : 's'})
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border/50">
+            <CardTitle className="flex items-baseline gap-2.5 text-foreground">
+              Schedule
+              <TitleCount>
+                {allSlots.length} applicant{allSlots.length === 1 ? '' : 's'}
+              </TitleCount>
             </CardTitle>
             <div className="flex flex-wrap items-center gap-2">
               {allSlots.length > 0 && (
                 <DestructiveConfirmDialog
-                  title="Simulate schedule?"
+                  title="Simulate Schedule?"
                   description={
                     <>
                       Auto-fills a complete interview schedule for testing: assigns applicants
@@ -963,17 +988,18 @@ export function TeamInterviewScheduleEditor({
                         : 'If no interview date is set, one will be chosen automatically.'}
                     </>
                   }
-                  confirmLabel="Simulate schedule"
+                  confirmLabel="Simulate Schedule"
                   onConfirm={handleSimulateSchedule}
                   trigger={
                     <LoadingButton
                       type="button"
                       variant="secondary"
                       size="sm"
+                      className="border border-border bg-popover text-foreground uma-hover-on-panel hover:text-foreground"
                       disabled={saving || simulating}
                     />
                   }
-                  triggerLabel="Simulate schedule"
+                  triggerLabel="Simulate Schedule"
                 />
               )}
               {assignedCount > 0 && (
@@ -981,6 +1007,7 @@ export function TeamInterviewScheduleEditor({
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="border-border text-foreground"
                   disabled={saving || simulating}
                   onClick={() => void clearAllApplicants()}
                 >
@@ -990,18 +1017,19 @@ export function TeamInterviewScheduleEditor({
             </div>
           </CardHeader>
           {allSlots.length > 0 && (
-            <div className="px-4 py-3">
-              <p className="mb-2 text-sm font-medium text-muted-foreground">
-                Unassigned Applicants ({unassignedApplicants.length})
+            <div className="border-b border-border/50 bg-muted/20 px-4 py-3">
+              <p className={cn('mb-2 flex items-baseline gap-2.5', SCHEDULE_SECTION_LABEL_CLASS)}>
+                Unassigned Applicants
+                <TitleCount>{unassignedApplicants.length}</TitleCount>
               </p>
               {unassignedApplicants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">All applicants are scheduled.</p>
+                <p className={SCHEDULE_STATUS_TEXT_CLASS}>All applicants are scheduled.</p>
               ) : (
                 <ul className="flex flex-wrap gap-1.5">
                   {unassignedApplicants.map((a) => (
                     <li
                       key={a.id}
-                      className="display-field px-2 py-0.5 text-sm"
+                      className="rounded-md border border-border bg-popover px-2 py-0.5 text-sm font-medium text-foreground"
                     >
                       {a.label}
                     </li>
@@ -1012,7 +1040,7 @@ export function TeamInterviewScheduleEditor({
           )}
           {allSlots.length > 0 && scheduleValidation.messages.length > 0 && (
             <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-3">
-              <p className="text-sm font-medium text-destructive">Scheduling conflicts</p>
+              <p className="text-sm font-medium text-destructive">Scheduling Conflicts</p>
               <p className="mt-1 text-sm text-destructive/90">
                 Fix the highlighted rows before saving.
               </p>
@@ -1025,7 +1053,7 @@ export function TeamInterviewScheduleEditor({
           )}
           <CardContent className="overflow-x-auto p-0">
             {allSlots.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">
+              <p className={cn('p-4', SCHEDULE_STATUS_TEXT_CLASS)}>
                 No applicants in this round yet. Advance applicants first.
               </p>
             ) : (
@@ -1038,7 +1066,7 @@ export function TeamInterviewScheduleEditor({
                   <col style={{ width: '10%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="bg-muted/40">
+                  <tr className="border-b border-border/50 bg-muted/30">
                     <SortableColumnHeader
                       label="Time"
                       column="time"
@@ -1063,10 +1091,10 @@ export function TeamInterviewScheduleEditor({
                       sortState={sortState}
                       onSort={handleColumnSort}
                     />
-                    <th className="p-3" />
+                    <th className="h-10 px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40">
+                <tbody className="divide-y divide-border/50">
                   {displaySessions.map((session) => (
                     <tr
                       key={session.id}
@@ -1080,7 +1108,7 @@ export function TeamInterviewScheduleEditor({
                         <NativeSelect
                           value={session.scheduledAt}
                           disabled={!interviewDate || timeBlocks.length === 0}
-                          className="w-full"
+                          className={cn('h-8 w-full', SCHEDULE_FIELD_CLASS)}
                           onChange={(e) =>
                             updateSession(session.id, { scheduledAt: e.target.value })
                           }
@@ -1127,7 +1155,7 @@ export function TeamInterviewScheduleEditor({
                             updateSession(session.id, { location: e.target.value })
                           }
                           placeholder="Room / Zoom link"
-                          className="h-8 w-full text-sm"
+                          className={cn('h-8 w-full text-sm', SCHEDULE_FIELD_CLASS)}
                         />
                       </td>
                       <td className="p-3">
@@ -1135,7 +1163,7 @@ export function TeamInterviewScheduleEditor({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-muted-foreground"
+                          className="text-foreground hover:text-destructive"
                           onClick={() => removeSession(session.id)}
                         >
                           Remove
@@ -1150,21 +1178,32 @@ export function TeamInterviewScheduleEditor({
           {allSlots.length > 0 && (
             <div
               ref={scheduleBottomRef}
-              className="flex flex-wrap items-center justify-end gap-2 px-4 py-3"
+              className="flex flex-wrap items-center justify-end gap-2 border-t border-border/50 px-4 py-3"
             >
-              <Button type="button" variant="outline" size="sm" onClick={addSession}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-border text-foreground"
+                onClick={addSession}
+              >
                 Add interview slot
               </Button>
-              <LoadingButton
-                variant={scheduleDirty ? 'primary' : 'secondary'}
-                onClick={handleSave}
-                loading={saving}
-                disabled={
-                  !scheduleDirty || saving || scheduleValidation.messages.length > 0
-                }
-              >
-                {saveButtonLabel(saving, scheduleDirty, 'Save schedule')}
-              </LoadingButton>
+              {scheduleDirty || saving ? (
+                <LoadingButton
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={
+                    !scheduleDirty || saving || scheduleValidation.messages.length > 0
+                  }
+                >
+                  {saveButtonLabel(saving, scheduleDirty, 'Save schedule')}
+                </LoadingButton>
+              ) : (
+                <SavedIndicator />
+              )}
             </div>
           )}
         </Card>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -16,7 +16,7 @@ import { ApplicationFieldsList } from '@/components/application-fields-list';
 import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,10 +30,13 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ApplicationStage } from '@/lib/db';
 import { displayApplicantId } from '@/lib/applicant-id';
 import { applicationStageLabel } from '@/lib/stages';
+import { teamBadgeClass } from '@/lib/team-colors';
 
 interface Team {
   id: number;
@@ -157,7 +160,7 @@ function SortableHeader({
   dir,
   onSort,
   className,
-  title,
+  tooltip,
 }: {
   label: string;
   sortKey: SortKey;
@@ -165,30 +168,83 @@ function SortableHeader({
   dir: SortDir;
   onSort: (key: SortKey) => void;
   className?: string;
-  title?: string;
+  tooltip: string;
 }) {
   const active = activeKey === sortKey;
   return (
-    <th className={cn('p-3 text-left font-medium text-muted-foreground', className)}>
-      <button
-        type="button"
-        title={title}
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-foreground"
-      >
-        {label}
-        {active ? (
-          dir === 'asc' ? (
-            <ArrowUpIcon className="size-3.5" />
-          ) : (
-            <ArrowDownIcon className="size-3.5" />
-          )
-        ) : (
-          <ChevronsUpDownIcon className="size-3.5 opacity-40" />
-        )}
-      </button>
+    <th className={cn('overflow-hidden p-3 text-left font-medium text-muted-foreground', className)}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              onClick={() => onSort(sortKey)}
+              className="inline-flex max-w-full items-center gap-1 hover:text-foreground"
+            >
+              <span className="whitespace-nowrap">{label}</span>
+              {active ? (
+                dir === 'asc' ? (
+                  <ArrowUpIcon className="size-4 shrink-0" />
+                ) : (
+                  <ArrowDownIcon className="size-4 shrink-0" />
+                )
+              ) : (
+                <ChevronsUpDownIcon className="size-4 shrink-0 opacity-40" />
+              )}
+            </button>
+          }
+        />
+        <TooltipContent side="top">{tooltip}</TooltipContent>
+      </Tooltip>
     </th>
   );
+}
+
+function DetailStat({
+  label,
+  tooltip,
+  children,
+}: {
+  label: string;
+  tooltip: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="cursor-help text-left font-normal normal-case text-muted-foreground decoration-muted-foreground/40 decoration-dotted underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {label}
+              </button>
+            }
+          />
+          <TooltipContent side="top">{tooltip}</TooltipContent>
+        </Tooltip>
+      </dt>
+      <dd className="mt-1 min-w-0 text-sm font-medium text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+const SHEET_WIDTH_KEY = 'uma-application-sheet-width';
+const SHEET_WIDTH_MIN = 380;
+const SHEET_WIDTH_DEFAULT = 540;
+
+function clampSheetWidth(width: number): number {
+  const max = typeof window === 'undefined' ? 720 : Math.round(window.innerWidth * 0.85);
+  return Math.min(max, Math.max(SHEET_WIDTH_MIN, Math.round(width)));
+}
+
+function readSheetWidth(): number {
+  if (typeof window === 'undefined') return SHEET_WIDTH_DEFAULT;
+  const raw = window.localStorage.getItem(SHEET_WIDTH_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return clampSheetWidth(Number.isFinite(parsed) ? parsed : SHEET_WIDTH_DEFAULT);
 }
 
 function otherTeamsForApplicant(
@@ -208,6 +264,7 @@ export default function AdminApplicationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
+  const [allCount, setAllCount] = useState(0);
   const [error, setError] = useState('');
 
   const [searchInput, setSearchInput] = useState('');
@@ -229,6 +286,12 @@ export default function AdminApplicationsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [sheetWidth, setSheetWidth] = useState(SHEET_WIDTH_DEFAULT);
+  const sheetDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    setSheetWidth(readSheetWidth());
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 400);
@@ -236,14 +299,11 @@ export default function AdminApplicationsPage() {
   }, [searchInput]);
 
   const fetchApplications = useCallback(
-    async (opts?: { append?: boolean; offset?: number }) => {
+    async (opts?: { append?: boolean; offset?: number; signal?: AbortSignal }) => {
       const append = Boolean(opts?.append);
       const offset = opts?.offset ?? 0;
       if (append) setLoadingMore(true);
-      else {
-        setLoading(true);
-        setApplications([]);
-      }
+      else setLoading(true);
       setError('');
       try {
         const params = new URLSearchParams();
@@ -253,7 +313,9 @@ export default function AdminApplicationsPage() {
         params.set('limit', '150');
         params.set('offset', String(offset));
 
-        const res = await fetch(`/api/admin/applications?${params.toString()}`);
+        const res = await fetch(`/api/admin/applications?${params.toString()}`, {
+          signal: opts?.signal,
+        });
         if (res.status === 401) {
           router.push('/login');
           return;
@@ -267,19 +329,31 @@ export default function AdminApplicationsPage() {
         setApplications((prev) => (append ? [...prev, ...nextRows] : nextRows));
         setTeams(json.teams ?? []);
         setTotal(typeof json.total === 'number' ? json.total : nextRows.length);
+        setAllCount(
+          typeof json.allCount === 'number'
+            ? json.allCount
+            : typeof json.total === 'number'
+              ? json.total
+              : nextRows.length,
+        );
         setHasMore(Boolean(json.hasMore));
-      } catch {
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         setError('Failed to load applications');
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (!opts?.signal?.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [router, searchQuery, teamFilter, stageFilter],
   );
 
   useEffect(() => {
-    void fetchApplications({ append: false, offset: 0 });
+    const controller = new AbortController();
+    void fetchApplications({ append: false, offset: 0, signal: controller.signal });
+    return () => controller.abort();
   }, [fetchApplications]);
 
   const sortedApplications = useMemo(
@@ -361,20 +435,20 @@ export default function AdminApplicationsPage() {
       <PageHeader
         eyebrow="Admin"
         title="Applications"
-        description="One row per team application. Same person on two teams = two rows (separate App IDs). List # is the blind ID for that team's graders."
+        description="One row per team application. Same person on two teams = two Application IDs. Applicant # is that team's number (what graders see)."
       />
 
       {error && <StatusBanner message={error} type="error" />}
 
       <PageSection>
-        <Card>
-          <CardHeader className="space-y-4">
-            <div>
-              <CardTitle>
-                All applications ({applications.length}
-                {total > applications.length ? ` of ${total}` : ''})
-              </CardTitle>
-            </div>
+        <Card className="gap-3 py-4">
+          <CardHeader className="gap-2 space-y-0">
+            <CardTitle className="flex items-baseline gap-2.5">
+              Applications
+              <TitleCount>
+                {applications.length} of {applications.length < total ? total : allCount || total}
+              </TitleCount>
+            </CardTitle>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="relative min-w-[200px] flex-1">
                 <Label htmlFor="app-search" className="sr-only">
@@ -383,10 +457,10 @@ export default function AdminApplicationsPage() {
                 <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="app-search"
-                  placeholder="Search name, email, applicant ID…"
+                  placeholder="Search name, email, Application ID, Applicant #…"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-9"
+                  className="bg-background pl-9"
                 />
               </div>
               <div className="space-y-1.5">
@@ -422,43 +496,51 @@ export default function AdminApplicationsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0" aria-busy={loading}>
             {sortedApplications.length === 0 ? (
               <p className="px-6 pb-6 text-sm text-muted-foreground">
-                {searchQuery || teamFilter !== 'all' || stageFilter !== 'all'
-                  ? 'No applications match your filters.'
-                  : 'No applications yet. Import CSV to get started.'}
+                {loading
+                  ? 'Searching…'
+                  : searchQuery || teamFilter !== 'all' || stageFilter !== 'all'
+                    ? 'No applications match your filters.'
+                    : 'No applications yet. Import CSV to get started.'}
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] table-fixed text-sm">
+              <div
+                className={cn(
+                  'overflow-hidden px-(--card-spacing) transition-opacity',
+                  loading && 'pointer-events-none opacity-60',
+                )}
+              >
+                <table className="w-full table-fixed text-sm">
                   <colgroup>
-                    <col style={{ width: '8%' }} />
-                    <col style={{ width: '7%' }} />
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '7%' }} />
                     <col style={{ width: '6%' }} />
-                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '9%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-border bg-muted/40">
+                    <tr className="border-b border-border bg-muted">
                       <SortableHeader
-                        label="App ID"
+                        label="Application ID"
                         sortKey="id"
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Unique file number for this team application. Same person on two teams gets two IDs."
                       />
                       <SortableHeader
-                        label="List #"
+                        label="Applicant #"
                         sortKey="rowIndex"
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
-                        title="Blind number Exec see on this team's list"
+                        tooltip="This team's number for this person. What graders see instead of a name."
                       />
                       <SortableHeader
                         label="Name"
@@ -466,6 +548,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="The candidate's name. “Also on …” means they applied to another team too."
                       />
                       <SortableHeader
                         label="Email"
@@ -473,6 +556,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Berkeley email for this person."
                       />
                       <SortableHeader
                         label="Team"
@@ -480,6 +564,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Which team this application is for."
                       />
                       <SortableHeader
                         label="Stage"
@@ -487,6 +572,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Where they are in this team's pipeline."
                       />
                       <SortableHeader
                         label="Score"
@@ -494,6 +580,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Average score for this application on this team."
                       />
                       <SortableHeader
                         label="Rank"
@@ -501,6 +588,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="Place on this team's scored list. 1 is the highest score."
                       />
                       <SortableHeader
                         label="Graders"
@@ -508,6 +596,7 @@ export default function AdminApplicationsPage() {
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
+                        tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
                       />
                     </tr>
                   </thead>
@@ -517,15 +606,17 @@ export default function AdminApplicationsPage() {
                         key={app.id}
                         onClick={() => openDetail(app)}
                         className={cn(
-                          'cursor-pointer hover:bg-muted/30',
-                          selectedId === app.id && 'bg-muted/40',
+                          'cursor-pointer',
+                          selectedId === app.id && 'bg-background',
                         )}
                       >
-                        <td className="p-3 font-mono tabular-nums text-muted-foreground">{app.id}</td>
-                        <td className="p-3 font-mono font-medium tabular-nums">
+                        <td className="overflow-hidden p-3 font-mono tabular-nums text-muted-foreground">
+                          {app.id}
+                        </td>
+                        <td className="overflow-hidden p-3 font-mono font-medium tabular-nums">
                           #{displayApplicantId(app.rowIndex)}
                         </td>
-                        <td className="min-w-0 p-3">
+                        <td className="min-w-0 overflow-hidden p-3">
                           <div className="truncate font-medium">{app.candidateName}</div>
                           {otherTeamsForApplicant(app, teamsByEmail).length > 0 && (
                             <p className="truncate text-sm text-muted-foreground">
@@ -536,22 +627,24 @@ export default function AdminApplicationsPage() {
                         <td className="min-w-0 truncate p-3 text-muted-foreground">
                           {app.candidateEmail}
                         </td>
-                        <td className="p-3">
-                          <StageBadge label={app.teamName} color="gray" />
+                        <td className="min-w-0 overflow-hidden p-3">
+                          <Badge className={cn('border-0 font-medium', teamBadgeClass(app.teamName))}>
+                            {app.teamName}
+                          </Badge>
                         </td>
-                        <td className="p-3">
+                        <td className="min-w-0 overflow-hidden p-3">
                           <StageBadge
                             label={applicationStageLabel(app.stage)}
                             color={stageBadgeColor(app.stage)}
                           />
                         </td>
-                        <td className="p-3 tabular-nums text-muted-foreground">
-                          {app.finalScore != null ? app.finalScore.toFixed(2) : '—'}
+                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
+                          {app.finalScore != null ? app.finalScore.toFixed(2) : '-'}
                         </td>
-                        <td className="p-3 tabular-nums text-muted-foreground">
-                          {app.rank ?? '—'}
+                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
+                          {app.rank ?? '-'}
                         </td>
-                        <td className="p-3 tabular-nums text-muted-foreground">
+                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
                           {app.graderCompleted}/{app.graderTotal}
                         </td>
                       </tr>
@@ -590,78 +683,126 @@ export default function AdminApplicationsPage() {
           }
         }}
       >
-        <SheetContent side="right" size="lg" className="overflow-y-auto">
+        <SheetContent
+          side="right"
+          size="lg"
+          className="relative gap-0 overflow-hidden p-0 data-[side=right]:w-auto data-[side=right]:max-w-[85vw] data-[side=right]:min-w-[22rem] data-[side=right]:sm:w-auto"
+          style={{ width: sheetWidth }}
+        >
+          <button
+            type="button"
+            aria-label="Drag to resize panel"
+            className="absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize border-0 bg-transparent p-0 hover:bg-primary/25"
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              sheetDragRef.current = { startX: event.clientX, startWidth: sheetWidth };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const drag = sheetDragRef.current;
+              if (!drag) return;
+              const next = clampSheetWidth(drag.startWidth - (event.clientX - drag.startX));
+              setSheetWidth(next);
+            }}
+            onPointerUp={(event) => {
+              const drag = sheetDragRef.current;
+              sheetDragRef.current = null;
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+              if (!drag) return;
+              const next = clampSheetWidth(drag.startWidth - (event.clientX - drag.startX));
+              setSheetWidth(next);
+              window.localStorage.setItem(SHEET_WIDTH_KEY, String(next));
+            }}
+          />
           {!sheetApp ? (
-            <div className="space-y-4 px-4 py-6" role="status" aria-label="Loading">
+            <div className="space-y-4 px-6 py-6" role="status" aria-label="Loading">
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-4 w-72" />
               <Skeleton className="h-40 w-full" />
             </div>
           ) : (
-            <>
-              <SheetHeader>
-                <SheetTitle>{sheetApp.candidateName}</SheetTitle>
-                <SheetDescription>
-                  App ID {sheetApp.id} · {sheetApp.teamName} · List #
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <SheetHeader className="shrink-0 space-y-1 border-b border-border/70 px-6 py-4 pr-14">
+                <SheetTitle className="truncate text-lg">{sheetApp.candidateName}</SheetTitle>
+                <SheetDescription className="truncate">
+                  Application ID {sheetApp.id} · {sheetApp.teamName} · Applicant #
                   {displayApplicantId(sheetApp.rowIndex)} · {sheetApp.candidateEmail}
                 </SheetDescription>
               </SheetHeader>
 
-              <div className="space-y-6 px-4 pb-6">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
                 {detailError && <StatusBanner message={detailError} type="error" />}
 
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <div className="min-w-0">
-                    <dt className="text-muted-foreground">Person</dt>
-                    <dd className="truncate font-medium">{sheetApp.candidateName}</dd>
+                <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl bg-muted/40 px-4 py-4">
+                  <DetailStat
+                    label="Person"
+                    tooltip="The candidate. “Also applied to …” means they have another team file."
+                  >
+                    <span className="block truncate">{sheetApp.candidateName}</span>
                     {otherTeamsForApplicant(sheetApp, teamsByEmail).length > 0 && (
-                      <dd className="mt-1 text-sm text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-sm font-normal text-muted-foreground">
                         Also applied to {otherTeamsForApplicant(sheetApp, teamsByEmail).join(', ')}
-                      </dd>
+                      </span>
                     )}
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">This application</dt>
-                    <dd className="font-mono tabular-nums">App ID {sheetApp.id}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">List #</dt>
-                    <dd className="font-mono font-medium">#{displayApplicantId(sheetApp.rowIndex)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Team</dt>
-                    <dd className="font-medium">{sheetApp.teamName}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Stage</dt>
-                    <dd>
-                      <StageBadge
-                        label={applicationStageLabel(sheetApp.stage)}
-                        color={stageBadgeColor(sheetApp.stage)}
-                      />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Score</dt>
-                    <dd className="tabular-nums">
-                      {sheetApp.finalScore != null ? sheetApp.finalScore.toFixed(2) : '—'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Rank</dt>
-                    <dd className="tabular-nums">{sheetApp.rank ?? '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Graders</dt>
-                    <dd className="tabular-nums">
+                  </DetailStat>
+                  <DetailStat
+                    label="This application"
+                    tooltip="Unique file number for this team application."
+                  >
+                    <span className="font-mono tabular-nums">Application ID {sheetApp.id}</span>
+                  </DetailStat>
+                  <DetailStat
+                    label="Applicant #"
+                    tooltip="This team's number for this person. What graders see instead of a name."
+                  >
+                    <span className="font-mono tabular-nums">
+                      #{displayApplicantId(sheetApp.rowIndex)}
+                    </span>
+                  </DetailStat>
+                  <DetailStat label="Team" tooltip="Which team this application is for.">
+                    <Badge className={cn('border-0 font-medium', teamBadgeClass(sheetApp.teamName))}>
+                      {sheetApp.teamName}
+                    </Badge>
+                  </DetailStat>
+                  <DetailStat
+                    label="Stage"
+                    tooltip="Where they are in this team's pipeline."
+                  >
+                    <StageBadge
+                      label={applicationStageLabel(sheetApp.stage)}
+                      color={stageBadgeColor(sheetApp.stage)}
+                    />
+                  </DetailStat>
+                  <DetailStat
+                    label="Score"
+                    tooltip="Average score for this application on this team."
+                  >
+                    <span className="tabular-nums">
+                      {sheetApp.finalScore != null ? sheetApp.finalScore.toFixed(2) : '-'}
+                    </span>
+                  </DetailStat>
+                  <DetailStat
+                    label="Rank"
+                    tooltip="Place on this team's scored list. 1 is the highest score."
+                  >
+                    <span className="tabular-nums">{sheetApp.rank ?? '-'}</span>
+                  </DetailStat>
+                  <DetailStat
+                    label="Graders"
+                    tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
+                  >
+                    <span className="tabular-nums">
                       {sheetApp.graderCompleted}/{sheetApp.graderTotal} completed
-                    </dd>
-                  </div>
+                    </span>
+                  </DetailStat>
                 </dl>
 
                 {sheetApp.adminNote && (
-                  <div>
-                    <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="mb-6">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Admin Note
                     </p>
                     <p className="display-field">{sheetApp.adminNote}</p>
@@ -669,7 +810,7 @@ export default function AdminApplicationsPage() {
                 )}
 
                 <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Application fields
                   </p>
                   {detailLoading ? (
@@ -688,7 +829,7 @@ export default function AdminApplicationsPage() {
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-2">
+                <div className="mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-4">
                   <Button
                     variant="outline"
                     size="sm"
@@ -700,7 +841,7 @@ export default function AdminApplicationsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-destructive hover:text-destructive"
+                    className="text-destructive hover:bg-destructive/15 hover:text-destructive"
                     onClick={() => setDeleteOpen(true)}
                     disabled={!detail}
                   >
@@ -717,17 +858,17 @@ export default function AdminApplicationsPage() {
                   title="Delete application?"
                   description={
                     <>
-                      Remove <strong>{detail.candidateName}</strong> (App ID {detail.id}, list #
-                      {displayApplicantId(detail.rowIndex)} on {detail.teamName})? This deletes
-                      scores, assignments, and flags for this application. The applicant record
-                      stays if they applied to other teams.
+                      Remove <strong>{detail.candidateName}</strong> (Application ID {detail.id},
+                      Applicant #{displayApplicantId(detail.rowIndex)} on {detail.teamName})? This
+                      deletes scores, assignments, and flags for this application. The person
+                      record stays if they applied to other teams.
                     </>
                   }
                   confirmLabel="Delete application"
                   onConfirm={handleDelete}
                 />
               )}
-            </>
+            </div>
           )}
         </SheetContent>
       </Sheet>

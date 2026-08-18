@@ -108,7 +108,7 @@ export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUpl
             'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
             dragOver
               ? 'border-primary bg-primary/10'
-              : 'border-border/80 bg-background hover:border-primary/50 hover:bg-muted/30',
+              : 'border-border/80 uma-nested-surface hover:border-primary/50 uma-hover-on-nested',
           )}
           onClick={() => fileInputRef.current?.click()}
           onKeyDown={(e) => {

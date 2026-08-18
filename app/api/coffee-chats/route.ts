@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { forbidden, requireAuth, unauthorized } from '@/lib/auth';
 import type { CoffeeChatInput } from '@/lib/coffee-chats';
-import { isWithinCoffeeChatWindow } from '@/lib/coffee-chats';
+import { isWithinCoffeeChatWindow, validateApplicantGradeLevel, validateApplicantEmail, validateTeamsInterested } from '@/lib/coffee-chats';
 import {
   canUserAccessCoffeeChats,
   createCoffeeChat,
@@ -93,6 +93,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    try {
+      validateApplicantGradeLevel(body.applicantGradeLevel);
+      validateApplicantEmail(body.applicantEmail);
+      validateTeamsInterested(body.teamsInterested);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Invalid coffee chat input.';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
     const chat = await createCoffeeChat(user, body);
     return NextResponse.json({ chat }, { status: 201 });
   } catch (e) {
@@ -100,7 +109,7 @@ export async function POST(req: NextRequest) {
     if (message.includes('closed')) {
       return forbidden(message);
     }
-    if (message.includes('not found') || message.includes('required') || message.includes('date')) {
+    if (message.includes('not found') || message.includes('required') || message.includes('date') || message.includes('grade level') || message.includes('team')) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error('POST /api/coffee-chats failed:', e);

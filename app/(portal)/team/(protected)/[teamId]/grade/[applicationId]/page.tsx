@@ -6,6 +6,7 @@ import PageLoading from '@/components/page-loading';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
@@ -254,103 +255,145 @@ export default function TeamGradingScorePage({
           )}
 
           {appData.graderInstructions && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
                 Instructions
               </p>
-              <p className="whitespace-pre-wrap text-sm text-amber-900">
+              <p className="whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
                 {appData.graderInstructions}
               </p>
             </div>
           )}
 
-          {contextFields.length > 0 && (
-            <Card className="p-4 sm:p-5">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Application context
-              </p>
-              <div className="space-y-3">
-                {contextFields.map((field) => {
-                  const val = appData.fields[field] || '—';
-                  const isUrl = val.startsWith('http://') || val.startsWith('https://');
-                  return (
-                    <div key={field} className="flex min-w-0 gap-3">
-                      <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
-                        {field}
-                      </span>
-                      {isUrl ? (
-                        <a
-                          href={val}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="min-w-0 break-all text-sm text-primary underline"
-                        >
-                          {val}
-                        </a>
-                      ) : (
-                        <span className="min-w-0 break-words text-sm">{val}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <section className="space-y-4">
+              <h2 className="uma-section-label">Written responses</h2>
 
-          {appData.scoreFields.map((field) => (
-            <Card
-              key={field}
-              data-score-field={field}
-              className={cn(
-                'p-4 transition-shadow sm:p-5',
-                !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
+              {contextFields.length > 0 && (
+                <Card className="p-4 sm:p-5">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Application context
+                  </p>
+                  <div className="space-y-3">
+                    {contextFields.map((field) => {
+                      const val = appData.fields[field] || '-';
+                      const isUrl = val.startsWith('http://') || val.startsWith('https://');
+                      return (
+                        <div key={field} className="flex min-w-0 gap-3">
+                          <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
+                            {field}
+                          </span>
+                          {isUrl ? (
+                            <a
+                              href={val}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-w-0 break-all text-sm text-primary underline"
+                            >
+                              {val}
+                            </a>
+                          ) : (
+                            <span className="min-w-0 break-words text-sm">{val}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
               )}
-            >
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                {field}
-                <RequiredAsterisk className="ml-0.5" />
-              </p>
-              <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
-                {appData.fields[field] ? (
-                  renderWithLinks(appData.fields[field])
+
+              {appData.scoreFields.map((field) => (
+                <Card
+                  key={field}
+                  data-score-field={field}
+                  className={cn(
+                    'p-4 sm:p-5',
+                    !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
+                  )}
+                >
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                    {field}
+                    <RequiredAsterisk className="ml-0.5" />
+                  </p>
+                  <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
+                    {appData.fields[field] ? (
+                      renderWithLinks(appData.fields[field])
+                    ) : (
+                      <span className="italic text-muted-foreground">No response</span>
+                    )}
+                  </p>
+                  <div className="pt-4">
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      Score (1–5)
+                      <RequiredAsterisk className="ml-0.5" />
+                    </p>
+                    <ScoreSelector
+                      value={scores[field] ?? null}
+                      onChange={(n) => scoreField(field, n)}
+                      disabled={gradingLocked}
+                    />
+                  </div>
+                </Card>
+              ))}
+
+              {(appData.customScoreFields ?? []).map((field) => (
+                <Card
+                  key={`custom:${field}`}
+                  data-score-field={field}
+                  className={cn(
+                    'p-4 sm:p-5',
+                    !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
+                  )}
+                >
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
+                    {field}
+                    <RequiredAsterisk className="ml-0.5" />
+                  </p>
+                  <div className="pt-4">
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      Score (1–5)
+                      <RequiredAsterisk className="ml-0.5" />
+                    </p>
+                    <ScoreSelector
+                      value={scores[field] ?? null}
+                      onChange={(n) => scoreField(field, n)}
+                      disabled={gradingLocked}
+                    />
+                  </div>
+                </Card>
+              ))}
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="uma-section-label">Portfolio &amp; supplementary</h2>
+              <Card className="p-4 sm:p-5">
+                {Object.keys(appData.portfolioFields ?? {}).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No portfolio links for this applicant.
+                  </p>
                 ) : (
-                  <span className="italic text-muted-foreground">No response</span>
+                  <div className="space-y-3">
+                    {Object.entries(appData.portfolioFields ?? {}).map(([field, val]) => (
+                      <div key={field} className="flex flex-col gap-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">{field}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-fit"
+                          nativeButton={false}
+                          render={
+                            <a href={val} target="_blank" rel="noopener noreferrer">
+                              {applicantDisplayId(appData.rowIndex)} - Portfolio
+                            </a>
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </p>
-              <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
-                <ScoreSelector
-                  value={scores[field] ?? null}
-                  onChange={(n) => scoreField(field, n)}
-                  disabled={gradingLocked}
-                />
-              </div>
-            </Card>
-          ))}
-
-          {(appData.customScoreFields ?? []).map((field) => (
-            <Card
-              key={`custom:${field}`}
-              data-score-field={field}
-              className={cn(
-                'p-4 transition-shadow sm:p-5',
-                !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
-              )}
-            >
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
-                {field}
-                <RequiredAsterisk className="ml-0.5" />
-              </p>
-              <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
-                <ScoreSelector
-                  value={scores[field] ?? null}
-                  onChange={(n) => scoreField(field, n)}
-                  disabled={gradingLocked}
-                />
-              </div>
-            </Card>
-          ))}
+              </Card>
+            </section>
+          </div>
 
           <Card className="p-4 sm:p-5">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -362,7 +405,7 @@ export default function TeamGradingScorePage({
               placeholder="Any comments or flags for this application"
               rows={3}
               disabled={gradingLocked}
-              className="w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="field-textarea resize-none disabled:opacity-60"
             />
           </Card>
 

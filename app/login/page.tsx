@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import Image from 'next/image';
+import { AppCreditBar } from '@/components/app-credit-bar';
 import { LoginForm } from '@/components/login-form';
 import { isGoogleOAuthConfigured } from '@/lib/google-oauth';
 
@@ -28,7 +29,7 @@ export default function LoginPage() {
         <div className="absolute -right-1/4 bottom-0 h-[45vh] w-[60vw] rounded-full bg-[#5c59b6]/15 blur-3xl" />
       </div>
 
-      <div className="relative z-10 grid min-h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="relative z-10 grid min-h-svh pb-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <section className="relative flex min-h-[28vh] flex-col justify-center overflow-hidden bg-[#9c5e8d] px-6 py-10 text-white sm:min-h-[34vh] sm:px-10 lg:min-h-svh lg:px-12 xl:px-16 2xl:px-20">
           {/* Soft base only — animated blobs carry the color motion */}
           <div
@@ -91,6 +92,7 @@ export default function LoginPage() {
           </div>
         </section>
       </div>
+      <AppCreditBar className="absolute inset-x-0 bottom-0 z-20" />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDownIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import { SettingsPanel, settingsControlClass, settingsDateFieldWidth } from '@/components/settings-panel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,13 @@ interface DateSettingsResponse {
 
 function normalizeDate(value: string | null | undefined): string {
   return value ?? '';
+}
+
+function formatMdY(iso: string): string {
+  if (!iso) return '-';
+  const [year, month, day] = iso.split('-');
+  if (!year || !month || !day) return iso;
+  return `${month}/${day}/${year}`;
 }
 
 function saveButtonLabel(loading: boolean, dirty: boolean): string {
@@ -117,73 +124,60 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
   };
 
   return (
-    <div className="display-panel">
-      <button
-        type="button"
-        className="flex w-full items-start justify-between gap-3 text-left"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <div>
-          <p className="text-sm font-medium">Coffee chat window</p>
+    <SettingsPanel
+      label="Coffee chat window"
+      open={open}
+      onOpenChange={setOpen}
+      loading={loading}
+      collapsedSummary={`${formatMdY(startDate)} – ${formatMdY(dueDate)}`}
+    >
+      {loading ? (
+        <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
+          <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+            <Skeleton className="h-4 w-12" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+          <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+            <Skeleton className="h-4 w-12" />
+            <Skeleton className="h-8 w-full" />
+          </div>
         </div>
-        <ChevronDownIcon
-          className={cn(
-            'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
-
-      {open && (
-        <div className="mt-4 space-y-4">
-          {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2" role="status" aria-label="Loading">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-9 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-9 w-full" />
-              </div>
-            </div>
-          ) : (
-            <>
+      ) : (
+        <>
           {roundCount === 0 && (
             <p className="text-sm text-muted-foreground">
               No teams set up yet. Saving will initialize this phase for every team.
             </p>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="coffeeChatStartDate" required>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+              <Label htmlFor="coffeeChatStartDate" className="text-sm" required>
                 Opens
               </Label>
               <Input
                 id="coffeeChatStartDate"
                 type="date"
+                className={settingsControlClass}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="applicationDueDate" required>
+            <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+              <Label htmlFor="applicationDueDate" className="text-sm" required>
                 Closes
               </Label>
               <Input
                 id="applicationDueDate"
                 type="date"
+                className={settingsControlClass}
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
             <LoadingButton
               size="sm"
+              className="ml-auto"
               loading={saving}
               disabled={!isDirty}
               onClick={handleSave}
@@ -194,10 +188,8 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
 
           {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
-            </>
-          )}
-        </div>
+        </>
       )}
-    </div>
+    </SettingsPanel>
   );
 }

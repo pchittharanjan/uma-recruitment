@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { teamDotClass, teamLinkClass } from '@/lib/team-colors';
 
 interface TeamReadinessRow {
   teamId: number;
@@ -60,6 +61,7 @@ interface TeamReadinessRow {
     }>;
     advancedCount: number;
     rejectedCount: number;
+    onListCount: number;
     pendingCount: number;
     canRevert: boolean;
     revertBlockedReason: string | null;
@@ -98,6 +100,8 @@ function outcomeBadge(outcome: AdvancementOutcomeLabel) {
   switch (outcome) {
     case 'advanced':
       return <StageBadge label="Advancing" color="green" />;
+    case 'on_list':
+      return <StageBadge label="On submitted list" color="yellow" />;
     case 'rejected':
       return <StageBadge label="Rejected" color="gray" />;
     default:
@@ -152,9 +156,22 @@ function TeamOutcomePanel({
     <div className="space-y-4 bg-muted/20 px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {team.outcome.advancedCount} advancing to {advancedLabel},{' '}
-          {team.outcome.rejectedCount} rejected, {team.outcome.pendingCount} still in{' '}
-          {advancementFromStageLabel(fromStage).toLowerCase()}.
+          {team.outcome.onListCount > 0 ? (
+            <>
+              {team.outcome.onListCount} on the submitted list awaiting approval,{' '}
+              {team.outcome.pendingCount} not selected
+              {team.outcome.rejectedCount > 0
+                ? `, ${team.outcome.rejectedCount} rejected`
+                : ''}
+              .
+            </>
+          ) : (
+            <>
+              {team.outcome.advancedCount} advancing to {advancedLabel},{' '}
+              {team.outcome.rejectedCount} rejected, {team.outcome.pendingCount} still in{' '}
+              {advancementFromStageLabel(fromStage).toLowerCase()}.
+            </>
+          )}
         </p>
         {team.outcome.canRevert ? (
           <LoadingButton
@@ -179,7 +196,7 @@ function TeamOutcomePanel({
               <col style={{ width: '20%' }} />
             </colgroup>
             <TableHeader>
-              <TableRow className="border-border/40 hover:bg-transparent">
+              <TableRow className="border-border/50 bg-muted/50 hover:bg-muted/50">
                 <TableHead>#</TableHead>
                 <TableHead>Applicant</TableHead>
                 <TableHead>Outcome</TableHead>
@@ -196,7 +213,7 @@ function TeamOutcomePanel({
                 <TableCell className="font-medium">{row.candidateName}</TableCell>
                 <TableCell>{outcomeBadge(row.outcome)}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {row.average !== null ? row.average.toFixed(2) : '—'}
+                  {row.average !== null ? row.average.toFixed(2) : '-'}
                 </TableCell>
               </TableRow>
             ))}
@@ -207,7 +224,7 @@ function TeamOutcomePanel({
       <DestructiveConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Revert team advancement?"
+        title="Revert Team Advancement?"
         description={
           <>
             Move {team.outcome.advancedCount + team.outcome.rejectedCount} applicant(s) back to{' '}
@@ -215,7 +232,7 @@ function TeamOutcomePanel({
             grading unlocks again.
           </>
         }
-        confirmLabel="Revert advancement"
+        confirmLabel="Revert Advancement"
         onConfirm={handleRevert}
       />
     </div>
@@ -250,7 +267,7 @@ export function AdminAdvancementReadinessOverview({
         <CardTitle className="text-base">Submission Status</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-hidden rounded-lg bg-muted/35">
+        <div className="overflow-hidden rounded-lg bg-surface-panel">
           <Table className="w-full table-fixed">
             {/*
               Balanced proportional columns across the full card — no flexible
@@ -266,7 +283,7 @@ export function AdminAdvancementReadinessOverview({
               <col style={{ width: '18%' }} />
             </colgroup>
             <TableHeader>
-              <TableRow className="border-border/40 hover:bg-transparent">
+              <TableRow className="border-border/50 bg-muted/50 hover:bg-muted/50">
                 <TableHead className="w-10 px-2" />
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
                   Team
@@ -299,7 +316,7 @@ export function AdminAdvancementReadinessOverview({
                       <TableCell className="w-10 px-2">
                         <button
                           type="button"
-                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground uma-hover-on-nested hover:text-foreground"
                           aria-expanded={expanded}
                           aria-label={expanded ? 'Hide applicants' : 'Show applicants'}
                           onClick={() => toggleTeam(team.teamId)}
@@ -314,8 +331,18 @@ export function AdminAdvancementReadinessOverview({
                       <TableCell>
                         <Link
                           href={`/admin/teams/${team.teamId}`}
-                          className="font-medium hover:underline"
+                          className={cn(
+                            'inline-flex items-center gap-2 font-medium hover:underline',
+                            teamLinkClass(team.teamName),
+                          )}
                         >
+                          <span
+                            className={cn(
+                              'size-2 shrink-0 rounded-full',
+                              teamDotClass(team.teamName),
+                            )}
+                            aria-hidden
+                          />
                           {team.teamName}
                         </Link>
                       </TableCell>
@@ -336,7 +363,7 @@ export function AdminAdvancementReadinessOverview({
                       </TableCell>
                       <TableCell>
                         {summary.totalAssignments === 0 ? (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         ) : (
                           <span
                             className={cn(
@@ -352,7 +379,7 @@ export function AdminAdvancementReadinessOverview({
                       </TableCell>
                       <TableCell>
                         {totalGraders === 0 ? (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         ) : (
                           <span
                             className={cn(

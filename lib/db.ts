@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { createClient, type Client, type ResultSet, type Row } from '@libsql/client';
 import { cachedPerRequest } from '@/lib/request-cache';
+import { cachedProcess } from '@/lib/process-cache';
 import { normalizeUserRole, type UserRole } from '@/lib/roles';
 
 export type { UserRole } from '@/lib/roles';
@@ -130,6 +131,7 @@ async function initDbOnce(): Promise<void> {
 const MIGRATIONS = [
     'ALTER TABLE applications ADD COLUMN row_index INTEGER NOT NULL DEFAULT 0',
     "ALTER TABLE round_settings ADD COLUMN context_fields TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE round_settings ADD COLUMN portfolio_fields TEXT NOT NULL DEFAULT '[]'",
     'ALTER TABLE round_settings ADD COLUMN graders_per_application INTEGER NOT NULL DEFAULT 3',
     `CREATE TABLE IF NOT EXISTS round_stage_unlocks (
       round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
@@ -299,7 +301,44 @@ const MIGRATIONS = [
     `CREATE INDEX IF NOT EXISTS idx_notifications_user_created
       ON notifications(user_id, created_at DESC)`,
     'ALTER TABLE scores ADD COLUMN note TEXT',
+    'ALTER TABLE coffee_chats ADD COLUMN applicant_grade_level TEXT',
+    "ALTER TABLE coffee_chats ADD COLUMN teams_interested TEXT NOT NULL DEFAULT '[]'",
+    'ALTER TABLE coffee_chats ADD COLUMN applicant_email TEXT',
 ];
+
+async function scoresNeedsScaleMigration(
+  db: ReturnType<typeof getDb>,
+): Promise<boolean> {
+  const result = await db.execute({
+    sql: `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'scores'`,
+  });
+  const ddl = (result.rows[0]?.sql as string) ?? '';
+  if (!ddl) return false;
+  return ddl.includes('BETWEEN 1 AND 5') || ddl.includes('score INTEGER NOT NULL');
+}
+
+async function migrateScoresWidenScale(db: ReturnType<typeof getDb>): Promise<void> {
+  if (!(await scoresNeedsScaleMigration(db))) return;
+
+  await db.execute('PRAGMA foreign_keys=OFF');
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS scores_scale_mig (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      field_name TEXT NOT NULL,
+      score INTEGER CHECK (score IS NULL OR (score BETWEEN 1 AND 10)),
+      note TEXT,
+      UNIQUE (assignment_id, field_name)
+    )`);
+    await db.execute(`INSERT INTO scores_scale_mig (id, assignment_id, field_name, score, note)
+      SELECT id, assignment_id, field_name, score, note FROM scores`);
+    await db.execute('DROP TABLE scores');
+    await db.execute('ALTER TABLE scores_scale_mig RENAME TO scores');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_scores_assignment ON scores(assignment_id)');
+  } finally {
+    await db.execute('PRAGMA foreign_keys=ON');
+  }
+}
 
 async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
   for (const sql of MIGRATIONS) {
@@ -318,6 +357,7 @@ async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
   await migrateCoffeeChatsNullableRoundId(db);
   await backfillCoffeeChatsNullRoundId(db);
   await migrateRoundCommunicationsToOutcomeEmails(db);
+  await migrateScoresWidenScale(db);
 }
 
 /** Copy legacy round_communications rows into application-stage outcome emails. */
@@ -646,7 +686,7 @@ export interface Score {
   id: number;
   assignment_id: number;
   field_name: string;
-  score: number;
+  score: number | null;
   note: string | null;
 }
 
@@ -769,21 +809,27 @@ export function rowToFlag(row: Row): Flag {
 // ── query helpers ───────────────────────────────────────────────────────────
 
 export async function getTeams(): Promise<Team[]> {
-  return cachedPerRequest('teams', async () => {
-    const db = getDb();
-    const result = await db.execute('SELECT * FROM teams ORDER BY id');
-    return result.rows.map(rowToTeam);
-  });
+  return cachedPerRequest('teams', () =>
+    cachedProcess('teams', 60_000, async () => {
+      const db = getDb();
+      const result = await db.execute('SELECT * FROM teams ORDER BY id');
+      return result.rows.map(rowToTeam);
+    }),
+  );
 }
 
 export async function getTeamById(id: number): Promise<Team | null> {
-  const db = getDb();
-  const result = await db.execute({
-    sql: 'SELECT * FROM teams WHERE id = ?',
-    args: [id],
-  });
-  if (result.rows.length === 0) return null;
-  return rowToTeam(result.rows[0]);
+  return cachedPerRequest(`team:${id}`, () =>
+    cachedProcess(`team:${id}`, 60_000, async () => {
+      const db = getDb();
+      const result = await db.execute({
+        sql: 'SELECT * FROM teams WHERE id = ?',
+        args: [id],
+      });
+      if (result.rows.length === 0) return null;
+      return rowToTeam(result.rows[0]);
+    }),
+  );
 }
 
 export async function getTeamByName(name: TeamName): Promise<Team | null> {
@@ -797,15 +843,17 @@ export async function getTeamByName(name: TeamName): Promise<Team | null> {
 }
 
 export async function getUserById(id: number): Promise<User | null> {
-  return cachedPerRequest(`user:${id}`, async () => {
-    const db = getDb();
-    const result = await db.execute({
-      sql: 'SELECT * FROM users WHERE id = ?',
-      args: [id],
-    });
-    if (result.rows.length === 0) return null;
-    return rowToUser(result.rows[0]);
-  });
+  return cachedPerRequest(`user:${id}`, () =>
+    cachedProcess(`user:${id}`, 60_000, async () => {
+      const db = getDb();
+      const result = await db.execute({
+        sql: 'SELECT * FROM users WHERE id = ?',
+        args: [id],
+      });
+      if (result.rows.length === 0) return null;
+      return rowToUser(result.rows[0]);
+    }),
+  );
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {

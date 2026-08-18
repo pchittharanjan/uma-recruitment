@@ -34,7 +34,7 @@ export async function GET(
 
     const stageParam = req.nextUrl.searchParams.get('stage');
     const stage = (stageParam ?? round.status) as InterviewSlotStage;
-    if (!INTERVIEW_STAGES.includes(stage) || round.status !== stage) {
+    if (!INTERVIEW_STAGES.includes(stage)) {
       return NextResponse.json({ error: 'Interview export is not available for this phase.' }, { status: 400 });
     }
 

@@ -15,6 +15,7 @@ import {
   phaseOpenedCtaLabel,
   phaseWelcomeHeadline,
 } from '@/lib/phase-tours';
+import { isTeamName, teamStepCircleClass } from '@/lib/team-colors';
 import { cn } from '@/lib/utils';
 
 const DISMISS_KEY_PREFIX = 'uma-phase-opened-v2:';
@@ -43,8 +44,57 @@ function isOnDestination(pathname: string, href: string): boolean {
   return href !== '/' && pathname.startsWith(`${href}/`);
 }
 
+function teamIconTone(teamName: string | null) {
+  if (!teamName || !isTeamName(teamName)) return null;
+  if (teamName === 'Strategy') {
+    return {
+      iconClass: 'text-orange-700',
+      ringClass: 'bg-orange-100 ring-orange-200/80',
+    };
+  }
+  if (teamName === 'Events') {
+    return {
+      iconClass: 'text-blue-700',
+      ringClass: 'bg-blue-100 ring-blue-200/80',
+    };
+  }
+  return {
+    iconClass: 'text-violet-700',
+    ringClass: 'bg-violet-100 ring-violet-200/80',
+  };
+}
+
+function PhaseTourSteps({
+  teamName,
+  steps,
+}: {
+  teamName: string | null;
+  steps: { title: string; description: string }[];
+}) {
+  return (
+    <ol className="grid gap-2.5">
+      {steps.map((step, index) => (
+        <li
+          key={step.title}
+          className="rounded-lg border border-border bg-muted/40 p-3 sm:p-3.5"
+        >
+          <div className="flex items-center gap-4.5">
+            <span aria-hidden className={teamStepCircleClass(teamName, index, steps.length)}>
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium leading-snug text-foreground">{step.title}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{step.description}</p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
- * Welcome dialog when a pipeline phase opens — greeting, one-line context, single CTA.
+ * Welcome dialog when a pipeline phase opens — greeting, steps, single CTA.
  * No confetti — that stays reserved for final selection.
  */
 export function PhaseOpenedDialog({
@@ -53,6 +103,8 @@ export function PhaseOpenedDialog({
   cycleLabel,
   href,
   userName,
+  teamName = null,
+  isDirector = false,
   onOpenChange,
 }: {
   open: boolean;
@@ -60,13 +112,16 @@ export function PhaseOpenedDialog({
   cycleLabel: string;
   href: string;
   userName: string;
+  teamName?: string | null;
+  isDirector?: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const tour = getPhaseTourContent(status);
+  const tour = getPhaseTourContent(status, { isDirector });
   const Icon = tour?.icon;
-  const headline = phaseWelcomeHeadline(userName, status);
+  const headline = phaseWelcomeHeadline(userName, status, teamName);
+  const tone = teamIconTone(teamName);
 
   const dismiss = () => {
     try {
@@ -95,40 +150,44 @@ export function PhaseOpenedDialog({
       <DialogContent
         showCloseButton={false}
         overlayClassName="bg-black/40"
-        className="gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-xl"
+        className="gap-0 overflow-hidden p-0 sm:max-w-[720px]"
       >
-        <div aria-hidden className="uma-marketing-gradient h-1.5 w-full opacity-90" />
+        <div aria-hidden className="uma-marketing-gradient h-3 w-full opacity-90" style={{ marginBottom: '-6px' }} />
 
-        <div className="space-y-4 px-8 pt-8 pb-2">
+        <div className="space-y-2 px-8 pt-11 pb-4">
           <DialogHeader className="gap-4 text-left">
-            <div className="flex items-start gap-3.5">
+            <div className="flex items-center gap-3.5">
               {Icon && tour ? (
                 <div
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
-                    tour.ringClass,
+                    tone?.ringClass ?? tour.ringClass,
                   )}
                 >
-                  <Icon className={cn('h-5 w-5', tour.iconClass)} />
+                  <Icon className={cn('h-5 w-5', tone?.iconClass ?? tour.iconClass)} />
                 </div>
               ) : null}
-              <div className="min-w-0 pt-0.5">
-                <DialogTitle className="text-balance text-left text-xl leading-snug">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-left text-lg leading-snug sm:text-xl sm:whitespace-nowrap" style={{ WebkitTextStroke: '0.1px currentColor' }}>
                   {headline}
                 </DialogTitle>
               </div>
             </div>
 
             {tour ? (
-              <DialogDescription className="text-pretty text-left text-sm leading-relaxed">
+              <DialogDescription className="text-pretty w-full max-w-none text-left text-sm leading-relaxed">
                 {tour.message}
               </DialogDescription>
             ) : null}
           </DialogHeader>
+
+          {tour && tour.steps.length > 0 ? (
+            <PhaseTourSteps teamName={teamName} steps={tour.steps} />
+          ) : null}
         </div>
 
-        <div className="flex justify-center px-8 pt-6 pb-8">
-          <Button type="button" className="h-11 px-8 text-base" onClick={goToPhase}>
+        <div className="px-8 pt-3 pb-6">
+          <Button type="button" className="h-11 w-full text-base" onClick={goToPhase}>
             {phaseOpenedCtaLabel(status)}
           </Button>
         </div>

@@ -14,6 +14,7 @@ import {
   getGraderAssignmentForUser,
   graderContextFieldsForSettings,
   serializeApplicationFields,
+  serializePortfolioFields,
   userSeesBlindApplications,
 } from '@/lib/team-dashboard';
 
@@ -88,6 +89,7 @@ async function handleGet(
       assignmentId: assignment.assignmentId,
       rowIndex: assignment.rowIndex,
       fields: serializeApplicationFields(assignment.fields, settings, blind),
+      portfolioFields: serializePortfolioFields(assignment.fields, settings, blind),
       existingScores,
       existingComment: assignment.comment,
       graderProgress: {

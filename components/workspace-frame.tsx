@@ -1,5 +1,6 @@
 'use client';
 
+import { NavigationProgress } from '@/components/navigation-progress';
 import { WorkspaceChrome } from '@/components/workspace-chrome';
 import { WorkspaceProvider } from '@/components/workspace-provider';
 import { useWorkspaceEmbed } from '@/hooks/use-workspace-embed';
@@ -19,6 +20,7 @@ export function WorkspaceFrame({
 
   return (
     <WorkspaceProvider area={area}>
+      <NavigationProgress />
       <WorkspaceChrome>{children}</WorkspaceChrome>
     </WorkspaceProvider>
   );

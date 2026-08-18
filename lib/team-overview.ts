@@ -11,7 +11,6 @@ import {
 } from '@/lib/advancement-submissions';
 import { isTeamDirector } from '@/lib/directors';
 import { getTeamById, type AssignmentStage, type RoundStatus, type User } from '@/lib/db';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import {
   canUserAccessTeamStage,
@@ -41,20 +40,16 @@ export async function buildTeamOverview(user: User, teamId: number): Promise<Tea
   }
 
   const displayStatus = round.status;
-  const [globalState, unlocks, granted, interviewOnlyStage] = await Promise.all([
-    getGlobalPipelineState(),
+  const [unlocks, granted, interviewOnlyStage] = await Promise.all([
     getRoundStageUnlocks(round.id),
     getGrantedStagesForUser(user, teamId),
     getInterviewOnlyScope(user, teamId),
   ]);
   const archiveBrowse =
-    (globalState.status === 'closed' || displayStatus === 'closed') &&
-    (granted === 'all' || granted.length > 0);
+    displayStatus === 'closed' && (granted === 'all' || granted.length > 0);
   const unlockedStages = archiveBrowse
     ? [...UNLOCKABLE_STAGES]
-    : globalState.unlockedStages.length > 0
-      ? globalState.unlockedStages
-      : unlocks.map((u) => u.stage);
+    : unlocks.map((u) => u.stage);
   const grantedStages = archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted;
 
   const [team, gradingEditLock, interviewEditLock] = await Promise.all([

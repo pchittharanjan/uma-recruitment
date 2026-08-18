@@ -59,7 +59,7 @@ export function parseGraderPaste(
       if (lenient) continue;
       return {
         graders: [],
-        error: `Line ${i + 1}: "${lines[i]}" — expected name and email (tab or comma separated)`,
+        error: `Line ${i + 1}: "${lines[i]}" - expected name and email (tab or comma separated)`,
       };
     }
     parsed.push(row);

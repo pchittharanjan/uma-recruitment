@@ -17,23 +17,26 @@ const ADMIN_SEGMENT_LABELS: Record<string, string> = {
   import: 'Import CSV',
   users: 'People',
   assignments: 'Assignments',
-  finalize: 'Finalize results',
-  'interview-results': 'Interview results',
-  communications: 'Applicant outcome emails',
+  finalize: 'Finalize Results',
+  'interview-results': 'Interview Results',
+  communications: 'Applicant Outcome Emails',
   schedule: 'Schedule',
-  'interview-setup': 'Setup interview',
+  'interview-setup': 'Interview Setup',
   setup: 'Setup',
-  'grader-preview': 'Grader preview',
+  'grader-preview': 'Grader Preview',
+  'interview-preview': 'Interviewer Preview',
   deliberations: 'Deliberations',
-  'final-selection': 'Final selection',
+  'final-selection': 'Final Selection',
+  first_round: 'First Round Interview',
+  final_round: 'Final Round Interview',
 };
 
 const TEAM_SEGMENT_LABELS: Record<string, string> = {
-  grade: 'Application grading',
+  grade: 'Application Grading',
   interviews: 'Interviews',
   advancement: 'Advancement',
   deliberations: 'Deliberations',
-  'final-selection': 'Final selection',
+  'final-selection': 'Final Selection',
   'first-round': 'Advance to Final Round',
   first_round: 'First Round Interview',
   final_round: 'Final Round Interview',
@@ -80,20 +83,33 @@ function buildAdminBreadcrumbs(
     }
 
     if (segment === 'schedule' && parts[index + 1] === 'first-round') {
-      crumbs.push({ label: 'First Round Interview schedule' });
+      crumbs.push({ label: 'First Round Interview Schedule' });
       index += 2;
       continue;
     }
 
     if (segment === 'schedule' && parts[index + 1] === 'final-round') {
-      crumbs.push({ label: 'Final Round Interview schedule' });
+      crumbs.push({ label: 'Final Round Interview Schedule' });
       index += 2;
       continue;
     }
 
     if (segment === 'interview-setup') {
-      crumbs.push({ label: 'Setup interview' });
+      crumbs.push({ label: 'Interview Setup' });
       index += 1;
+      continue;
+    }
+
+    if (segment === 'interview-preview') {
+      const stage = parts[index + 1];
+      const hasStage = stage === 'first_round' || stage === 'final_round';
+      crumbs.push({
+        label:
+          stage === 'final_round'
+            ? 'Final Round Interviewer Preview'
+            : 'Interviewer Preview',
+      });
+      index += hasStage ? 2 : 1;
       continue;
     }
 
@@ -114,19 +130,19 @@ function buildTeamBreadcrumbs(
 ): BreadcrumbItem[] {
   // /team — multi-team picker (breadcrumbs hidden on this route; label for completeness)
   if (parts.length === 1) {
-    return [{ label: 'Your teams' }];
+    return [{ label: 'Your Teams' }];
   }
 
   if (parts[1] === 'final-selection') {
     return [
-      { label: 'Your teams', href: '/team' },
-      { label: 'Final selection' },
+      { label: 'Your Teams', href: '/team' },
+      { label: 'Final Selection' },
     ];
   }
 
   const teamId = parts[1];
   if (!/^\d+$/.test(teamId)) {
-    return [{ label: 'Your teams', href: '/team' }];
+    return [{ label: 'Your Teams', href: '/team' }];
   }
 
   const teamName = dynamic.teamNames?.[teamId] ?? `Team ${teamId}`;
@@ -181,7 +197,7 @@ function buildTeamBreadcrumbs(
       crumbs.push({
         label: progress
           ? `Interview ${progress.current} of ${progress.total}`
-          : 'Score interview',
+          : 'Score Interview',
       });
       index += 1;
       continue;

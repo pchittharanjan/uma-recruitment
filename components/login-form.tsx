@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { timeOfDayGreeting } from '@/lib/greeting';
 
 const BERKELEY_DOMAIN = 'berkeley.edu';
 
@@ -234,7 +235,7 @@ export function LoginForm({
       <FieldGroup>
         <div className="login-form-header space-y-1">
           <p className="text-xs font-medium uppercase tracking-[0.2em] uma-gradient-text">
-            Welcome back
+            {timeOfDayGreeting()}
           </p>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           {/* Same text-sm slot as the helper — swap in place so layout never shifts. */}
@@ -266,12 +267,12 @@ export function LoginForm({
                 data-loading={googleLoading ? 'true' : undefined}
                 onClick={handleGoogleSignIn}
                 disabled={googleLoading || loading}
-                className="login-signin-button h-11 w-full rounded-full text-base font-medium"
+                className="login-signin-button h-11 w-full rounded-full text-base font-medium normal-case"
               >
                 <span className="login-signin-button__label">
                   <span
                     className={cn(
-                      'login-signin-button__label-state inline-flex items-center justify-center gap-2',
+                      'login-signin-button__label-state inline-flex items-center justify-center gap-2 normal-case',
                       googleLoading && 'invisible',
                     )}
                     aria-hidden={googleLoading}
@@ -393,7 +394,7 @@ export function LoginForm({
             className={cn(
               'h-11 w-full rounded-full text-base font-medium',
               googleEnabled
-                ? 'border border-border bg-background text-foreground hover:bg-muted/60'
+                ? 'border border-border bg-background text-foreground hover:bg-muted/50'
                 : 'login-signin-button',
             )}
           >

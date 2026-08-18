@@ -10,7 +10,12 @@ import { getGradingEditLock } from '@/lib/advancement-submissions';
 import { isTeamDirector } from '@/lib/directors';
 import { getGraderAssignmentForUser } from '@/lib/team-dashboard';
 import { getInterviewGroupMembers, getInterviewGuideForRound } from '@/lib/interview-slots';
-import { interviewGuideForApi, interviewScoreFieldsFromGuide } from '@/lib/interview-guide';
+import {
+  interviewGuideForApi,
+  interviewNoteFieldsFromGuide,
+  interviewScaleMax,
+  interviewScoreFieldsFromGuide,
+} from '@/lib/interview-guide';
 import { assertPipelineWritable, pipelineClosedEditLock } from '@/lib/pipeline-writable';
 
 const INTERVIEW_STAGES: AssignmentStage[] = ['first_round', 'final_round'];
@@ -25,14 +30,15 @@ interface ScoreEntry {
 function validateScores(
   scores: Record<string, number>,
   scoreFields: string[],
+  scaleMax: number,
 ): string | null {
   for (const field of scoreFields) {
     const val = scores[field];
     if (val === undefined) {
       return `Missing score for field: ${field}`;
     }
-    if (!Number.isInteger(val) || val < 1 || val > 5) {
-      return `Score for "${field}" must be an integer between 1 and 5`;
+    if (!Number.isInteger(val) || val < 1 || val > scaleMax) {
+      return `Score for "${field}" must be an integer between 1 and ${scaleMax}`;
     }
   }
   return null;
@@ -48,6 +54,7 @@ async function saveInterviewScore(
   userId: number,
   scoreFields: string[],
   scores: Record<string, number>,
+  noteFields: string[],
   notes: Record<string, string> | undefined,
   comment: string,
 ): Promise<void> {
@@ -60,6 +67,13 @@ async function saveInterviewScore(
                 score = excluded.score,
                 note = excluded.note`,
         args: [assignmentId, field, scores[field], noteForField(notes, field)],
+      })),
+      ...noteFields.map((field) => ({
+        sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, ?, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET
+                score = excluded.score,
+                note = excluded.note`,
+        args: [assignmentId, field, null, noteForField(notes, field)],
       })),
       {
         sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
@@ -124,6 +138,8 @@ export async function POST(
       await getInterviewGuideForRound(assignment.roundId, stage as 'first_round' | 'final_round'),
     );
     const scoreFields = interviewScoreFieldsFromGuide(interviewGuide);
+    const noteFields = interviewNoteFieldsFromGuide(interviewGuide);
+    const scaleMax = interviewScaleMax(interviewGuide);
 
     const body = await req.json();
 
@@ -169,7 +185,7 @@ export async function POST(
           return notFound(`Assignment not found for application ${entry.applicationId}`);
         }
 
-        const validationError = validateScores(entry.scores ?? {}, scoreFields);
+        const validationError = validateScores(entry.scores ?? {}, scoreFields, scaleMax);
         if (validationError) {
           const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
           const label = member?.candidateName ?? `application ${entry.applicationId}`;
@@ -194,6 +210,7 @@ export async function POST(
           user.id,
           scoreFields,
           entry.scores,
+          noteFields,
           entry.notes,
           (entry.comment as string | undefined) ?? '',
         );
@@ -206,12 +223,20 @@ export async function POST(
     const notes = (body.notes as Record<string, string> | undefined) ?? {};
     const comment = (body.comment as string | undefined) ?? '';
 
-    const validationError = validateScores(scores, scoreFields);
+    const validationError = validateScores(scores, scoreFields, scaleMax);
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    await saveInterviewScore(assignment.assignmentId, user.id, scoreFields, scores, notes, comment);
+    await saveInterviewScore(
+      assignment.assignmentId,
+      user.id,
+      scoreFields,
+      scores,
+      noteFields,
+      notes,
+      comment,
+    );
 
     const db = getDb();
     const next = await db.execute({

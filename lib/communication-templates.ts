@@ -12,26 +12,26 @@ const STAGE_DEFAULTS: Record<
   RoundCommunicationsTemplates
 > = {
   application: {
-    passSubject: 'UMA {team} — First Round Invitation',
+    passSubject: 'UMA {team} - First Round Invitation',
     passBody:
       'Hi {name},\n\nCongratulations! You have been invited to the First Round Interview for UMA {team}.\n\nWe will follow up with scheduling details soon.\n\nBest,\nUMA Recruitment',
-    rejectSubject: 'UMA {team} — Application update',
+    rejectSubject: 'UMA {team} - Application update',
     rejectBody:
       'Hi {name},\n\nThank you for applying to UMA {team}. After careful review, we are unable to move forward with your application at this time.\n\nWe appreciate your interest and wish you the best.\n\nBest,\nUMA Recruitment',
   },
   first_round: {
-    passSubject: 'UMA {team} — Final Round Invitation',
+    passSubject: 'UMA {team} - Final Round Invitation',
     passBody:
       'Hi {name},\n\nCongratulations! You have been invited to the Final Round Interview for UMA {team}.\n\nWe will follow up with scheduling details soon.\n\nBest,\nUMA Recruitment',
-    rejectSubject: 'UMA {team} — First Round update',
+    rejectSubject: 'UMA {team} - First Round update',
     rejectBody:
       'Hi {name},\n\nThank you for interviewing with UMA {team}. After careful review, we are unable to move you forward to Final Round at this time.\n\nWe appreciate your time and wish you the best.\n\nBest,\nUMA Recruitment',
   },
   final_round: {
-    passSubject: 'UMA {team} — Welcome to the team',
+    passSubject: 'UMA {team} - Welcome to the team',
     passBody:
       'Hi {name},\n\nCongratulations! We are excited to offer you a spot on UMA {team}.\n\nWe will follow up with next steps soon.\n\nBest,\nUMA Recruitment',
-    rejectSubject: 'UMA {team} — Final decision',
+    rejectSubject: 'UMA {team} - Final decision',
     rejectBody:
       'Hi {name},\n\nThank you for your time throughout the UMA {team} recruitment process. After careful deliberation, we are unable to offer you a spot at this time.\n\nWe appreciate your interest and wish you the best.\n\nBest,\nUMA Recruitment',
   },

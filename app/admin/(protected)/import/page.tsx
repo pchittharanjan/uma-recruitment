@@ -8,13 +8,15 @@ import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import CsvFileUpload, { type CsvParseResult } from '@/components/csv-file-upload';
 import { Button } from '@/components/ui/button';
-import { PageContainer, PageContent, PageHeader, PagePanel, PageSection } from '@/components/page-shell';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PageContainer, PageContent, PageHeader, PagePanel, PageSection, TitleCount } from '@/components/page-shell';
 import { phasePageEyebrow } from '@/lib/stages';
 import StatusBanner from '@/components/status-banner';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
   buildQuestionReview,
+  buildPortfolioFieldSets,
   buildScoreFieldSets,
   detectContextHeaders,
   reviewableHeaders,
@@ -45,6 +47,7 @@ import {
 } from '@/lib/grader-parse';
 import { DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
 import { cn } from '@/lib/utils';
+import { teamDotClass } from '@/lib/team-colors';
 import {
   ImportWizardProgressPlaceholder,
   WIZARD_STEP_IDS,
@@ -503,8 +506,22 @@ export default function UnifiedImportPage() {
 
     try {
       const scoreFieldsPayload: Partial<Record<TeamName, string[]>> = {};
+      const portfolioFieldsPayload: Partial<Record<TeamName, string[]>> = {};
       for (const team of teamsWithApps) {
         scoreFieldsPayload[team] = Array.from(scoreFieldsByTeam[team]);
+      }
+      if (teamSplitConfig) {
+        const portfolioSets = buildPortfolioFieldSets(
+          headers,
+          allRows,
+          teamSplitConfig,
+          contextHeaders,
+        );
+        for (const team of teamsWithApps) {
+          portfolioFieldsPayload[team] = Array.from(portfolioSets[team]).filter(
+            (h) => !scoreFieldsByTeam[team].has(h) && !contextHeaders.has(h),
+          );
+        }
       }
 
       const fd = new FormData();
@@ -513,6 +530,7 @@ export default function UnifiedImportPage() {
       fd.append('teamSplitConfig', JSON.stringify(teamSplitConfig));
       fd.append('gradersByTeam', JSON.stringify(gradersByTeam));
       fd.append('scoreFieldsByTeam', JSON.stringify(scoreFieldsPayload));
+      fd.append('portfolioFieldsByTeam', JSON.stringify(portfolioFieldsPayload));
       fd.append('contextFields', JSON.stringify(Array.from(contextHeaders)));
       fd.append('gradersPerApplication', String(gradersPerApplication));
 
@@ -652,7 +670,7 @@ export default function UnifiedImportPage() {
     <PageContainer size="wide" className="space-y-6">
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
-        title="Import applications"
+        title="Import Applications"
         description="Load this cycle’s spreadsheet, map teams, then assign graders. Unlock grading later from the dashboard."
         actions={<EraseTestDataButton onSuccess={resetImportWizard} redirectTo="/admin/import" />}
       />
@@ -712,7 +730,7 @@ export default function UnifiedImportPage() {
         {step === 'teams' && teamSplitConfig && (
           <PageContent width="narrow">
             <PagePanel className="space-y-4">
-              <h2 className="text-base font-semibold">Team split</h2>
+              <h2 className="text-base font-semibold">Team Split</h2>
 
               {teamSplitConfig.mode === 'named_columns' ? (
                 <div className="rounded-lg bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-900">
@@ -778,7 +796,11 @@ export default function UnifiedImportPage() {
         {step === 'scoring' && teamSplitConfig && splitByTeam && (
           <PagePanel className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold">Review question tagging</h2>
+              <h2 className="text-lg font-semibold">Review Question Tagging</h2>
+              <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                Link columns (Google Drive, Figma, portfolio URLs) are auto-classified as portfolio
+                fields for Design. Graders see them in a separate panel without names or email.
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -786,11 +808,9 @@ export default function UnifiedImportPage() {
                 {essayRows.length} questions shown
               </span>
               <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={showAllColumns}
-                  onChange={(e) => setShowAllColumns(e.target.checked)}
-                  className="h-4 w-4 rounded"
+                  onCheckedChange={(checked) => setShowAllColumns(checked === true)}
                 />
                 Show empty columns
               </label>
@@ -830,17 +850,15 @@ export default function UnifiedImportPage() {
                           return (
                             <td key={team} className="px-3 py-3.5 text-center">
                               {hasApps ? (
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={scoreFieldsByTeam[team].has(row.header)}
-                                  onChange={(e) =>
-                                    toggleScoreField(team, row.header, e.target.checked)
+                                  onCheckedChange={(checked) =>
+                                    toggleScoreField(team, row.header, checked === true)
                                   }
-                                  className="size-4 rounded"
                                   aria-label={`Score for ${team}`}
                                 />
                               ) : (
-                                <span className="text-muted-foreground">—</span>
+                                <span className="text-muted-foreground">-</span>
                               )}
                             </td>
                           );
@@ -870,7 +888,10 @@ export default function UnifiedImportPage() {
                 onClick={() => setShowContextEditor((v) => !v)}
                 className="flex w-full items-center justify-between py-2 text-left text-sm font-medium"
               >
-                <span>Application info ({contextRows.length} columns — not scored)</span>
+                <span className="flex items-baseline gap-2.5">
+                  Application info
+                  <TitleCount>{contextRows.length} columns, not scored</TitleCount>
+                </span>
                 <span className="text-muted-foreground">{showContextEditor ? 'Hide' : 'Show'}</span>
               </button>
               {showContextEditor && (
@@ -883,7 +904,7 @@ export default function UnifiedImportPage() {
                   {contextRows.map((row) => (
                     <div
                       key={row.header}
-                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-muted/40"
+                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 uma-hover-on-panel"
                     >
                       <span className="min-w-0 text-sm">{shortHeaderLabel(row.header)}</span>
                       <Button
@@ -915,10 +936,10 @@ export default function UnifiedImportPage() {
           <PagePanel className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Users per team</h2>
+                <h2 className="text-lg font-semibold">Users per Team</h2>
                 {hasSimulatedGraders && (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Simulated users use @berkeley.edu test emails — they are created automatically
+                    Simulated users use @berkeley.edu test emails, and they are created automatically
                     on import.
                   </p>
                 )}
@@ -945,7 +966,7 @@ export default function UnifiedImportPage() {
                   gradersPreloadStatus === 'empty' && (
                     <span className="text-sm text-amber-800">
                       No users with team access found under People for{' '}
-                      {teamsWithApps.length === 1 ? 'this team' : 'these teams'} — add users
+                      {teamsWithApps.length === 1 ? 'this team' : 'these teams'} - add users
                       manually or use Simulate users.
                     </span>
                   )}
@@ -1167,7 +1188,13 @@ export default function UnifiedImportPage() {
                       index > 0 && 'border-t border-border/50',
                     )}
                   >
-                    <span className="font-medium text-foreground">{t.team.name}</span>
+                    <span className="inline-flex items-center gap-2 font-medium text-foreground">
+                      <span
+                        className={cn('size-2 shrink-0 rounded-full', teamDotClass(t.team.name))}
+                        aria-hidden
+                      />
+                      {t.team.name}
+                    </span>
                     <span className="tabular-nums text-muted-foreground">
                       {t.applicationCount.toLocaleString()} applications
                     </span>
@@ -1183,9 +1210,9 @@ export default function UnifiedImportPage() {
               <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-5">
                 <LoadingButton
                   variant="secondary"
-                  onClick={() => router.push('/admin/dashboard#stage-access')}
+                  onClick={() => router.push('/admin/dashboard#pipeline-controls')}
                 >
-                  Stage access
+                  Click to unlock each phase
                 </LoadingButton>
                 <LoadingButton
                   onClick={() => router.push('/admin/dashboard')}

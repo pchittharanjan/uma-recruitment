@@ -7,11 +7,19 @@ import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label, RequiredAsterisk } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -21,11 +29,16 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
+  COFFEE_CHAT_GRADE_LEVELS,
+  COFFEE_CHAT_TEAM_OPTIONS,
   coffeeChatSubmittedLabel,
+  formatTeamsInterested,
   parseUserCoffeeChatList,
   todayIsoDate,
+  type CoffeeChatGradeLevel,
   type UserCoffeeChatListItem,
 } from '@/lib/coffee-chats';
+import type { TeamName } from '@/lib/db';
 import { phasePageEyebrow } from '@/lib/stages';
 
 type MyChat = UserCoffeeChatListItem;
@@ -65,12 +78,26 @@ interface CoffeeChatAvailabilityResponse {
 const emptyForm = {
   chatDate: todayIsoDate(),
   applicantName: '',
+  applicantEmail: '',
+  applicantGradeLevel: '' as CoffeeChatGradeLevel | '',
+  teamsInterested: [] as TeamName[],
   vibes: '',
   greenFlags: '',
   redFlags: '',
   otherComments: '',
   conflictOfInterest: '',
 };
+
+const REQUIRED_TEXT_FIELDS = [
+  ['vibes', 'General Thoughts and Vibes'],
+] as const;
+
+const OPTIONAL_TEXT_FIELDS = [
+  ['greenFlags', 'Green Flags'],
+  ['redFlags', 'Red Flags'],
+  ['otherComments', 'Other Comments'],
+  ['conflictOfInterest', 'Conflict of Interest'],
+] as const;
 
 export default function CoffeeChatsPage() {
   const router = useRouter();
@@ -155,6 +182,9 @@ export default function CoffeeChatsPage() {
     setForm({
       chatDate: chat.chat_date,
       applicantName: chat.applicant_name,
+      applicantEmail: chat.applicant_email ?? '',
+      applicantGradeLevel: chat.applicant_grade_level ?? '',
+      teamsInterested: [...chat.teams_interested],
       vibes: chat.vibes ?? '',
       greenFlags: chat.green_flags ?? '',
       redFlags: chat.red_flags ?? '',
@@ -181,6 +211,28 @@ export default function CoffeeChatsPage() {
       setError('Applicant name is required.');
       return;
     }
+    if (!form.applicantEmail.trim()) {
+      setError('Applicant email is required.');
+      return;
+    }
+    if (!form.applicantEmail.trim().toLowerCase().endsWith('@berkeley.edu')) {
+      setError('Applicant email must be a @berkeley.edu address.');
+      return;
+    }
+    if (!form.applicantGradeLevel) {
+      setError('Applicant grade level is required.');
+      return;
+    }
+    if (form.teamsInterested.length === 0) {
+      setError('Select at least one team the applicant is interested in.');
+      return;
+    }
+    for (const [key, label] of REQUIRED_TEXT_FIELDS) {
+      if (!form[key].trim()) {
+        setError(`${label} is required.`);
+        return;
+      }
+    }
 
     setSaving(true);
     setError('');
@@ -189,11 +241,14 @@ export default function CoffeeChatsPage() {
       const payload = {
         chatDate: form.chatDate,
         applicantName: form.applicantName,
-        vibes: form.vibes || null,
-        greenFlags: form.greenFlags || null,
-        redFlags: form.redFlags || null,
-        otherComments: form.otherComments || null,
-        conflictOfInterest: form.conflictOfInterest || null,
+        applicantEmail: form.applicantEmail.trim().toLowerCase(),
+        applicantGradeLevel: form.applicantGradeLevel,
+        teamsInterested: form.teamsInterested,
+        vibes: form.vibes.trim(),
+        greenFlags: form.greenFlags.trim() || null,
+        redFlags: form.redFlags.trim() || null,
+        otherComments: form.otherComments.trim() || null,
+        conflictOfInterest: form.conflictOfInterest.trim() || null,
       };
 
       const res = await fetch(
@@ -233,10 +288,10 @@ export default function CoffeeChatsPage() {
   const formDisabled = pipelineClosed || !intakeAvailable;
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer className="space-y-6">
       <PageHeader
         eyebrow={phasePageEyebrow('pre_application')}
-        title="Submit notes"
+        title="Submit Notes"
         actions={
           isAdmin ? (
             <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/admin/coffee-chats" />}>
@@ -274,100 +329,195 @@ export default function CoffeeChatsPage() {
               type="warning"
               message={
                 unavailableReason ??
-                `Submissions are closed. Window: ${windowInfo.coffeeChatStartDate ?? '—'} through ${windowInfo.applicationDueDate ?? '—'}.`
+                `Submissions are closed. Window: ${windowInfo.coffeeChatStartDate ?? '-'} through ${windowInfo.applicationDueDate ?? '-'}.`
               }
             />
           )}
 
           <PageSection ref={formSectionRef}>
-            <Card>
-              <CardHeader>
-                <CardTitle>{editingId ? 'Edit submission' : 'New coffee chat'}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <Card className="overflow-hidden">
+                <CardHeader>
+                  <CardTitle className="text-base">{editingId ? 'Edit Submission' : 'New Coffee Chat'}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 pb-1">
+                  <div className="space-y-4 sm:max-w-lg">
                   <div className="space-y-2">
                     <Label htmlFor="chatDate" required>
-                      Date of chat
+                      Date of Chat
                     </Label>
                     <Input
                       id="chatDate"
                       type="date"
+                      className="bg-background"
                       value={form.chatDate}
                       disabled={formDisabled}
                       required
                       onChange={(e) => setForm((f) => ({ ...f, chatDate: e.target.value }))}
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="submitterName">Your full name</Label>
-                  <Input id="submitterName" value={me?.user.name ?? ''} readOnly disabled />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="submitterName">Your Full Name</Label>
+                    <Input id="submitterName" value={me?.user.name ?? ''} readOnly disabled />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="applicantName" required>
-                    Applicant full name
-                  </Label>
-                  <Input
-                    id="applicantName"
-                    value={form.applicantName}
-                    disabled={formDisabled}
-                    placeholder="Full name"
-                    required
-                    onChange={(e) => setForm((f) => ({ ...f, applicantName: e.target.value }))}
-                  />
-                </div>
-
-                {(
-                  [
-                    ['vibes', 'General Thoughts and Vibes', form.vibes],
-                    ['greenFlags', 'Green flags', form.greenFlags],
-                    ['redFlags', 'Red flags', form.redFlags],
-                    ['otherComments', 'Other comments', form.otherComments],
-                    ['conflictOfInterest', 'Conflict of Interest', form.conflictOfInterest],
-                  ] as const
-                ).map(([key, label, value]) => (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={key}>{label}</Label>
-                    <textarea
-                      id={key}
-                      rows={3}
-                      className="field-textarea"
-                      value={value}
+                  <div className="space-y-2">
+                    <Label htmlFor="applicantName" required>
+                      Applicant Full Name
+                    </Label>
+                    <Input
+                      id="applicantName"
+                      className="bg-background"
+                      value={form.applicantName}
                       disabled={formDisabled}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, [key]: e.target.value }))
-                      }
+                      placeholder="Full name"
+                      required
+                      onChange={(e) => setForm((f) => ({ ...f, applicantName: e.target.value }))}
                     />
                   </div>
-                ))}
 
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {editingId && (
-                    <Button type="button" variant="secondary" onClick={resetForm}>
-                      Cancel edit
-                    </Button>
-                  )}
-                  <LoadingButton
-                    disabled={saving || formDisabled}
-                    onClick={handleSubmit}
-                  >
-                    {editingId ? 'Save changes' : 'Submit coffee chat'}
-                  </LoadingButton>
+                  <div className="space-y-2">
+                    <Label htmlFor="applicantEmail" required>
+                      Applicant Email
+                    </Label>
+                    <Input
+                      id="applicantEmail"
+                      type="email"
+                      className="bg-background"
+                      value={form.applicantEmail}
+                      disabled={formDisabled}
+                      placeholder="name@berkeley.edu"
+                      required
+                      onChange={(e) => setForm((f) => ({ ...f, applicantEmail: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="applicantGradeLevel" required>
+                      Applicant Grade Level
+                    </Label>
+                    <Select
+                      value={form.applicantGradeLevel || null}
+                      disabled={formDisabled}
+                      onValueChange={(value) => {
+                        if (value == null) return;
+                        setForm((f) => ({
+                          ...f,
+                          applicantGradeLevel: value as CoffeeChatGradeLevel,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger id="applicantGradeLevel" className="w-full bg-background">
+                        <SelectValue placeholder="Select grade level" />
+                      </SelectTrigger>
+                      <SelectContent align="start" alignItemWithTrigger={false}>
+                        {COFFEE_CHAT_GRADE_LEVELS.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
-                {error && <p className="text-sm text-destructive">{error}</p>}
-              </CardContent>
-            </Card>
+                  <fieldset className="space-y-3" disabled={formDisabled}>
+                  <legend className="text-sm font-medium">
+                    Teams Interested
+                    <RequiredAsterisk className="ml-0.5" />
+                    </legend>
+                    <div className="flex flex-wrap gap-2">
+                      {COFFEE_CHAT_TEAM_OPTIONS.map((team) => {
+                        const checked = form.teamsInterested.includes(team);
+                        return (
+                          <label
+                            key={team}
+                            htmlFor={`team-${team}`}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg uma-nested-surface px-3 py-2 text-sm"
+                          >
+                            <Checkbox
+                              id={`team-${team}`}
+                              checked={checked}
+                              disabled={formDisabled}
+                              onCheckedChange={(next) => {
+                                setForm((f) => ({
+                                  ...f,
+                                  teamsInterested: next
+                                    ? [...f.teamsInterested, team]
+                                    : f.teamsInterested.filter((item) => item !== team),
+                                }));
+                              }}
+                            />
+                            {team}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
+                  <div className="space-y-4">
+                    {REQUIRED_TEXT_FIELDS.map(([key, label]) => (
+                      <div key={key} className="space-y-2 pt-2">
+                        <Label htmlFor={key} required>
+                          {label}
+                        </Label>
+                        <textarea
+                          id={key}
+                          rows={3}
+                          className="field-textarea bg-background"
+                          value={form[key]}
+                          disabled={formDisabled}
+                          required
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, [key]: e.target.value }))
+                          }
+                        />
+                      </div>
+                    ))}
+                    {OPTIONAL_TEXT_FIELDS.map(([key, label]) => (
+                      <div key={key} className="space-y-2 pt-2">
+                        <Label htmlFor={key}>{label}</Label>
+                        <textarea
+                          id={key}
+                          rows={3}
+                          className="field-textarea bg-background"
+                          value={form[key]}
+                          disabled={formDisabled}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, [key]: e.target.value }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-5">
+                    {editingId && (
+                      <Button type="button" variant="secondary" onClick={resetForm}>
+                        Cancel edit
+                      </Button>
+                    )}
+                    <LoadingButton
+                      disabled={saving || formDisabled}
+                      onClick={handleSubmit}
+                    >
+                      {editingId ? 'Save changes' : 'Submit coffee chat'}
+                    </LoadingButton>
+                  </div>
+
+                  {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                </CardContent>
+              </Card>
           </PageSection>
 
           <PageSection>
             <Card>
               <CardHeader>
-                <CardTitle>Your submissions</CardTitle>
+                <CardTitle className="flex items-baseline gap-2.5">
+                  Your Submissions
+                  <TitleCount>{myChats.length}</TitleCount>
+                </CardTitle>
                 <CardDescription>
                   You can edit your own notes for up to 7 days after submitting.
                 </CardDescription>
@@ -387,6 +537,11 @@ export default function CoffeeChatsPage() {
                           <span className="text-muted-foreground font-normal">
                             · {chat.chat_date}
                           </span>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {chat.applicant_grade_level ?? 'Grade level not set'}
+                          {' · '}
+                          {formatTeamsInterested(chat.teams_interested)}
                         </p>
                         {chat.vibes && (
                           <p className="text-sm text-muted-foreground line-clamp-2">{chat.vibes}</p>
@@ -436,11 +591,27 @@ export default function CoffeeChatsPage() {
                     <dt className="text-muted-foreground">Date of Chat</dt>
                     <dd className="mt-1 font-medium">{viewingChat.chat_date}</dd>
                   </div>
+                  <div>
+                    <dt className="text-muted-foreground">Applicant email</dt>
+                    <dd className="mt-1 font-medium">{viewingChat.applicant_email ?? '-'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Grade level</dt>
+                    <dd className="mt-1 font-medium">
+                      {viewingChat.applicant_grade_level ?? '-'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Teams interested</dt>
+                    <dd className="mt-1 font-medium">
+                      {formatTeamsInterested(viewingChat.teams_interested)}
+                    </dd>
+                  </div>
                   {VIEW_FIELD_LABELS.map(([label, key]) => (
                     <div key={key}>
                       <dt className="text-muted-foreground">{label}</dt>
                       <dd className="display-field mt-1 whitespace-pre-wrap">
-                        {viewingChat[key]?.trim() ? viewingChat[key] : '—'}
+                        {viewingChat[key]?.trim() ? viewingChat[key] : '-'}
                       </dd>
                     </div>
                   ))}

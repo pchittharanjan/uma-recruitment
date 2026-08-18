@@ -1,48 +1,57 @@
 'use client';
 
 import Link from 'next/link';
-import StageBadge from '@/components/stage-badge';
-import { RecruitmentPhaseStepper } from '@/components/recruitment-phase-stepper';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { RoundStatus } from '@/lib/db';
-import { phaseLabel, type UnlockableStage } from '@/lib/stages';
+import { phaseLabelForTeam } from '@/lib/team-pipeline-profile';
+import { teamLinkClass, teamStageBadgeClass } from '@/lib/team-colors';
+import { cn } from '@/lib/utils';
 
-/** Read-Only global pipeline status — matches dashboard wording; manage on dashboard. */
+/** Read-only team pipeline status — manage advances on the dashboard. */
 export function PipelineStatusSnapshot({
+  teamName,
   status,
-  unlockedStages = [],
-  showStepper = true,
 }: {
+  teamName: string;
   status: RoundStatus;
-  unlockedStages?: UnlockableStage[];
-  showStepper?: boolean;
 }) {
   return (
-    <div className="display-panel space-y-5 p-5 sm:p-6">
-      <div>
-        <p className="uma-section-label">Global status</p>
-        <div className="mt-3 space-y-2">
-          <StageBadge label={phaseLabel(status)} color="blue" />
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            <Link
-              href="/admin/dashboard"
-              className="font-medium text-primary underline-offset-2 hover:underline"
+    <Card>
+      <CardHeader className="border-b border-border">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <CardTitle>{teamName} pipeline</CardTitle>
+            <span
+              className={cn(
+                'inline-flex items-center rounded-lg border px-2.5 py-1 text-sm font-medium',
+                teamStageBadgeClass(teamName),
+              )}
             >
-              Manage on dashboard
-            </Link>
-          </p>
+              {phaseLabelForTeam(status, teamName)}
+            </span>
+          </div>
+          <Link
+            href="/admin/dashboard#pipeline-controls"
+            className={cn(
+              'shrink-0 text-sm font-medium underline-offset-2 hover:underline',
+              teamLinkClass(teamName),
+            )}
+          >
+            Manage on dashboard
+          </Link>
         </div>
-      </div>
-
-      {showStepper && (
-        <div>
-          <p className="uma-section-label mb-3">Phase progression</p>
-          <RecruitmentPhaseStepper
-            currentStatus={status}
-            unlockedStages={unlockedStages}
-            mode="viewer"
-          />
-        </div>
-      )}
-    </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Each team advances on its own schedule. Use the dashboard team cards to move phases and
+          unlock stages.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

@@ -33,6 +33,13 @@ export function invalidateClientFetchCache(urlPrefix?: string): void {
   }
 }
 
+/** Sync read of a still-usable cache entry (fresh or stale). */
+export function peekCachedJson<T = unknown>(url: string): T | null {
+  const hit = store.get(url);
+  if (!hit || hit.staleUntil < Date.now()) return null;
+  return hit.body as T;
+}
+
 function revalidateInBackground(
   url: string,
   ttlMs: number,

@@ -6,7 +6,6 @@ import { forbidden, unauthorized } from '@/lib/auth';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { getRoundStageUnlocks, getGrantedStagesForUser, getInterviewOnlyScope } from '@/lib/stage-access';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { PIPELINE_PHASES, phaseLabel, UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 import { runWithRequestCache } from '@/lib/request-cache';
@@ -32,17 +31,15 @@ async function handleGet(req: NextRequest) {
     }
 
     const displayStatus = round.status;
-    const [unlocks, globalState, granted, interviewOnlyStage, recruitmentCycleLabel] =
+    const [unlocks, granted, interviewOnlyStage, recruitmentCycleLabel] =
       await Promise.all([
         getRoundStageUnlocks(round.id),
-        getGlobalPipelineState(),
         getGrantedStagesForUser(user, teamId),
         getInterviewOnlyScope(user, teamId),
         getRecruitmentCycleLabel(),
       ]);
     const archiveBrowse =
-      (globalState.status === 'closed' || displayStatus === 'closed') &&
-      (granted === 'all' || granted.length > 0);
+      displayStatus === 'closed' && (granted === 'all' || granted.length > 0);
 
     return NextResponse.json({
       round: {
@@ -54,9 +51,7 @@ async function handleGet(req: NextRequest) {
       phases: PIPELINE_PHASES,
       unlockedStages: archiveBrowse
         ? [...UNLOCKABLE_STAGES]
-        : globalState.unlockedStages.length > 0
-          ? globalState.unlockedStages
-          : unlocks.map((u) => u.stage),
+        : unlocks.map((u) => u.stage),
       grantedStages: archiveBrowse ? 'all' : granted === 'all' ? 'all' : granted,
       interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
     });

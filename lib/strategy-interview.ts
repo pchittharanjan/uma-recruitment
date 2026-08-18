@@ -29,19 +29,28 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
   const firstRound: InterviewGuide = {
     format: 'case_study',
     casePdfUrl: STRATEGY_GROUP_CASE_PDF,
-    intro: 'Group casing — Liquid Death. Present the case from the PDF, then take notes and score each question.',
+    intro: 'Group casing: Liquid Death. Present the case from the PDF, take notes on each question, then score the evaluation criteria.',
     caseStudy: {
       title: 'Liquid Death',
       prompt:
         'Liquid Death wants to become the largest hydration brand on college campuses. Develop a strategy that bypasses traditional corporate barriers and makes the brand integral to campus culture.',
       discussionPoints: [...STRATEGY_GROUP_CASE_QUESTIONS],
     },
+    rubric: {
+      scaleMax: 5,
+      criteria: [
+        { name: 'Structure', weight: 1 },
+        { name: 'Quant / analytics', weight: 1 },
+        { name: 'Insight', weight: 1 },
+        { name: 'Communication', weight: 1 },
+      ],
+    },
   };
 
   const finalRound: InterviewGuide = {
     format: 'case_and_behavioral',
     casePdfUrl: STRATEGY_INDIV_CASE_PDF,
-    intro: 'Individual interview — Chili’s case (part 1), then behavioral questions (part 2). Candidates have 15 minutes for the case.',
+    intro: "Individual interview: Chili's case (part 1), then behavioral questions (part 2). Candidates have 15 minutes for the case.",
     caseStudy: {
       title: 'Chili’s Grill & Bar',
       prompt:
@@ -49,6 +58,15 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
       discussionPoints: [...STRATEGY_INDIV_CASE_QUESTIONS],
     },
     questions: [...STRATEGY_BEHAVIORAL_QUESTIONS],
+    rubric: {
+      scaleMax: 5,
+      criteria: [
+        { name: 'Structure', weight: 1 },
+        { name: 'Quant / analytics', weight: 1 },
+        { name: 'Insight', weight: 1 },
+        { name: 'Communication', weight: 1 },
+      ],
+    },
   };
 
   return { first_round: firstRound, final_round: finalRound };

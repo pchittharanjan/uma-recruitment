@@ -1,6 +1,14 @@
-import type { InterviewGuide } from '@/lib/interview-guide';
+import {
+  interviewScaleMax,
+  interviewWeightPercents,
+  normalizeInterviewRubric,
+  type InterviewGuide,
+} from '@/lib/interview-guide';
 
 function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel?: string }) {
+  const rubric = normalizeInterviewRubric(guide.rubric);
+  const percents = rubric ? interviewWeightPercents(rubric.criteria) : [];
+
   return (
     <div className="space-y-3 text-sm text-amber-900 dark:text-amber-100">
       {partLabel && (
@@ -15,7 +23,7 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
       {guide.caseStudy?.discussionPoints && guide.caseStudy.discussionPoints.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-            Discussion points
+            Case questions
           </p>
           <ul className="list-disc space-y-1 pl-5">
             {guide.caseStudy.discussionPoints.map((point, i) => (
@@ -26,6 +34,20 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
           </ul>
         </div>
       )}
+      {rubric ? (
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            Evaluation (1–{interviewScaleMax(guide)})
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            {rubric.criteria.map((criterion, i) => (
+              <li key={i}>
+                {criterion.name} ({percents[i]}%)
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -76,10 +98,10 @@ export function InterviewGuideDisplay({ guide }: { guide: InterviewGuide }) {
 
       {guide.format === 'case_and_behavioral' && (
         <div className="space-y-5">
-          <CaseStudyBlock guide={guide} partLabel="Part 1 — Case" />
+          <CaseStudyBlock guide={guide} partLabel="Part 1: Case" />
           <QuestionsBlock
             questions={guide.questions ?? []}
-            partLabel="Part 2 — Behavioral"
+            partLabel="Part 2: Behavioral"
           />
         </div>
       )}

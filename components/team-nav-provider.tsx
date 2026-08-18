@@ -20,6 +20,8 @@ export type TeamNavTeam = {
   round: { status: RoundStatus } | null;
   grantedStages: UnlockableStage[] | 'all';
   unlockedStages: UnlockableStage[];
+  interviewOnlyStage?: string | null;
+  isDirector?: boolean;
 };
 
 export type TeamNavSnapshot = {

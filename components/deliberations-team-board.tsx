@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { DeliberationsBoardInstructions } from '@/components/deliberations-board-instructions';
 import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
 import {
@@ -25,6 +26,8 @@ interface DeliberationsResponse {
   board: DeliberationsBoardData;
   selectionComplete?: boolean;
   canSave?: boolean;
+  canFinalize?: boolean;
+  phasePreview?: boolean;
   pipelineClosed?: boolean;
   /** When set, overrides pipelineClosed for board interactivity (admin stays writable). */
   readOnly?: boolean;
@@ -147,9 +150,12 @@ export function DeliberationsTeamBoard({
   }
 
   const effectiveCanSave = data.canSave ?? canSave;
+  const effectiveCanFinalize = data.canFinalize ?? effectiveCanSave;
   // Prefer explicit readOnly from API (admin stays writable when closed).
   const readOnly =
     data.readOnly !== undefined ? Boolean(data.readOnly) : Boolean(data.pipelineClosed);
+
+  const candidateCount = data.board.candidates.length;
 
   return (
     <div className="space-y-4">
@@ -159,19 +165,22 @@ export function DeliberationsTeamBoard({
           message="Recruitment is closed. Deliberations are view-only."
         />
       )}
-      <p className="text-sm text-muted-foreground">
-        Drag applicants Pool → Considering → Accept. Accept is capped at the team offer limit.
-        Click a card for details; use ⋯ to reject or add to compare (2 / 4 / list).
-        {readOnly
-          ? ' This cycle is closed — the board is view-only.'
-          : effectiveCanSave
-            ? selectionComplete
-              ? ' Final selection is locked for this team.'
-              : ' Hit save to keep progress, then Complete final selection when Accept is ready.'
-            : ' Rearrange freely — only an admin can save the shared board or lock offers.'}
-      </p>
+      {candidateCount === 0 && !data.phasePreview && (
+        <StatusBanner
+          type="info"
+          message="No candidates in this phase yet. Advance applicants from earlier phases to populate the board."
+        />
+      )}
+      <DeliberationsBoardInstructions
+        canSave={effectiveCanSave}
+        canEditAcceptCap={effectiveCanSave}
+        canFinalize={effectiveCanFinalize}
+        readOnly={readOnly}
+        selectionComplete={selectionComplete}
+        phasePreview={Boolean(data.phasePreview)}
+      />
       <DeliberationsKanban
-        key={`${data.team.id}-${data.round.id}-${reloadKey}-${data.board.candidates.length}-fr${data.board.candidates.filter((c) => c.firstRoundAverage != null).length}`}
+        key={`${data.team.id}-${data.round.id}-${reloadKey}-${candidateCount}-fr${data.board.candidates.filter((c) => c.firstRoundAverage != null).length}`}
         teamId={data.team.id}
         initialColumns={initialColumns}
         initialSavedLayout={savedLayout}
@@ -179,6 +188,8 @@ export function DeliberationsTeamBoard({
         allowOverCap={data.board.allowOverCap}
         teamName={data.team.name}
         canSave={effectiveCanSave}
+        canEditAcceptCap={effectiveCanSave}
+        canFinalize={effectiveCanFinalize}
         readOnly={readOnly}
         selectionComplete={selectionComplete}
         saveUrl={effectiveCanSave ? boardUrl : undefined}

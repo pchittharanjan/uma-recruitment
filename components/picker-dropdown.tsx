@@ -217,7 +217,7 @@ export function MultiPickerDropdown<T extends string | number>({
                   onToggleValue(option.value);
                 }}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors',
+                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm capitalize transition-colors',
                   option.disabled
                     ? 'cursor-not-allowed opacity-50'
                     : checked

@@ -8,7 +8,6 @@ import {
   applyInterviewAdvancementSelection,
   computeInterviewRankings,
 } from '@/lib/interview-results';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { pipelineClosedEditLock } from '@/lib/pipeline-writable';
 import { cachedPerRequest } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
@@ -380,7 +379,7 @@ async function listAdvancementSubmissionHistoryUncached(
           JOIN users u ON u.id = s.submitted_by
           LEFT JOIN users r ON r.id = s.reviewed_by
           WHERE s.team_id = ? AND s.round_id = ?${stageFilter}
-          ORDER BY s.submitted_at DESC`,
+          ORDER BY s.submitted_at DESC, s.id DESC`,
     args,
   });
   return result.rows.map((row) => rowToSubmission(row as Record<string, unknown>));
@@ -432,9 +431,8 @@ export async function submitTeamAdvancement(
   const round = await getActiveRoundForTeam(teamId);
   if (!round) throw new Error('No active round for this team.');
 
-  const globalState = await getGlobalPipelineState();
   const requiredStatus = requiredPipelineStatus(fromStage);
-  if (globalState.status !== requiredStatus) {
+  if (round.status !== requiredStatus) {
     throw new Error(`Advancement can only be submitted during the ${requiredStatus.replace('_', ' ')} stage.`);
   }
 

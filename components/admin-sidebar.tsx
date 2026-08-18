@@ -1,24 +1,25 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AdminNavUser } from '@/components/admin-nav-user';
+import { SidebarBrandHeader } from '@/components/sidebar-brand-header';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SidebarPhaseNav } from '@/components/sidebar-phase-nav';
+import { useAdminPhase } from '@/components/admin-phase-provider';
+import { useIsClient, useBrowserSearch } from '@/hooks/use-workspace-embed';
+import { isAdminDashboardPhase, parseDashboardViewPhase } from '@/lib/stages';
+import type { RoundStatus } from '@/lib/db';
 import { LayoutDashboardIcon, Table2Icon, UsersIcon, ListChecksIcon } from 'lucide-react';
 
 const navItems = [
@@ -28,28 +29,23 @@ const navItems = [
   { title: 'Users', href: '/admin/users', icon: UsersIcon },
 ];
 
-function isNavActive(pathname: string, href: string): boolean {
+function isNavActive(
+  pathname: string,
+  href: string,
+  dashboardViewPhase: RoundStatus | null,
+): boolean {
   if (href === '/admin/dashboard') {
+    if (pathname === '/admin/dashboard') {
+      if (dashboardViewPhase && isAdminDashboardPhase(dashboardViewPhase)) {
+        return false;
+      }
+      return true;
+    }
     return (
-      pathname === '/admin/dashboard' ||
-      (pathname.startsWith('/admin/teams/') && !pathname.startsWith('/admin/applications'))
+      pathname.startsWith('/admin/teams/') && !pathname.startsWith('/admin/applications')
     );
   }
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function BrandLogo() {
-  return (
-    <div className="flex size-5 shrink-0 items-center justify-center">
-      <Image
-        src="/uma-logo.png"
-        alt=""
-        width={20}
-        height={20}
-        className="max-h-5 max-w-5 object-contain brightness-0"
-      />
-    </div>
-  );
 }
 
 export function AdminSidebar({
@@ -61,6 +57,17 @@ export function AdminSidebar({
   showApplicationsNav?: boolean;
 }) {
   const pathname = usePathname();
+  const search = useBrowserSearch();
+  const { phase } = useAdminPhase();
+  const mounted = useIsClient();
+
+  const dashboardViewPhase =
+    mounted && pathname === '/admin/dashboard' && phase?.status
+      ? parseDashboardViewPhase(
+          new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('view'),
+          phase.status,
+        )
+      : null;
 
   const visibleNavItems = navItems.filter(
     (item) => !('requiresData' in item && item.requiresData) || showApplicationsNav,
@@ -68,52 +75,7 @@ export function AdminSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="shrink-0 gap-1 p-2 pb-3">
-        <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:hidden">
-          <SidebarMenu className="min-w-0 flex-1">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="h-9 w-full justify-start gap-2.5 hover:bg-transparent active:bg-transparent"
-                tooltip="Recruitment Hub"
-                render={<Link href="/admin/dashboard" />}
-              >
-                <BrandLogo />
-                <span className="truncate text-[0.9375rem] font-semibold leading-none tracking-tight">
-                  Recruitment Hub
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <SidebarTrigger className="size-8 shrink-0 text-muted-foreground max-md:hidden" />
-        </div>
-
-        <div className="hidden w-full flex-col gap-1 group-data-[collapsible=icon]:flex">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="hover:bg-transparent active:bg-transparent"
-                tooltip="Recruitment Hub"
-                render={<Link href="/admin/dashboard" />}
-              >
-                <BrandLogo />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <SidebarTrigger className="size-8 text-muted-foreground max-md:hidden" />
-              }
-            />
-            <TooltipContent side="right" align="center">
-              Expand Sidebar
-              <kbd className="pointer-events-none ml-1.5 inline-flex h-5 items-center rounded border border-border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground">
-                ⌘B
-              </kbd>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </SidebarHeader>
+      <SidebarBrandHeader href="/admin/dashboard" tooltip="Recruitment Hub" />
 
       <SidebarContent>
         <SidebarGroup>
@@ -122,7 +84,7 @@ export function AdminSidebar({
               {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
-                    isActive={isNavActive(pathname, item.href)}
+                    isActive={isNavActive(pathname, item.href, dashboardViewPhase)}
                     tooltip={item.title}
                     render={<Link href={item.href} />}
                   >

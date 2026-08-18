@@ -288,7 +288,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-xl group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border group-data-[variant=inset]:rounded-xl"
+          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-xl group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border group-data-[variant=inset]:rounded-xl"
         >
           {children}
         </div>
@@ -570,7 +570,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: "hover:bg-sidebar-accent-hover hover:text-sidebar-accent-foreground",
         outline:
-          "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent-hover hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
+          "bg-background ring-1 ring-sidebar-border hover:bg-sidebar-accent-hover hover:text-sidebar-accent-foreground hover:ring-sidebar-accent",
       },
       size: {
         default: "h-8 text-sm",

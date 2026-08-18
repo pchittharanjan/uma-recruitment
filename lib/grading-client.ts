@@ -11,6 +11,7 @@ export interface GradeAppData {
   existingComment: string;
   graderProgress: { total: number; completed: number };
   scoreFields: string[];
+  portfolioFields?: Record<string, string>;
   contextFields: string[];
   customScoreFields: string[];
   graderInstructions: string | null;

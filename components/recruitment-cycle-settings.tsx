@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDownIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import { SettingsPanel } from '@/components/settings-panel';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
@@ -12,7 +12,6 @@ import {
   type RecruitmentSemester,
 } from '@/lib/org-recruitment-cycle';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 
 interface CycleSettingsResponse {
   semester: RecruitmentSemester;
@@ -116,44 +115,26 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
   };
 
   return (
-    <div className="display-panel px-4 py-3">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 text-left"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <div>
-          <p className="uma-section-label">Recruitment cycle</p>
-          {!open && !loading && (
-            <p className="mt-1 text-sm font-medium text-foreground">
-              {semester === 'fall' ? 'Fall' : 'Spring'} {year}
-            </p>
-          )}
+    <SettingsPanel
+      label="Recruitment cycle"
+      open={open}
+      onOpenChange={setOpen}
+      loading={loading}
+      collapsedSummary={`${semester === 'fall' ? 'Fall' : 'Spring'} ${year}`}
+    >
+      {loading ? (
+        <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
+          <div className="w-[7.5rem] space-y-1">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+          <div className="w-[5.5rem] space-y-1">
+            <Skeleton className="h-4 w-10" />
+            <Skeleton className="h-8 w-full" />
+          </div>
         </div>
-        <ChevronDownIcon
-          className={cn(
-            'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
-
-      {open && (
-        <div className="mt-3 space-y-2">
-          {loading ? (
-            <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
-              <div className="w-[7.5rem] space-y-1">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-              <div className="w-[5.5rem] space-y-1">
-                <Skeleton className="h-4 w-10" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            </div>
-          ) : (
-            <>
+      ) : (
+        <>
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-[7.5rem] space-y-1">
               <Label htmlFor="recruitmentSemester" className="text-sm" required>
@@ -199,10 +180,8 @@ export function RecruitmentCycleSettings({ onSaved }: { onSaved?: () => void }) 
 
           {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
-            </>
-          )}
-        </div>
+        </>
       )}
-    </div>
+    </SettingsPanel>
   );
 }

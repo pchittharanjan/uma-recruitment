@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { PartyPopperIcon } from 'lucide-react';
 import { fireRecruitmentConfetti } from '@/lib/confetti-fireworks';
+import { TEAM_ORDER, teamHexColors } from '@/lib/team-colors';
 
 export interface FinalSelectionOffer {
   applicationId: number;
@@ -11,45 +12,9 @@ export interface FinalSelectionOffer {
   teamName: string;
 }
 
-const TEAM_ORDER = ['Strategy', 'Events', 'Design'] as const;
-
-const TEAM_COLORS: Record<
-  string,
-  { dot: string; badgeBg: string; badgeFg: string; avatarBg: string; avatarFg: string }
-> = {
-  Strategy: {
-    dot: '#0ea5e9',
-    badgeBg: '#e0f2fe',
-    badgeFg: '#0c4a6e',
-    avatarBg: '#e0f2fe',
-    avatarFg: '#075985',
-  },
-  Events: {
-    dot: '#f59e0b',
-    badgeBg: '#fef3c7',
-    badgeFg: '#78350f',
-    avatarBg: '#fef3c7',
-    avatarFg: '#92400e',
-  },
-  Design: {
-    dot: '#8b5cf6',
-    badgeBg: '#ede9fe',
-    badgeFg: '#4c1d95',
-    avatarBg: '#ede9fe',
-    avatarFg: '#5b21b6',
-  },
-};
 
 function teamColors(teamName: string) {
-  return (
-    TEAM_COLORS[teamName] ?? {
-      dot: '#a3a3a3',
-      badgeBg: '#f5f5f5',
-      badgeFg: '#404040',
-      avatarBg: '#f5f5f5',
-      avatarFg: '#404040',
-    }
-  );
+  return teamHexColors(teamName);
 }
 
 function initials(name: string): string {
@@ -140,7 +105,7 @@ export function FinalSelectionOffers({
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [members, activeTeam]);
 
-  const title = cycleLabel ? `${cycleLabel} Newbies` : 'Final selection';
+  const title = cycleLabel ? `${cycleLabel} Newbies` : 'Final Selection';
 
   return (
     <div style={{ margin: '0 auto', width: '100%', maxWidth: 1024 }}>
@@ -335,7 +300,7 @@ export function FinalSelectionOffers({
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {member.grade || '—'}
+                      {member.grade || '-'}
                     </td>
                     <td style={{ padding: '12px 24px' }}>
                       <span

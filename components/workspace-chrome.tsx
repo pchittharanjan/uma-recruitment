@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Columns2Icon, XIcon } from 'lucide-react';
+import { AppCreditBar } from '@/components/app-credit-bar';
 import { NotificationBell } from '@/components/notification-bell';
 import { useWorkspace } from '@/components/workspace-provider';
 import { WorkspaceNewTabMenu } from '@/components/workspace-new-tab-menu';
 import { Button } from '@/components/ui/button';
-import { withEmbedParam, type WorkspaceTab } from '@/lib/workspace';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { withEmbedParam, workspaceTabMatches, type WorkspaceTab } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 function tabDomId(prefix: string, href: string) {
@@ -48,7 +50,7 @@ function WorkspaceTabBar({
       className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto [scrollbar-width:thin]"
     >
       {tabs.map((tab, index) => {
-        const isActive = activeHref != null && tab.href === activeHref;
+        const isActive = activeHref != null && workspaceTabMatches(tab.href, activeHref);
         return (
           <div
             key={tab.href}
@@ -67,8 +69,8 @@ function WorkspaceTabBar({
                 canClose ? 'pr-7' : 'pr-2.5',
                 'rounded-sm focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
                 isActive
-                  ? 'font-medium text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'font-medium text-foreground bg-background'
+                  : 'rounded-md text-muted-foreground uma-hover-on-canvas hover:text-foreground',
               )}
               onClick={() => onSelect(tab.href)}
               onKeyDown={(event) => {
@@ -110,7 +112,7 @@ function WorkspaceTabBar({
                 className={cn(
                   'absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-md',
                   'text-muted-foreground outline-none transition-colors',
-                  'hover:bg-muted hover:text-foreground',
+                  'hover:bg-muted/50 hover:text-foreground',
                   'focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50',
                   isActive
                     ? 'opacity-70 hover:opacity-100'
@@ -186,16 +188,25 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
     toggleSplit,
   } = useWorkspace();
   const dragRef = useRef<{ startX: number; startRatio: number } | null>(null);
+  const [iframeReady, setIframeReady] = useState(false);
+  const isMobile = useIsMobile();
+  const effectiveSplit = split && !isMobile;
 
   const rightHref = splitHref;
   const canClose = tabs.length > 1;
+
+  useEffect(() => {
+    setIframeReady(false);
+  }, [rightHref]);
 
   const openOnRight = (href: string) => {
     openTab(href, { background: true });
     setSplitHref(href);
   };
 
-  const splitToggle = <SplitToggleButton split={split} onToggle={toggleSplit} />;
+  const splitToggle = (
+    <SplitToggleButton split={effectiveSplit} onToggle={toggleSplit} />
+  );
   const toolbarEnd = (
     <div className="ml-2 flex shrink-0 items-center gap-0.5">
       <NotificationBell />
@@ -205,8 +216,8 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {split ? (
-        <div className="flex h-12 shrink-0 items-stretch bg-card/40 backdrop-blur-[2px]">
+      {effectiveSplit ? (
+        <div className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 backdrop-blur-[2px]">
           <div
             className="flex min-w-0 items-stretch pl-2 sm:pl-3"
             style={{ width: `${splitRatio}%` }}
@@ -245,7 +256,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : (
-        <div className="flex h-12 shrink-0 items-stretch bg-card/40 px-2 backdrop-blur-[2px] sm:px-3">
+        <div className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 px-2 backdrop-blur-[2px] sm:px-3">
           <WorkspaceTabBar
             tabs={tabs}
             activeHref={activeHref}
@@ -260,55 +271,77 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {split ? (
-        <div className="flex min-h-0 min-w-0 flex-1">
-          <div
-            className="min-h-0 min-w-0 overflow-auto"
-            style={{ width: `${splitRatio}%` }}
-          >
-            {children}
-          </div>
-          <button
-            type="button"
-            aria-label="Resize split"
-            className="group relative z-10 w-1.5 shrink-0 cursor-ew-resize bg-border/70 hover:bg-primary/60"
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              event.preventDefault();
-              dragRef.current = { startX: event.clientX, startRatio: splitRatio };
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              const drag = dragRef.current;
-              if (!drag) return;
-              const parent = event.currentTarget.parentElement;
-              if (!parent) return;
-              const deltaPct = ((event.clientX - drag.startX) / parent.clientWidth) * 100;
-              setSplitRatio(drag.startRatio + deltaPct);
-            }}
-            onPointerUp={(event) => {
-              dragRef.current = null;
-              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                event.currentTarget.releasePointerCapture(event.pointerId);
-              }
-            }}
-          />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-            {rightHref ? (
-              <iframe
-                key={rightHref}
-                title="Split view"
-                src={withEmbedParam(rightHref)}
-                className="min-h-0 w-full flex-1 border-0 bg-background"
-              />
-            ) : (
-              <SplitEmptyPane onOpen={openOnRight} />
-            )}
-          </div>
+      <div
+        className={cn(
+          'flex min-h-0 min-w-0 flex-1',
+          effectiveSplit ? 'flex-row' : 'flex-col',
+        )}
+      >
+        <div
+          className="min-h-0 min-w-0 flex-1 overflow-auto"
+          style={effectiveSplit ? { width: `${splitRatio}%`, flex: 'none' } : undefined}
+        >
+          {children}
         </div>
-      ) : (
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</div>
-      )}
+        {split ? (
+          <>
+            <button
+              type="button"
+              aria-label="Resize split"
+              className={cn(
+                'group relative z-10 w-1.5 shrink-0 cursor-ew-resize bg-border/70 hover:bg-primary/60',
+                !effectiveSplit && 'hidden',
+              )}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                dragRef.current = { startX: event.clientX, startRatio: splitRatio };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const drag = dragRef.current;
+                if (!drag) return;
+                const parent = event.currentTarget.parentElement;
+                if (!parent) return;
+                const deltaPct = ((event.clientX - drag.startX) / parent.clientWidth) * 100;
+                setSplitRatio(drag.startRatio + deltaPct);
+              }}
+              onPointerUp={(event) => {
+                dragRef.current = null;
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+              }}
+            />
+            <div
+              className={cn(
+                'relative min-h-0 min-w-0 flex-1 flex-col bg-background',
+                effectiveSplit ? 'flex' : 'hidden',
+              )}
+            >
+              {rightHref ? (
+                <>
+                  {effectiveSplit && !iframeReady ? (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-muted-foreground">
+                      Loading page…
+                    </div>
+                  ) : null}
+                  <iframe
+                    key={rightHref}
+                    title="Split view"
+                    src={withEmbedParam(rightHref)}
+                    onLoad={() => setIframeReady(true)}
+                    className="min-h-0 w-full flex-1 border-0 bg-background"
+                  />
+                </>
+              ) : (
+                <SplitEmptyPane onOpen={openOnRight} />
+              )}
+            </div>
+          </>
+        ) : null}
+      </div>
+      <AppCreditBar />
     </div>
   );
 }

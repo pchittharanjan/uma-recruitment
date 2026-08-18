@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cachedJsonFetch } from '@/lib/client-fetch-cache';
+import { teamCheckboxAccentClass, teamDotClass } from '@/lib/team-colors';
+import { cn } from '@/lib/utils';
 
 const CAP_INPUT_CLASS =
   'h-9 w-full max-w-[6rem] border-foreground/20 bg-background ';
@@ -70,7 +72,7 @@ function CapCell({
         type="number"
         min={1}
         inputMode="numeric"
-        placeholder="—"
+        placeholder="-"
         className={CAP_INPUT_CLASS}
         value={capInputValue(value)}
         onChange={(e) => onCapChange(e.target.value)}
@@ -80,6 +82,7 @@ function CapCell({
           id={overId}
           checked={allowOver}
           onCheckedChange={(checked) => onOverChange(checked === true)}
+          checkedClassName={teamCheckboxAccentClass(teamName)}
         />
         <Label htmlFor={overId} className="cursor-pointer text-xs font-normal text-muted-foreground">
           Can go over
@@ -250,7 +253,7 @@ export function TeamAdvancementCapSettings() {
   return (
     <Card>
       <CardHeader className="gap-2 px-6">
-        <CardTitle className="text-base">Team advancement limits</CardTitle>
+        <CardTitle className="text-base">Team Advancement Limits</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 overflow-hidden px-6 pt-4">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -285,7 +288,7 @@ export function TeamAdvancementCapSettings() {
             role="columnheader"
             className="whitespace-nowrap py-1 text-sm font-medium text-muted-foreground"
           >
-            Deliberations → Final selection
+            Deliberations → Final Selection
           </div>
 
           {loading
@@ -310,12 +313,16 @@ export function TeamAdvancementCapSettings() {
               ))
             : rows.map((row) => (
                 <div key={row.teamId} role="row" className="contents">
-                  <div role="cell" className="flex items-center py-1.5 font-medium">
+                  <div role="cell" className="flex items-center gap-2 py-1.5 font-medium">
+                    <span
+                      className={cn('size-2 shrink-0 rounded-full', teamDotClass(row.teamName))}
+                      aria-hidden
+                    />
                     {row.teamName}
                   </div>
                   <CapCell
                     teamName={row.teamName}
-                    stageLabel="Application advancement"
+                    stageLabel="Application Advancement"
                     inputId={`app-cap-${row.teamId}`}
                     value={row.applicationCap}
                     allowOver={row.applicationAllowOverCap}
@@ -327,7 +334,7 @@ export function TeamAdvancementCapSettings() {
                   />
                   <CapCell
                     teamName={row.teamName}
-                    stageLabel="First round advancement"
+                    stageLabel="First Round Advancement"
                     inputId={`fr-cap-${row.teamId}`}
                     value={row.firstRoundCap}
                     allowOver={row.firstRoundAllowOverCap}
@@ -339,7 +346,7 @@ export function TeamAdvancementCapSettings() {
                   />
                   <CapCell
                     teamName={row.teamName}
-                    stageLabel="Deliberations final selection"
+                    stageLabel="Deliberations Final Selection"
                     inputId={`delibs-cap-${row.teamId}`}
                     value={row.deliberationsCap}
                     allowOver={row.deliberationsAllowOverCap}

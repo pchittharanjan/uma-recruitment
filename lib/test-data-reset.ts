@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/db';
+import { reclaimApplicationIds } from '@/lib/admin-applications';
 
 export interface TestDataPurgeResult {
   roundsRemoved: number;
@@ -47,6 +48,7 @@ export async function purgeTestRecruitmentData(): Promise<TestDataPurgeResult> {
       sql: `DELETE FROM applications WHERE round_id IN (${placeholders})`,
       args: roundIds,
     });
+    await reclaimApplicationIds();
 
     await db.execute({
       sql: `DELETE FROM team_advancement_submissions WHERE round_id IN (${placeholders})`,

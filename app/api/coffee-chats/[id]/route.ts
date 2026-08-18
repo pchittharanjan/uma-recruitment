@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { forbidden, requireAuth, unauthorized } from '@/lib/auth';
 import type { CoffeeChatUpdateInput } from '@/lib/coffee-chats';
+import { validateApplicantGradeLevel, validateApplicantEmail, validateTeamsInterested } from '@/lib/coffee-chats';
 import { updateCoffeeChat } from '@/lib/coffee-chats-server';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
@@ -32,6 +33,22 @@ export async function PATCH(
     }
 
     const body = (await req.json()) as CoffeeChatUpdateInput;
+
+    try {
+      if (body.applicantGradeLevel !== undefined) {
+        validateApplicantGradeLevel(body.applicantGradeLevel);
+      }
+      if (body.applicantEmail !== undefined) {
+        validateApplicantEmail(body.applicantEmail);
+      }
+      if (body.teamsInterested !== undefined) {
+        validateTeamsInterested(body.teamsInterested);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Invalid coffee chat input.';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
     const chat = await updateCoffeeChat(user, id, body);
     return NextResponse.json({ chat });
   } catch (e) {
@@ -39,7 +56,7 @@ export async function PATCH(
     if (message.includes('only edit your own') || message.includes('edit window') || message.includes('closed')) {
       return forbidden(message);
     }
-    if (message.includes('not found') || message.includes('required') || message.includes('date')) {
+    if (message.includes('not found') || message.includes('required') || message.includes('date') || message.includes('grade level') || message.includes('team')) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     console.error('PATCH /api/coffee-chats/[id] failed:', e);

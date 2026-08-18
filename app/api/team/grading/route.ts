@@ -9,7 +9,7 @@ import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
-import { listGraderAssignments } from '@/lib/team-dashboard';
+import { listGraderAssignments, userSeesBlindApplications } from '@/lib/team-dashboard';
 
 const ASSIGNMENT_STAGES: AssignmentStage[] = ['application', 'first_round', 'final_round'];
 
@@ -60,10 +60,15 @@ async function handleGet(req: NextRequest) {
           }
         : null;
 
+    const blind = userSeesBlindApplications(user);
+    const safeAssignments = blind
+      ? assignments.map(({ candidateName: _name, ...rest }) => rest)
+      : assignments;
+
     return NextResponse.json({
       grader: { id: user.id, name: user.name, email: user.email },
       stage,
-      assignments,
+      assignments: safeAssignments,
       progress: { completed, total: assignments.length },
       gradingEditLock,
       isDirector,

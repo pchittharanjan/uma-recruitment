@@ -4,21 +4,17 @@ import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import PageLoading from '@/components/page-loading';
+import { CasePdfPane } from '@/components/case-pdf-pane';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent } from '@/components/page-shell';
-import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { Button } from '@/components/ui/button';
 import StatusBanner from '@/components/status-banner';
-import { InterviewQuestionGroups } from '@/components/interview-question-eval';
-import {
-  interviewScoreFieldGroups,
-  type InterviewGuide,
-  type InterviewScoreFieldGroup,
-} from '@/lib/interview-guide';
+import { InterviewNotesAndScoringForm } from '@/components/interview-question-eval';
+import { type InterviewGuide } from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
 import { formatInterviewProgressLabel } from '@/lib/interview-sessions';
@@ -70,7 +66,7 @@ interface InterviewScoreData {
 }
 
 function formatSlotTime(iso: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, {
@@ -83,7 +79,7 @@ function formatSlotTime(iso: string): string {
 }
 
 function formatSlotHeader(iso: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, {
@@ -110,21 +106,6 @@ function emptyDraft(): CandidateDraft {
   return { scores: {}, notes: {}, comment: '' };
 }
 
-function CasePdfPane({ url, title }: { url: string; title: string }) {
-  return (
-    <div className="flex min-h-[40vh] flex-col border-b bg-muted/30 lg:min-h-0 lg:border-r lg:border-b-0">
-      <p className="shrink-0 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </p>
-      <iframe
-        src={`${url}#view=FitH`}
-        title={title}
-        className="min-h-0 w-full flex-1 bg-white"
-      />
-    </div>
-  );
-}
-
 function NotesPanelHeader({
   title,
   intro,
@@ -133,24 +114,24 @@ function NotesPanelHeader({
   intro?: string;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <h2 className="text-base font-semibold">{title}</h2>
       {intro?.trim() ? (
-        <p className="text-sm text-muted-foreground">{intro.trim()}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{intro.trim()}</p>
       ) : null}
     </div>
   );
 }
 
 function NotesAndEvaluationForm({
-  fieldGroups,
+  guide,
   draft,
   locked,
   onNoteChange,
   onScoreChange,
   onCommentChange,
 }: {
-  fieldGroups: InterviewScoreFieldGroup[];
+  guide: InterviewGuide | null;
   draft: CandidateDraft;
   locked: boolean;
   onNoteChange: (field: string, value: string) => void;
@@ -158,29 +139,16 @@ function NotesAndEvaluationForm({
   onCommentChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-6">
-      <InterviewQuestionGroups
-        groups={fieldGroups}
-        notes={draft.notes}
-        scores={draft.scores}
-        disabled={locked}
-        onNoteChange={onNoteChange}
-        onScoreChange={onScoreChange}
-      />
-      <Card className="p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Overall notes
-        </p>
-        <textarea
-          value={draft.comment}
-          onChange={(e) => onCommentChange(e.target.value)}
-          disabled={locked}
-          placeholder="Anything else from the interview (not visible to other stages until deliberations)"
-          rows={3}
-          className="w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
-        />
-      </Card>
-    </div>
+    <InterviewNotesAndScoringForm
+      guide={guide}
+      notes={draft.notes}
+      scores={draft.scores}
+      comment={draft.comment}
+      disabled={locked}
+      onNoteChange={onNoteChange}
+      onScoreChange={onScoreChange}
+      onCommentChange={onCommentChange}
+    />
   );
 }
 
@@ -232,7 +200,6 @@ export default function TeamInterviewScorePage({
 
   const isGroupInterview = (data?.groupEntries?.length ?? 0) > 1;
   const scoreFieldList = data ? allScoreFields(data) : [];
-  const fieldGroups = interviewScoreFieldGroups(data?.interviewGuide ?? null);
   const casePdfUrl = data?.interviewGuide?.casePdfUrl;
 
   const groupCompletion = useMemo(() => {
@@ -279,8 +246,8 @@ export default function TeamInterviewScorePage({
           ? 'Interview score submitted'
           : stage === 'first_round'
             ? json.isDirector
-              ? 'All interviews scored — next: color recommendations, then meet with your PMs'
-              : 'All interviews scored — next: color recommendations'
+              ? 'All interviews scored. Next: color recommendations, then meet with your PMs'
+              : 'All interviews scored. Next: color recommendations'
             : 'All interviews scored',
       );
       if (json.nextApplicationId) {
@@ -420,7 +387,7 @@ export default function TeamInterviewScorePage({
     </div>
   );
 
-  const notesBody = isGroupInterview && data.groupEntries ? (
+  const notesContent = isGroupInterview && data.groupEntries ? (
     <>
       {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
       {data.slot?.logisticsNote && (
@@ -430,7 +397,7 @@ export default function TeamInterviewScorePage({
         </p>
       )}
       <NotesPanelHeader
-        title="Notes & evaluation"
+        title="Notes & Evaluation"
         intro={data.interviewGuide?.intro}
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -465,7 +432,7 @@ export default function TeamInterviewScorePage({
             >
               <h3 className="text-lg font-semibold">{entry.candidateName}</h3>
               <NotesAndEvaluationForm
-                fieldGroups={fieldGroups}
+                guide={data.interviewGuide ?? null}
                 draft={entryDraft}
                 locked={scoringLocked}
                 onNoteChange={(field, value) =>
@@ -487,36 +454,6 @@ export default function TeamInterviewScorePage({
         })}
       </Tabs>
       {submitError && <StatusBanner message={submitError} type="error" />}
-      <div className="flex items-center justify-between gap-4 pt-2">
-        <div className="flex-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{
-                width: `${
-                  groupCompletion.total
-                    ? (groupCompletion.completed / groupCompletion.total) * 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {groupCompletion.completed} of {groupCompletion.total} applicants scored
-          </p>
-        </div>
-        <LoadingButton
-          onClick={handleGroupSubmit}
-          loading={submitting}
-          disabled={scoringLocked || groupCompletion.completed !== groupCompletion.total}
-        >
-          {scoringLocked
-            ? 'Editing locked'
-            : groupCompletion.completed === groupCompletion.total
-              ? 'Submit all →'
-              : `${groupCompletion.total - groupCompletion.completed} remaining`}
-        </LoadingButton>
-      </div>
     </>
   ) : (
     <>
@@ -529,11 +466,11 @@ export default function TeamInterviewScorePage({
         </p>
       )}
       <NotesPanelHeader
-        title="Notes & evaluation"
+        title="Notes & Evaluation"
         intro={data.interviewGuide?.intro}
       />
       <NotesAndEvaluationForm
-        fieldGroups={fieldGroups}
+        guide={data.interviewGuide ?? null}
         draft={draft}
         locked={scoringLocked}
         onNoteChange={(field, value) =>
@@ -545,24 +482,69 @@ export default function TeamInterviewScorePage({
         onCommentChange={(value) => setDraft((prev) => ({ ...prev, comment: value }))}
       />
       {submitError && <StatusBanner message={submitError} type="error" />}
-      <GradingSubmitFooter
-        scoredCount={scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}
-        totalScored={scoreFieldList.length}
-        onSubmit={handleSingleSubmit}
-        submitting={submitting}
-        locked={scoringLocked}
-      />
     </>
   );
+
+  const groupFooter = (
+    <div
+      className={cn(
+        'flex items-center justify-between gap-4',
+        casePdfUrl
+          ? 'shrink-0 border-t border-border bg-muted/50 px-6 py-4 sm:px-7 lg:px-8'
+          : 'pt-2',
+      )}
+    >
+      <div className="flex-1">
+        <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-background">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{
+              width: `${
+                groupCompletion.total
+                  ? (groupCompletion.completed / groupCompletion.total) * 100
+                  : 0
+              }%`,
+            }}
+          />
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {groupCompletion.completed} of {groupCompletion.total} applicants scored
+        </p>
+      </div>
+      <LoadingButton
+        onClick={handleGroupSubmit}
+        loading={submitting}
+        disabled={scoringLocked}
+      >
+        {scoringLocked ? 'Editing locked' : 'Submit all →'}
+      </LoadingButton>
+    </div>
+  );
+
+  const singleFooter = (
+    <GradingSubmitFooter
+      variant={casePdfUrl ? 'embedded' : 'sticky'}
+      scoredCount={scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}
+      totalScored={scoreFieldList.length}
+      onSubmit={handleSingleSubmit}
+      submitting={submitting}
+      locked={scoringLocked}
+    />
+  );
+
+  const footer = isGroupInterview ? groupFooter : singleFooter;
 
   if (casePdfUrl) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {header}
-        <div className="grid min-h-[calc(100svh-8rem)] flex-1 grid-cols-1 lg:grid-cols-2">
+        <div className="grid min-h-[calc(100svh-8rem)] flex-1 grid-cols-1 overflow-hidden rounded-xl bg-surface-panel lg:grid-cols-2">
           <CasePdfPane url={casePdfUrl} title={pdfTitle} />
-          <div className={cn('min-h-0 overflow-y-auto p-5 sm:p-6', 'space-y-4')}>
-            {notesBody}
+          <div className="flex min-h-0 flex-col">
+            <div className={cn('min-h-0 flex-1 overflow-y-auto p-6 sm:p-7 lg:p-8', 'space-y-8')}>
+              {notesContent}
+            </div>
+            {footer}
           </div>
         </div>
       </div>
@@ -573,8 +555,9 @@ export default function TeamInterviewScorePage({
     <>
       {header}
       <PageContainer>
-        <PageContent width="wide" className="space-y-4">
-          {notesBody}
+        <PageContent width="wide" className="space-y-8">
+          {notesContent}
+          {footer}
         </PageContent>
       </PageContainer>
     </>

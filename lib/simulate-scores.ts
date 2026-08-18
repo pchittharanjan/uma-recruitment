@@ -1,5 +1,6 @@
 import { getDb } from '@/lib/db';
 import {
+  interviewScaleMax,
   interviewScoreFieldsFromGuide,
   type InterviewGuideStage,
 } from '@/lib/interview-guide';
@@ -8,8 +9,8 @@ import { getRoundSettings } from '@/lib/rounds';
 
 const BATCH_CHUNK_SIZE = 200;
 
-function randomScore(): number {
-  return Math.floor(Math.random() * 5) + 1;
+function randomScore(max = 5): number {
+  return Math.floor(Math.random() * max) + 1;
 }
 
 export interface SimulateScoresResult {
@@ -35,6 +36,7 @@ async function simulatePendingAssignments(
   roundId: number,
   stage: 'application' | InterviewGuideStage,
   scoreFieldNames: string[],
+  scaleMax = 5,
 ): Promise<SimulateScoresResult> {
   const db = getDb();
   const pending = await db.execute({
@@ -57,7 +59,7 @@ async function simulatePendingAssignments(
         sql: `INSERT INTO scores (assignment_id, field_name, score)
               VALUES (?, ?, ?)
               ON CONFLICT(assignment_id, field_name) DO UPDATE SET score = excluded.score`,
-        args: [assignmentId, fieldName, randomScore()],
+        args: [assignmentId, fieldName, randomScore(scaleMax)],
       });
       scoresWritten += 1;
     }
@@ -104,5 +106,11 @@ export async function simulateTeamInterviewScores(
     throw new Error('No scored fields configured for this interview stage.');
   }
 
-  return simulatePendingAssignments(teamId, roundId, stage, scoreFieldNames);
+  return simulatePendingAssignments(
+    teamId,
+    roundId,
+    stage,
+    scoreFieldNames,
+    interviewScaleMax(interviewGuide),
+  );
 }

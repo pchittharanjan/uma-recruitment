@@ -85,6 +85,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let portfolioFieldsByTeam: Partial<Record<TeamName, string[]>> = {};
+    const portfolioFieldsByTeamRaw = formData.get('portfolioFieldsByTeam') as string | null;
+    if (portfolioFieldsByTeamRaw) {
+      try {
+        portfolioFieldsByTeam = JSON.parse(portfolioFieldsByTeamRaw) as Partial<
+          Record<TeamName, string[]>
+        >;
+      } catch {
+        portfolioFieldsByTeam = {};
+      }
+    }
+
     let customScoreFields: string[] = [];
     const customRaw = formData.get('customScoreFields') as string | null;
     if (customRaw) {
@@ -131,6 +143,7 @@ export async function POST(req: NextRequest) {
             roundLabel: roundLabel || 'Application Round',
             spreadsheet,
             scoreFieldsByTeam,
+            portfolioFieldsByTeam,
             contextFields,
             customScoreFields,
             teamSplitConfig,

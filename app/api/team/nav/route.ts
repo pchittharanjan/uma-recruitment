@@ -2,8 +2,9 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessibleTeams } from '@/lib/access';
+import { listDirectorTeamIdsForUser } from '@/lib/directors';
 import { initDb } from '@/lib/db';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
+import { getActiveRoundsByTeam } from '@/lib/pipeline-phase';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import {
   getGrantedStagesForUser,
@@ -14,7 +15,7 @@ import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { unauthorized } from '@/lib/auth';
 import type { UnlockableStage } from '@/lib/stages';
-import { UNLOCKABLE_STAGES } from '@/lib/stages';
+import { statusIndex, UNLOCKABLE_STAGES } from '@/lib/stages';
 import { getRecruitmentCycleLabel, getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { isOrgFinalSelectionComplete } from '@/lib/org-final-selection-status';
 import { withPerfLog } from '@/lib/perf-log';
@@ -29,15 +30,31 @@ async function handleGet(req: NextRequest) {
     const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
     if (!user) return unauthorized();
 
-    const [teams, globalState, recruitmentCycleLabel, recruitmentCycleShortLabel, finalSelectionComplete] =
+    const [teams, activeRounds, recruitmentCycleLabel, recruitmentCycleShortLabel, finalSelectionComplete, directorTeamIds] =
       await Promise.all([
         getAccessibleTeams(user),
-        getGlobalPipelineState(),
+        getActiveRoundsByTeam(),
         getRecruitmentCycleLabel(),
         getRecruitmentCycleShortLabel(),
         isOrgFinalSelectionComplete(),
+        listDirectorTeamIdsForUser(user.id),
       ]);
-    const pipelineClosed = globalState.status === 'closed';
+    const directorTeamIdSet = new Set(directorTeamIds);
+
+    const teamStatuses = activeRounds
+      .filter((entry) => entry.round)
+      .map((entry) => entry.round!.status);
+    const allTeamsClosed =
+      teamStatuses.length > 0 && teamStatuses.every((status) => status === 'closed');
+    const pipelineClosed = allTeamsClosed;
+    /** Canonical summary for org-wide gates (coffee chats); per-team round.status is authoritative elsewhere. */
+    const orgPipelineStatus = pipelineClosed
+      ? ('closed' as const)
+      : teamStatuses.length > 0
+        ? teamStatuses.reduce((lowest, status) =>
+            statusIndex(status) < statusIndex(lowest) ? status : lowest,
+          )
+        : null;
 
     const teamNav = await Promise.all(
       teams.map(async (team) => {
@@ -46,10 +63,11 @@ async function handleGet(req: NextRequest) {
           getGrantedStagesForUser(user, team.id),
           getInterviewOnlyScope(user, team.id),
         ]);
+        const teamPipelineClosed = round?.status === 'closed';
         const unlocks = round ? await getRoundStageUnlocks(round.id) : [];
         const hasAnyAccess = granted === 'all' || granted.length > 0;
         // Closed archive: everyone with team access can browse all phases (view-only).
-        const archiveBrowse = pipelineClosed && hasAnyAccess;
+        const archiveBrowse = teamPipelineClosed && hasAnyAccess;
 
         return {
           id: team.id,
@@ -64,17 +82,16 @@ async function handleGet(req: NextRequest) {
           grantedStages: archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted,
           unlockedStages: archiveBrowse
             ? [...UNLOCKABLE_STAGES]
-            : globalState.unlockedStages.length > 0
-              ? globalState.unlockedStages
-              : unlocks.map((u) => u.stage),
+            : unlocks.map((u) => u.stage),
           interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
+          isDirector: directorTeamIdSet.has(team.id),
         };
       }),
     );
 
     return NextResponse.json({
-      status: globalState.status,
-      unlockedStages: pipelineClosed ? [...UNLOCKABLE_STAGES] : globalState.unlockedStages,
+      status: orgPipelineStatus,
+      unlockedStages: [],
       teams: teamNav,
       isExec: user.role === 'exec',
       pipelineClosed,
@@ -96,4 +113,5 @@ export type TeamNavTeam = {
   grantedStages: UnlockableStage[] | 'all';
   unlockedStages: UnlockableStage[];
   interviewOnlyStage: string | null;
+  isDirector: boolean;
 };

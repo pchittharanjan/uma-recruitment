@@ -1,8 +1,13 @@
 import 'server-only';
 
 import { resolveApplicantEmail } from '@/lib/candidates';
-import { getDb } from '@/lib/db';
+import { getDb, getTeamById } from '@/lib/db';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
+import {
+  deliberationsSortScore,
+  deliberationsPendingStages,
+  getTeamPipelineProfile,
+} from '@/lib/team-pipeline-profile';
 import type {
   DeliberationsBoardData,
   DeliberationsBoardLayout,
@@ -103,8 +108,10 @@ async function loadAllStageReviews(
   const scoresByAssignment = new Map<number, Record<string, number>>();
   for (const row of scoresResult.rows) {
     const assignmentId = row.assignment_id as number;
+    const score = row.score as number | null;
+    if (score == null) continue;
     if (!scoresByAssignment.has(assignmentId)) scoresByAssignment.set(assignmentId, {});
-    scoresByAssignment.get(assignmentId)![row.field_name as string] = row.score as number;
+    scoresByAssignment.get(assignmentId)![row.field_name as string] = score;
   }
 
   for (const row of assignmentsResult.rows) {
@@ -174,6 +181,11 @@ export async function buildDeliberationsBoard(
   roundId: number,
 ): Promise<DeliberationsBoardData> {
   const db = getDb();
+  const team = await getTeamById(teamId);
+  const teamName = team?.name ?? 'Strategy';
+  const profile = getTeamPipelineProfile(teamName);
+  const poolStages = profile.deliberationsPoolStages;
+  const stagePlaceholders = poolStages.map(() => '?').join(', ');
   const { cap, allowOverCap } = await getTeamAdvancementCapState(teamId, 'deliberations');
 
   const appsResult = await db.execute({
@@ -181,9 +193,9 @@ export async function buildDeliberationsBoard(
           FROM applications app
           JOIN candidates c ON c.id = app.candidate_id
           WHERE app.team_id = ? AND app.round_id = ?
-            AND app.stage IN ('final_round', 'deliberations', 'advanced')
+            AND app.stage IN (${stagePlaceholders})
           ORDER BY app.row_index ASC`,
-    args: [teamId, roundId],
+    args: [teamId, roundId, ...poolStages],
   });
 
   const appIds = appsResult.rows.map((row) => Number(row.id)).filter(Number.isFinite);
@@ -211,11 +223,8 @@ export async function buildDeliberationsBoard(
     };
   });
 
-  // Prefer higher final-round average, then first, then application, then row.
   candidates.sort((a, b) => {
-    const score = (c: DeliberationsCandidate) =>
-      c.finalRoundAverage ?? c.firstRoundAverage ?? c.applicationScore ?? -1;
-    const diff = score(b) - score(a);
+    const diff = deliberationsSortScore(b, teamName) - deliberationsSortScore(a, teamName);
     if (diff !== 0) return diff;
     return a.rowIndex - b.rowIndex;
   });
@@ -238,30 +247,47 @@ export interface DeliberationsFinalSelectionResult {
   offeredApplicationIds: number[];
 }
 
-/** True when no applicants remain undecided in final_round / deliberations. */
+/**
+ * True when this team has locked Accept → offers on the deliberations board.
+ *
+ * `rejected` is also used when cutting applicants at Application / First Round,
+ * so it must not count as “final selection complete” on its own. Offers are
+ * the `advanced` stage, and only after the round has reached deliberations.
+ */
 export async function isDeliberationsFinalSelectionComplete(
   teamId: number,
   roundId: number,
 ): Promise<boolean> {
   const db = getDb();
+  const round = await db.execute({
+    sql: `SELECT status FROM rounds WHERE id = ? AND team_id = ?`,
+    args: [roundId, teamId],
+  });
+  const status = round.rows[0]?.status;
+  if (status !== 'deliberations' && status !== 'closed') return false;
+
+  const team = await getTeamById(teamId);
+  const pendingStages = deliberationsPendingStages(team?.name ?? 'Strategy');
+  const pendingPlaceholders = pendingStages.map(() => '?').join(', ');
+
   const pending = await db.execute({
     sql: `SELECT COUNT(*) AS count
           FROM applications
           WHERE team_id = ? AND round_id = ?
-            AND stage IN ('final_round', 'deliberations')`,
-    args: [teamId, roundId],
+            AND stage IN (${pendingPlaceholders})`,
+    args: [teamId, roundId, ...pendingStages],
   });
   const pendingCount = Number(pending.rows[0]?.count ?? 0);
   if (pendingCount > 0) return false;
 
-  const decided = await db.execute({
+  const offered = await db.execute({
     sql: `SELECT COUNT(*) AS count
           FROM applications
           WHERE team_id = ? AND round_id = ?
-            AND stage IN ('advanced', 'rejected')`,
+            AND stage = 'advanced'`,
     args: [teamId, roundId],
   });
-  return Number(decided.rows[0]?.count ?? 0) > 0;
+  return Number(offered.rows[0]?.count ?? 0) > 0;
 }
 
 export async function countTeamsWithCompleteFinalSelection(
@@ -315,13 +341,19 @@ export async function commitDeliberationsFinalSelection(
   await saveDeliberationsBoardLayout(teamId, roundId, layout, updatedBy);
 
   const db = getDb();
+  const team = await getTeamById(teamId);
+  const poolStages = getTeamPipelineProfile(team?.name ?? 'Strategy').deliberationsPoolStages;
+  const poolPlaceholders = poolStages.map(() => '?').join(', ');
+  const pendingStages = deliberationsPendingStages(team?.name ?? 'Strategy');
+  const pendingPlaceholders = pendingStages.map(() => '?').join(', ');
+
   for (const applicationId of acceptIds) {
     await db.execute({
       sql: `UPDATE applications
             SET stage = 'advanced'
             WHERE id = ? AND team_id = ? AND round_id = ?
-              AND stage IN ('final_round', 'deliberations', 'advanced')`,
-      args: [applicationId, teamId, roundId],
+              AND stage IN (${poolPlaceholders})`,
+      args: [applicationId, teamId, roundId, ...poolStages],
     });
   }
 
@@ -330,8 +362,8 @@ export async function commitDeliberationsFinalSelection(
       sql: `UPDATE applications
             SET stage = 'rejected'
             WHERE id = ? AND team_id = ? AND round_id = ?
-              AND stage IN ('final_round', 'deliberations')`,
-      args: [applicationId, teamId, roundId],
+              AND stage IN (${pendingPlaceholders})`,
+      args: [applicationId, teamId, roundId, ...pendingStages],
     });
   }
 
@@ -352,14 +384,20 @@ export async function buildDeliberationsCandidateDetail(
 ): Promise<DeliberationsCandidateDetail | null> {
   const db = getDb();
 
+  const team = await getTeamById(teamId);
+  const teamName = team?.name ?? 'Strategy';
+  const profile = getTeamPipelineProfile(teamName);
+  const poolStages = profile.deliberationsPoolStages;
+  const stagePlaceholders = poolStages.map(() => '?').join(', ');
+
   const appResult = await db.execute({
     sql: `SELECT app.id, app.row_index, app.stage, app.admin_note, app.fields,
                  c.name AS candidate_name, c.email AS candidate_email
           FROM applications app
           JOIN candidates c ON c.id = app.candidate_id
           WHERE app.id = ? AND app.team_id = ? AND app.round_id = ?
-            AND app.stage IN ('final_round', 'deliberations', 'advanced')`,
-    args: [applicationId, teamId, roundId],
+            AND app.stage IN (${stagePlaceholders})`,
+    args: [applicationId, teamId, roundId, ...poolStages],
   });
 
   if (appResult.rows.length === 0) return null;

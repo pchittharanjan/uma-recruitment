@@ -34,6 +34,7 @@ export interface UnifiedImportInput {
   /** Pre-parsed sheet (CSV / Excel / ODS). Preferred when available. */
   spreadsheet?: ParsedCsv;
   scoreFieldsByTeam: Partial<Record<TeamName, string[]>>;
+  portfolioFieldsByTeam?: Partial<Record<TeamName, string[]>>;
   contextFields: string[];
   customScoreFields: string[];
   teamSplitConfig: TeamSplitConfig;
@@ -122,6 +123,7 @@ async function importRowsForTeam(params: {
   roundLabel: string;
   csvHeaders: string[];
   scoreFields: string[];
+  portfolioFields: string[];
   contextFields: string[];
   customScoreFields: string[];
   rows: SplitRow[];
@@ -160,14 +162,15 @@ async function importRowsForTeam(params: {
   await db.execute({
     sql: `INSERT INTO round_settings (
             round_id, csv_headers, score_fields, custom_score_fields, grader_instructions,
-            context_fields, graders_per_application, coffee_chat_start_date, application_due_date
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            context_fields, portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(round_id) DO UPDATE SET
             csv_headers = excluded.csv_headers,
             score_fields = excluded.score_fields,
             custom_score_fields = excluded.custom_score_fields,
             grader_instructions = excluded.grader_instructions,
             context_fields = excluded.context_fields,
+            portfolio_fields = excluded.portfolio_fields,
             graders_per_application = excluded.graders_per_application,
             coffee_chat_start_date = excluded.coffee_chat_start_date,
             application_due_date = excluded.application_due_date`,
@@ -178,6 +181,7 @@ async function importRowsForTeam(params: {
       JSON.stringify(params.customScoreFields),
       params.graderInstructions?.trim() || null,
       JSON.stringify(params.contextFields),
+      JSON.stringify(params.portfolioFields),
       params.gradersPerApplication,
       orgDates.coffeeChatStartDate,
       orgDates.applicationDueDate,
@@ -339,11 +343,16 @@ export async function importUnifiedApplicationRound(
       parsed.headers.includes(f),
     );
 
+    const teamPortfolioFields = (input.portfolioFieldsByTeam?.[teamName] ?? []).filter((f) =>
+      parsed.headers.includes(f),
+    );
+
     const result = await importRowsForTeam({
       team,
       roundLabel,
       csvHeaders: parsed.headers,
       scoreFields: teamScoreFields,
+      portfolioFields: teamPortfolioFields,
       contextFields: input.contextFields.filter((h) => parsed.headers.includes(h)),
       customScoreFields,
       rows: byTeam[teamName],

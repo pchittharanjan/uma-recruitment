@@ -3,8 +3,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { teamBadgeClass } from '@/lib/team-colors';
 import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import type { AdvancementSubmissionStatus } from '@/lib/advancement-submissions-types';
+import StageBadge from '@/components/stage-badge';
 
 export interface AdvancementActivityCandidate {
   applicationId: number;
@@ -37,7 +39,7 @@ interface SubmissionEvent {
   actorName: string;
   at: number;
   description: string;
-  badge: { label: string; className: string };
+  badge: { label: string; color: 'yellow' | 'blue' | 'green' | 'gray' };
   complete: boolean;
   /** Submission id — keeps React keys unique across replaced history. */
   sourceId: number;
@@ -70,15 +72,6 @@ const AVATAR_COLORS = [
   'bg-amber-500',
 ];
 
-const BADGE = {
-  pending:
-    'rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300',
-  submitted:
-    'rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-800 dark:text-sky-300',
-  approved:
-    'rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300',
-  muted: 'rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground',
-} as const;
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -155,10 +148,10 @@ function eventsForEntry(entry: AdvancementActivityEntry): SubmissionEvent[] {
     at: entry.submittedAt,
     description: `submitted advancement list for ${count} to Admin review`,
     badge: isSuperseded(entry)
-      ? { label: 'Replaced', className: BADGE.muted }
+      ? { label: 'Replaced', color: 'gray' as const }
       : entry.status === 'submitted'
-        ? { label: 'Pending', className: BADGE.pending }
-        : { label: 'Submitted', className: BADGE.submitted },
+        ? { label: 'Pending', color: 'yellow' as const }
+        : { label: 'Submitted', color: 'blue' as const },
     complete: entry.status !== 'submitted',
     sourceId: entry.id,
   });
@@ -168,8 +161,8 @@ function eventsForEntry(entry: AdvancementActivityEntry): SubmissionEvent[] {
       kind: 'approved',
       actorName: entry.reviewedBy.name,
       at: entry.reviewedAt,
-      description: `approved advancement list (${count})`,
-      badge: { label: 'Approved', className: BADGE.approved },
+      description: `approved advancement list of ${count}`,
+      badge: { label: 'Approved', color: 'green' as const },
       complete: true,
       sourceId: entry.id,
     });
@@ -178,8 +171,8 @@ function eventsForEntry(entry: AdvancementActivityEntry): SubmissionEvent[] {
       kind: 'withdrawn',
       actorName: entry.reviewedBy.name,
       at: entry.reviewedAt,
-      description: `withdrew advancement list (${count})`,
-      badge: { label: 'Withdrawn', className: BADGE.muted },
+      description: `withdrew advancement list of ${count}`,
+      badge: { label: 'Withdrawn', color: 'gray' as const },
       complete: true,
       sourceId: entry.id,
     });
@@ -305,11 +298,11 @@ function TimelineEventRow({
       <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex shrink-0 items-center gap-2.5">
-            <div className="relative flex size-6 flex-none items-center justify-center bg-background">
+            <div className="relative flex size-6 flex-none items-center justify-center">
               <div
                 className={cn(
-                  'size-3 rounded-full border border-border ring-4 ring-background',
-                  event.complete ? 'bg-muted/50' : 'bg-background',
+                  'size-2 rounded-full',
+                  event.complete ? 'bg-border' : 'bg-primary/40',
                 )}
               />
             </div>
@@ -334,9 +327,7 @@ function TimelineEventRow({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {expandControl}
-          <span className={cn('mt-0.5 shrink-0', event.badge.className)}>
-            {event.badge.label}
-          </span>
+          <StageBadge label={event.badge.label} color={event.badge.color} size="compact" />
         </div>
       </div>
     </li>
@@ -486,8 +477,15 @@ export function AdvancementActivityLog({
           return (
             <section key={sectionKey}>
               {showTeamHeaders && section.teamName ? (
-                <h4 className="mb-3 text-sm font-medium text-foreground">
-                  {section.teamName}
+                <h4 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <span
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      teamBadgeClass(section.teamName),
+                    )}
+                  >
+                    {section.teamName}
+                  </span>
                 </h4>
               ) : null}
               <ul className="space-y-5 pb-1 [overflow-anchor:none]">

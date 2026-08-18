@@ -94,7 +94,7 @@ export default function AdminGraderPreviewPage({
             <div className="min-w-0">
               <p className="text-sm font-medium text-amber-900">Grader preview (read-only)</p>
               <p className="text-sm text-amber-800">
-                What a grader sees — names and identifying fields are stripped.
+                What a grader sees: names and identifying fields are stripped.
               </p>
             </div>
             <LoadingButton
@@ -130,7 +130,7 @@ export default function AdminGraderPreviewPage({
               </p>
               <div className="space-y-3">
                 {data.contextFields.map((field) => {
-                  const val = data.fields[field] || '—';
+                  const val = data.fields[field] || '-';
                   return (
                     <div key={field} className="flex min-w-0 gap-3">
                       <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
@@ -158,7 +158,10 @@ export default function AdminGraderPreviewPage({
                 )}
               </p>
               <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Score (1–5)
+                  <RequiredAsterisk className="ml-0.5" />
+                </p>
                 <ScoreSelector value={null} onChange={() => {}} disabled />
               </div>
             </Card>
@@ -171,7 +174,10 @@ export default function AdminGraderPreviewPage({
                 <RequiredAsterisk className="ml-0.5" />
               </p>
               <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">Score (1–5)</p>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Score (1–5)
+                  <RequiredAsterisk className="ml-0.5" />
+                </p>
                 <ScoreSelector value={null} onChange={() => {}} disabled />
               </div>
             </Card>

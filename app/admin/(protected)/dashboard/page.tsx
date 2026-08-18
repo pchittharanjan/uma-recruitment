@@ -20,6 +20,7 @@ import { PageContainer, PageHeader, PageSection } from '@/components/page-shell'
 import { useShellUser } from '@/components/shell-user-provider';
 import StatusBanner from '@/components/status-banner';
 import { cachedJsonFetch } from '@/lib/client-fetch-cache';
+import { greetingForName } from '@/lib/greeting';
 
 interface DashboardData {
   pipelineStatus: RoundStatus;
@@ -29,17 +30,11 @@ interface DashboardData {
 /** Survive client navigations so we can paint instantly, then force-refresh. */
 let lastDashboardData: DashboardData | null = null;
 
-function firstNameFromName(name: string | null | undefined): string {
-  if (!name) return '';
-  return name.trim().split(/\s+/)[0] ?? '';
-}
-
 function AdminDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewParam = searchParams.get('view') ?? '';
   const { user } = useShellUser();
-  const firstName = firstNameFromName(user.name);
   const [data, setData] = useState<DashboardData | null>(lastDashboardData);
   const [viewingStatus, setViewingStatus] = useState<RoundStatus | null>(() =>
     lastDashboardData
@@ -90,11 +85,7 @@ function AdminDashboardContent() {
   useEffect(() => {
     if (!data || typeof window === 'undefined') return;
     const hash = window.location.hash;
-    if (
-      hash !== '#interview-overview' &&
-      hash !== '#move-all-teams' &&
-      hash !== '#stage-access'
-    ) {
+    if (hash !== '#interview-overview' && hash !== '#pipeline-controls') {
       interviewOverviewScrolledRef.current = null;
       return;
     }
@@ -138,7 +129,7 @@ function AdminDashboardContent() {
       <PageSection>
         <PageHeader
           eyebrow="Admin"
-          title={firstName ? `Welcome back, ${firstName}` : 'Welcome back'}
+          title={greetingForName(user.name)}
           actions={
             <EraseTestDataButton
               redirectTo="/admin/dashboard"

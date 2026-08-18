@@ -4,11 +4,13 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import StatusBanner from '@/components/status-banner';
 import { CoffeeChatDateSettings } from '@/components/coffee-chat-date-settings';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatTeamsInterested } from '@/lib/coffee-chats';
+import type { TeamName } from '@/lib/db';
 import { phasePageEyebrow } from '@/lib/stages';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -23,6 +25,9 @@ interface CoffeeChatRow {
   chat_date: string;
   submitter_name: string;
   applicant_name: string;
+  applicant_email: string | null;
+  applicant_grade_level: string | null;
+  teams_interested: TeamName[];
   vibes: string | null;
   green_flags: string | null;
   red_flags: string | null;
@@ -64,17 +69,14 @@ export default function AdminCoffeeChatsPage() {
   }, []);
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer className="space-y-6">
       <PageHeader
         eyebrow={phasePageEyebrow('pre_application')}
-        title="Intake submissions"
+        title="Intake Submissions"
         actions={
-          <Link
-            href="/coffee-chats"
-            className="inline-flex h-8 items-center justify-center rounded-lg bg-secondary px-2.5 text-sm font-medium text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]"
-          >
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/coffee-chats" />}>
             Open submit form
-          </Link>
+          </Button>
         }
       />
 
@@ -84,15 +86,11 @@ export default function AdminCoffeeChatsPage() {
 
       <PageSection>
         <Card>
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-            <div>
-              <CardTitle>Submissions</CardTitle>
-              {chats.length > 0 && (
-                <CardDescription>
-                  {chats.length} submission{chats.length === 1 ? '' : 's'}
-                </CardDescription>
-              )}
-            </div>
+          <CardHeader>
+            <CardTitle className="flex items-baseline gap-2.5">
+              Submissions
+              <TitleCount>{chats.length}</TitleCount>
+            </CardTitle>
           </CardHeader>
           <CardContent className="overflow-hidden">
             {error && <StatusBanner type="error" message={error} />}
@@ -102,6 +100,9 @@ export default function AdminCoffeeChatsPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Applicant</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Grade level</TableHead>
+                    <TableHead>Teams</TableHead>
                     <TableHead>Submitter</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
@@ -114,6 +115,15 @@ export default function AdminCoffeeChatsPage() {
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-36" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-28" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-28" />
@@ -133,6 +143,9 @@ export default function AdminCoffeeChatsPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Applicant</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Grade level</TableHead>
+                    <TableHead>Teams</TableHead>
                     <TableHead>Submitter</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
@@ -143,6 +156,9 @@ export default function AdminCoffeeChatsPage() {
                       <TableRow>
                         <TableCell>{chat.chat_date}</TableCell>
                         <TableCell className="font-medium">{chat.applicant_name}</TableCell>
+                        <TableCell>{chat.applicant_email ?? '-'}</TableCell>
+                        <TableCell>{chat.applicant_grade_level ?? '-'}</TableCell>
+                        <TableCell>{formatTeamsInterested(chat.teams_interested)}</TableCell>
                         <TableCell>{chat.submitter_name}</TableCell>
                         <TableCell>
                           <Button
@@ -158,9 +174,23 @@ export default function AdminCoffeeChatsPage() {
                         </TableCell>
                       </TableRow>
                       {expandedId === chat.id && (
-                        <TableRow key={`${chat.id}-detail`}>
-                          <TableCell colSpan={4} className="p-4">
-                            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                        <TableRow key={`${chat.id}-detail`} className="hover:bg-transparent">
+                          <TableCell colSpan={7} className="bg-muted/35 p-4">
+                            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                              <div>
+                                <dt className="text-muted-foreground">Applicant email</dt>
+                                <dd className="mt-1 font-medium">{chat.applicant_email ?? '-'}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Grade level</dt>
+                                <dd className="mt-1 font-medium">{chat.applicant_grade_level ?? '-'}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Teams interested</dt>
+                                <dd className="mt-1 font-medium">
+                                  {formatTeamsInterested(chat.teams_interested)}
+                                </dd>
+                              </div>
                               {(
                                 [
                                   ['General Thoughts and Vibes', chat.vibes],
@@ -170,9 +200,11 @@ export default function AdminCoffeeChatsPage() {
                                   ['Conflict of Interest', chat.conflict_of_interest],
                                 ] as const
                               ).map(([label, value]) => (
-                                <div key={label}>
-                                  <dt className="font-medium text-muted-foreground">{label}</dt>
-                                  <dd className="display-field mt-1 whitespace-pre-wrap">{value || '—'}</dd>
+                                <div key={label} className="sm:col-span-2">
+                                  <dt className="text-muted-foreground">{label}</dt>
+                                  <dd className="display-field mt-1 whitespace-pre-wrap">
+                                    {value?.trim() ? value : '-'}
+                                  </dd>
                                 </div>
                               ))}
                             </dl>

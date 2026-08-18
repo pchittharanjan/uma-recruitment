@@ -65,7 +65,7 @@ export function SchedulePersonInput({
       <Input
         value={query}
         placeholder={placeholder}
-        className="h-8 text-sm"
+        className="h-8 border-border bg-popover text-sm text-foreground placeholder:text-muted-foreground"
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           const next = e.target.value;
@@ -87,12 +87,12 @@ export function SchedulePersonInput({
         }}
       />
       {showDropdown && (
-        <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover py-1 shadow-md">
+        <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-popover py-1 text-popover-foreground">
           {filtered.map((o) => (
             <li key={o.id}>
               <button
                 type="button"
-                className="w-full px-2 py-1.5 text-left text-sm hover:bg-muted"
+                className="w-full px-2 py-1.5 text-left text-sm text-foreground hover:bg-muted"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(o);

@@ -13,6 +13,8 @@ import {
 } from '@/lib/grader-parse';
 import type { EligibleGraderUser } from '@/lib/import-graders';
 import { roleLabel } from '@/lib/roles';
+import { teamDotClass } from '@/lib/team-colors';
+import { TitleCount } from '@/components/page-shell';
 import { cn } from '@/lib/utils';
 
 interface GraderTeamColumnProps {
@@ -173,9 +175,13 @@ export default function GraderTeamColumn({
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <Label className="text-sm font-medium">
-          {team}{' '}
-          <span className="font-normal text-muted-foreground">({applicationCount})</span>
+        <Label className="flex items-center gap-2 text-sm font-medium">
+          <span
+            className={cn('size-2 shrink-0 rounded-full', teamDotClass(team))}
+            aria-hidden
+          />
+          {team}
+          <TitleCount>{applicationCount}</TitleCount>
         </Label>
         {graders.length > 0 && (
           <span
@@ -185,7 +191,7 @@ export default function GraderTeamColumn({
             )}
           >
             {graders.length} user{graders.length === 1 ? '' : 's'}
-            {graders.length < minGraders && ` (need ${minGraders})`}
+            {graders.length < minGraders && ` · need ${minGraders}`}
           </span>
         )}
       </div>
@@ -196,7 +202,7 @@ export default function GraderTeamColumn({
           e.preventDefault();
           handlePaste(e.clipboardData.getData('text'));
         }}
-        className="flex cursor-text items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/40 px-3 py-3 text-center text-sm text-muted-foreground transition-colors hover:bg-muted/60 focus:outline-none focus:ring-2 focus:ring-ring/30"
+        className="flex cursor-text items-center justify-center gap-2 rounded-md border border-dashed border-foreground/20 bg-muted/40 px-3 py-3 text-center text-sm text-muted-foreground uma-hover-on-panel focus:outline-none focus:ring-2 focus:ring-ring/30"
       >
         <ClipboardPaste className="size-3.5 shrink-0" aria-hidden />
         Paste spreadsheet here
@@ -287,7 +293,7 @@ export default function GraderTeamColumn({
               {showPickerDropdown && (
                 <ul
                   className={cn(
-                    'absolute z-20 max-h-48 w-full overflow-auto rounded-md border bg-popover py-1 shadow-md',
+                    'absolute z-20 max-h-48 w-full overflow-auto rounded-md border bg-popover py-1',
                     dropUp ? 'bottom-full mb-1' : 'top-full mt-1',
                   )}
                 >
@@ -302,7 +308,7 @@ export default function GraderTeamColumn({
                       <li key={user.email}>
                         <button
                           type="button"
-                          className="flex w-full flex-col gap-0.5 px-2 py-1.5 text-left hover:bg-muted"
+                          className="flex w-full flex-col gap-0.5 px-2 py-1.5 text-left normal-case uma-hover-on-panel transition-colors"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             addUserAsGrader(user);

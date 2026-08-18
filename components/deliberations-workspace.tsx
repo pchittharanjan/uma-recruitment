@@ -20,7 +20,9 @@ import {
   readStoredDeliberationsTabIds,
   writeStoredDeliberationsTabIds,
 } from '@/lib/deliberations-workspace';
+import { teamDotClass } from '@/lib/team-colors';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type TeamOption = {
   id: number;
@@ -178,6 +180,8 @@ export function DeliberationsWorkspace() {
   const closedTeams = teamOptions.filter(
     (team) => team.hasRound && !openTabIds.includes(team.id),
   );
+  const isMobile = useIsMobile();
+  const effectiveSplit = split && !isMobile;
 
   if (!ready) return <PageLoading />;
 
@@ -189,9 +193,10 @@ export function DeliberationsWorkspace() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant={split ? 'secondary' : 'outline'}
+              variant={effectiveSplit ? 'secondary' : 'outline'}
               size="sm"
               disabled={openTabIds.length < 2}
+              className="hidden md:inline-flex"
               title={openTabIds.length < 2 ? 'Open two teams to split' : 'Split boards'}
               onClick={() => {
                 setSplit((prev) => {
@@ -229,7 +234,13 @@ export function DeliberationsWorkspace() {
               ) : (
                 closedTeams.map((team) => (
                   <DropdownMenuItem key={team.id} onClick={() => openTeam(team.id)}>
-                    {team.name}
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className={cn('size-2 shrink-0 rounded-full', teamDotClass(team.name))}
+                        aria-hidden
+                      />
+                      {team.name}
+                    </span>
                   </DropdownMenuItem>
                 ))
               )}
@@ -243,7 +254,7 @@ export function DeliberationsWorkspace() {
         <div
           role="tablist"
           aria-label="Deliberations team boards"
-          className="flex items-stretch gap-0 overflow-x-auto bg-muted/55"
+          className="uma-scroll-strip flex items-stretch gap-0 bg-muted/55"
         >
           {openTabIds.length === 0 ? (
             <div className="px-4 py-2.5 text-sm text-muted-foreground">No boards open</div>
@@ -258,7 +269,7 @@ export function DeliberationsWorkspace() {
                     'group flex max-w-56 shrink-0 items-center gap-0.5',
                     isActive
                       ? 'bg-background text-foreground'
-                      : 'bg-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground',
+                      : 'bg-transparent text-muted-foreground uma-hover-on-panel hover:text-foreground',
                   )}
                 >
                   <button
@@ -268,7 +279,7 @@ export function DeliberationsWorkspace() {
                     id={`delib-tab-${teamId}`}
                     aria-controls={`delib-panel-${teamId}`}
                     className={cn(
-                      'min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm',
+                      'min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm inline-flex items-center gap-2',
                       isActive && 'font-medium',
                     )}
                     onClick={() => {
@@ -278,6 +289,10 @@ export function DeliberationsWorkspace() {
                       );
                     }}
                   >
+                    <span
+                      className={cn('size-2 shrink-0 rounded-full', teamDotClass(label))}
+                      aria-hidden
+                    />
                     {label}
                   </button>
                   <button
@@ -285,7 +300,7 @@ export function DeliberationsWorkspace() {
                     aria-label={`Close ${label}`}
                     className={cn(
                       'mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground',
-                      'opacity-70 hover:bg-muted hover:text-foreground hover:opacity-100',
+                      'opacity-70 uma-hover-on-nested hover:text-foreground hover:opacity-100',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-70 group-focus-within:opacity-70',
                     )}
@@ -302,12 +317,12 @@ export function DeliberationsWorkspace() {
           )}
         </div>
 
-        <div className={cn('min-h-0 flex-1', split && openTabIds.length > 0 ? 'flex overflow-hidden' : 'overflow-auto p-4 sm:p-5')}>
+        <div className={cn('min-h-0 flex-1', effectiveSplit && openTabIds.length > 0 ? 'flex overflow-hidden' : 'overflow-auto p-4 sm:p-5')}>
           {openTabIds.length === 0 ? (
             <CenteredMessage
               className="min-h-[min(56vh,32rem)]"
               icon={LayoutGridIcon}
-              title="Open a team board"
+              title="Open a Team Board"
               description="Start deliberations by opening a team. You can keep several boards open and switch between them like browser tabs."
             >
               {closedTeams.length > 0 ? (
@@ -320,7 +335,13 @@ export function DeliberationsWorkspace() {
                       size="sm"
                       onClick={() => openTeam(team.id)}
                     >
-                      {team.name}
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className={cn('size-2 shrink-0 rounded-full', teamDotClass(team.name))}
+                          aria-hidden
+                        />
+                        {team.name}
+                      </span>
                     </Button>
                   ))}
                 </div>
@@ -330,7 +351,7 @@ export function DeliberationsWorkspace() {
                 </p>
               ) : null}
             </CenteredMessage>
-          ) : split ? (
+          ) : effectiveSplit ? (
             <>
               <div className="min-h-0 overflow-auto p-4 sm:p-5" style={{ width: `${splitRatio}%` }}>
                 {activeTabId != null && mountedTabIds.includes(activeTabId) && (

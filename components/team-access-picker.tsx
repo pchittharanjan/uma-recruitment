@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { teamCheckboxAccentClass, teamDotClass, teamRowHighlightClass } from '@/lib/team-colors';
 
 interface Team {
   id: number;
@@ -40,7 +41,7 @@ export default function TeamAccessPicker({
   return (
     <Table>
       <TableHeader>
-        <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
+        <TableRow className="border-b border-border bg-muted/50 hover:bg-muted/50">
           <TableHead className="h-auto p-4 text-left font-medium text-muted-foreground">
             Team
           </TableHead>
@@ -60,15 +61,24 @@ export default function TeamAccessPicker({
           return (
             <TableRow
               key={team.id}
-              className={cn('hover:bg-muted/20', selected && 'bg-primary/5')}
+              className={cn(selected && teamRowHighlightClass(team.name))}
             >
-              <TableCell className="p-4 font-medium">{team.name}</TableCell>
+              <TableCell className="p-4 font-medium">
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className={cn('size-2 shrink-0 rounded-full', teamDotClass(team.name))}
+                    aria-hidden
+                  />
+                  {team.name}
+                </span>
+              </TableCell>
               <TableCell className="p-4 text-center">
                 <div className="flex justify-center">
                   <Checkbox
                     checked={selected}
                     onCheckedChange={() => onToggleTeam(team.id)}
                     aria-label={`Access to ${team.name}`}
+                    checkedClassName={teamCheckboxAccentClass(team.name)}
                   />
                 </div>
               </TableCell>
@@ -80,7 +90,7 @@ export default function TeamAccessPicker({
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground/50" aria-hidden>
-                      —
+                      -
                     </span>
                   )
                 ) : selected ? (
@@ -93,7 +103,7 @@ export default function TeamAccessPicker({
                   </div>
                 ) : (
                   <span className="text-xs text-muted-foreground/50" aria-hidden>
-                    —
+                    -
                   </span>
                 )}
               </TableCell>

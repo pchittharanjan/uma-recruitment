@@ -3,6 +3,11 @@ import {
   canEditCoffeeChat,
   isWithinCoffeeChatWindow,
   normalizeApplicantName,
+  parseTeamsInterested,
+  serializeTeamsInterested,
+  validateApplicantGradeLevel,
+  validateApplicantEmail,
+  validateTeamsInterested,
   type CoffeeChat,
   type CoffeeChatInput,
   type CoffeeChatUpdateInput,
@@ -29,6 +34,9 @@ function rowToCoffeeChat(row: ResultSet['rows'][number]): CoffeeChat {
     submitter_name: row.submitter_name as string,
     applicant_name: row.applicant_name as string,
     applicant_name_normalized: row.applicant_name_normalized as string,
+    applicant_email: (row.applicant_email as string | null) ?? null,
+    applicant_grade_level: (row.applicant_grade_level as CoffeeChat['applicant_grade_level']) ?? null,
+    teams_interested: parseTeamsInterested(row.teams_interested as string | null | undefined),
     vibes: (row.vibes as string | null) ?? null,
     green_flags: (row.green_flags as string | null) ?? null,
     red_flags: (row.red_flags as string | null) ?? null,
@@ -53,6 +61,9 @@ export function serializeUserCoffeeChat(chat: CoffeeChatWithMeta) {
     id: chat.id,
     chat_date: chat.chat_date,
     applicant_name: chat.applicant_name,
+    applicant_email: chat.applicant_email,
+    applicant_grade_level: chat.applicant_grade_level,
+    teams_interested: chat.teams_interested,
     vibes: chat.vibes,
     green_flags: chat.green_flags,
     red_flags: chat.red_flags,
@@ -68,6 +79,9 @@ export function serializeAdminCoffeeChat(chat: CoffeeChatWithMeta) {
     chat_date: chat.chat_date,
     submitter_name: chat.submitter_name,
     applicant_name: chat.applicant_name,
+    applicant_email: chat.applicant_email,
+    applicant_grade_level: chat.applicant_grade_level,
+    teams_interested: chat.teams_interested,
     vibes: chat.vibes,
     green_flags: chat.green_flags,
     red_flags: chat.red_flags,
@@ -166,14 +180,18 @@ export async function createCoffeeChat(user: User, input: CoffeeChatInput): Prom
   validateChatDate(input.chatDate);
   const applicantName = validateApplicantName(input.applicantName);
   const normalized = normalizeApplicantName(applicantName);
+  const applicantEmail = validateApplicantEmail(input.applicantEmail);
+  const applicantGradeLevel = validateApplicantGradeLevel(input.applicantGradeLevel);
+  const teamsInterested = validateTeamsInterested(input.teamsInterested);
 
   const db = getDb();
   const result = await db.execute({
     sql: `INSERT INTO coffee_chats (
             round_id, chat_date, submitter_id, submitter_name,
-            applicant_name, applicant_name_normalized,
+            applicant_name, applicant_name_normalized, applicant_email,
+            applicant_grade_level, teams_interested,
             vibes, green_flags, red_flags, other_comments, conflict_of_interest
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       null,
       input.chatDate,
@@ -181,6 +199,9 @@ export async function createCoffeeChat(user: User, input: CoffeeChatInput): Prom
       user.name,
       applicantName,
       normalized,
+      applicantEmail,
+      applicantGradeLevel,
+      serializeTeamsInterested(teamsInterested),
       input.vibes?.trim() || null,
       input.greenFlags?.trim() || null,
       input.redFlags?.trim() || null,
@@ -228,6 +249,18 @@ export async function updateCoffeeChat(
     input.applicantName !== undefined
       ? normalizeApplicantName(applicantName)
       : existing.applicant_name_normalized;
+  const applicantEmail =
+    input.applicantEmail !== undefined
+      ? validateApplicantEmail(input.applicantEmail)
+      : existing.applicant_email;
+  const applicantGradeLevel =
+    input.applicantGradeLevel !== undefined
+      ? validateApplicantGradeLevel(input.applicantGradeLevel)
+      : existing.applicant_grade_level;
+  const teamsInterested =
+    input.teamsInterested !== undefined
+      ? validateTeamsInterested(input.teamsInterested)
+      : existing.teams_interested;
 
   const db = getDb();
   await db.execute({
@@ -235,6 +268,9 @@ export async function updateCoffeeChat(
             chat_date = ?,
             applicant_name = ?,
             applicant_name_normalized = ?,
+            applicant_email = ?,
+            applicant_grade_level = ?,
+            teams_interested = ?,
             vibes = ?,
             green_flags = ?,
             red_flags = ?,
@@ -246,6 +282,9 @@ export async function updateCoffeeChat(
       chatDate,
       applicantName,
       normalized,
+      applicantEmail,
+      applicantGradeLevel,
+      serializeTeamsInterested(teamsInterested),
       input.vibes !== undefined ? input.vibes?.trim() || null : existing.vibes,
       input.greenFlags !== undefined ? input.greenFlags?.trim() || null : existing.green_flags,
       input.redFlags !== undefined ? input.redFlags?.trim() || null : existing.red_flags,

@@ -128,8 +128,8 @@ export async function notifyApplicationsAssigned(params: {
     inputs.push({
       userId,
       kind: 'applications_assigned',
-      title: `${appLabel} assigned`,
-      body: `${params.teamName} — ready when Application grading is unlocked.`,
+      title: `${appLabel} assigned — ${params.teamName}`,
+      body: `Your queue is ready. Grading will open once the Application stage is unlocked.`,
       href,
       teamId: params.teamId,
     });
@@ -164,8 +164,8 @@ export async function notifyApplicationUnlocked(roundIds: number[]): Promise<voi
     inputs.push({
       userId,
       kind: 'application_unlocked',
-      title: 'Application grading unlocked',
-      body: `You can start grading for ${row.team_name as string}.`,
+      title: `Application grading open — ${row.team_name as string}`,
+      body: `Your assigned applications are ready to grade.`,
       href: `/team/${teamId}/grade`,
       teamId,
     });
@@ -189,8 +189,8 @@ export async function notifyInterviewAssigned(params: {
     unique.map((userId) => ({
       userId,
       kind: 'interview_assigned' as const,
-      title: `${stageLabel} interview assigned`,
-      body: `${params.teamName} — open your interview list to prepare.`,
+      title: `${stageLabel} interviews assigned — ${params.teamName}`,
+      body: `You have candidates to interview. Open your interview list to see who's scheduled.`,
       href,
       teamId: params.teamId,
     })),

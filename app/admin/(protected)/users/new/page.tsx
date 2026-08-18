@@ -495,7 +495,7 @@ export default function AdminNewUserPage() {
     <PageContainer size="full" className="min-w-0 space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Add users"
+        title="Add Users"
         actions={
           <Button variant="outline" onClick={() => router.push('/admin/users')}>
             <ArrowLeftIcon className="size-4" />

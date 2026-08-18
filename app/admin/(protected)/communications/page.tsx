@@ -38,7 +38,7 @@ interface TeamRow {
 
 function SentBadge({ sent, count }: { sent: boolean; count: number }) {
   if (count === 0) {
-    return <span className="text-sm text-muted-foreground">—</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
   if (sent) {
     return (
@@ -103,7 +103,7 @@ export default function AdminCommunicationsPage() {
     <PageContainer className="space-y-8">
       <PageHeader
         eyebrow={outcomeEmailPhaseEyebrow(resolvedStage)}
-        title="Applicant outcome emails"
+        title="Applicant Outcome Emails"
       />
 
       {error && <StatusBanner type="error" message={error} />}
@@ -117,10 +117,10 @@ export default function AdminCommunicationsPage() {
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl bg-muted/40">
+        <div className="display-panel overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="border-border/60 hover:bg-transparent">
+              <TableRow className="border-border/60 bg-background hover:bg-background">
                 <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Team
                 </TableHead>
@@ -145,7 +145,7 @@ export default function AdminCommunicationsPage() {
               {teams.map((row) => (
                 <TableRow
                   key={row.team.id}
-                  className="border-border/40 last:border-0 hover:bg-muted/35"
+                  className="border-border last:border-0"
                 >
                   <TableCell className="px-4 py-4 font-medium">{row.team.name}</TableCell>
                   <TableCell className="px-4 py-4 tabular-nums text-sm">{row.passCount}</TableCell>

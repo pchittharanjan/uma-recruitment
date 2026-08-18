@@ -8,6 +8,7 @@ import LoadingButton from '@/components/loading-button';
 import StatusBanner from '@/components/status-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,7 @@ interface RubricData {
   csvHeaders: string[];
   scoreFields: string[];
   customScoreFields: string[];
+  portfolioFields?: string[];
   contextFields: string[];
   graderVisibleContextFields: string[];
   graderInstructions: string | null;
@@ -148,7 +150,7 @@ export function TeamGradingSetup({
       <div className="space-y-4" role="status" aria-label="Loading">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Grader instructions</CardTitle>
+            <CardTitle className="text-base">Grader Instructions</CardTitle>
           </CardHeader>
           <CardContent>
             <Skeleton className="h-24 w-full" />
@@ -156,7 +158,7 @@ export function TeamGradingSetup({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Scored questions (CSV columns)</CardTitle>
+            <CardTitle className="text-base">Scored Questions (CSV Columns)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -180,7 +182,7 @@ export function TeamGradingSetup({
       {rubric?.roundStatus === 'closed' && (
         <StatusBanner
           type="info"
-          message="Recruitment is closed. Teams are view-only — you can still edit grading setup."
+          message="Recruitment is closed. Teams are view-only, and you can still edit grading setup."
         />
       )}
 
@@ -189,7 +191,7 @@ export function TeamGradingSetup({
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div className="min-w-0">
-            <CardTitle className="text-base">Grader instructions</CardTitle>
+            <CardTitle className="text-base">Grader Instructions</CardTitle>
           </div>
           <LoadingButton
             variant="secondary"
@@ -206,26 +208,27 @@ export function TeamGradingSetup({
             onChange={(e) => setInstructions(e.target.value)}
             rows={4}
             placeholder="e.g. Score holistically. Flag any concerns in the comments box."
-            className="w-full resize-y rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="field-textarea resize-y"
           />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Scored questions (CSV columns)</CardTitle>
+          <CardTitle className="text-base">Scored Questions (CSV Columns)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {rubric.csvHeaders.map((header) => (
             <label
               key={header}
-              className="flex cursor-pointer items-start gap-3 rounded-lg bg-muted/35 p-3 hover:bg-muted/30"
+              htmlFor={`score-field-${header}`}
+              className="flex cursor-pointer items-start gap-3 rounded-lg uma-nested-surface p-3 uma-hover-on-nested"
             >
-              <input
-                type="checkbox"
+              <Checkbox
+                id={`score-field-${header}`}
                 checked={scoreFields.has(header)}
-                onChange={(e) => toggleScoreField(header, e.target.checked)}
-                className="mt-0.5 size-4 rounded"
+                className="mt-0.5"
+                onCheckedChange={(checked) => toggleScoreField(header, checked === true)}
               />
               <span className="text-sm leading-snug">{shortHeaderLabel(header, 200)}</span>
             </label>
@@ -236,7 +239,7 @@ export function TeamGradingSetup({
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div className="min-w-0">
-            <CardTitle className="text-base">Custom score questions</CardTitle>
+            <CardTitle className="text-base">Custom Score Questions</CardTitle>
           </div>
           <Button
             type="button"
@@ -282,12 +285,12 @@ export function TeamGradingSetup({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">What graders see (blind review)</CardTitle>
+          <CardTitle className="text-base">What Graders See (Blind Review)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
             Graders see <strong className="text-foreground">applicant numbers only</strong> plus the
-            scored questions you select — nothing else from the CSV.
+            scored questions you select, and nothing else from the CSV.
           </p>
           {scoredQuestionLabels.length > 0 ? (
             <div>
@@ -300,6 +303,16 @@ export function TeamGradingSetup({
             </div>
           ) : (
             <p>Select at least one scored CSV column above.</p>
+          )}
+          {(rubric.portfolioFields?.length ?? 0) > 0 && (
+            <div>
+              <Label className="text-xs uppercase tracking-wide">Portfolio panel (Applicant # only)</Label>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                {rubric.portfolioFields!.map((h) => (
+                  <li key={h}>{shortHeaderLabel(h, 120)}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </CardContent>
       </Card>

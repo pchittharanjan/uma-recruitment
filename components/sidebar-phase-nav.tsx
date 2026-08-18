@@ -76,9 +76,9 @@ export function SidebarPhaseNav() {
                 : isAdminPhaseNavActive(pathname, phaseItem.status);
             const Icon = PHASE_ICONS[phaseItem.status];
             const tooltip = isFuture
-              ? `${phaseItem.label} — Preview`
+              ? `${phaseItem.label} - Preview`
               : isPast && !isPipelineCurrent
-                ? `${phaseItem.label} — Completed`
+                ? `${phaseItem.label} - Completed`
                 : phaseItem.label;
 
             return (

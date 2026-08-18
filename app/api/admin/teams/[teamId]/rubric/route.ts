@@ -54,6 +54,7 @@ export async function GET(
       customScoreFields: orgMerged?.custom_score_fields.length
         ? orgMerged.custom_score_fields
         : settings.custom_score_fields,
+      portfolioFields: settings.portfolio_fields,
       contextFields,
       graderVisibleContextFields: graderVisibleContext,
       graderInstructions: orgMerged?.grader_instructions ?? settings.grader_instructions,
@@ -114,6 +115,7 @@ export async function PUT(
     return NextResponse.json({
       scoreFields: updated.score_fields,
       customScoreFields: updated.custom_score_fields,
+      portfolioFields: updated.portfolio_fields,
       contextFields: resolveContextFields(updated),
       graderVisibleContextFields: graderContextFieldsForSettings(updated),
       graderInstructions: updated.grader_instructions,

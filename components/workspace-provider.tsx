@@ -11,17 +11,22 @@ import {
   type ReactNode,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { markNavigationPending } from '@/components/navigation-progress';
+import { useOptionalShellUser } from '@/components/shell-user-provider';
 import { useBrowserSearch } from '@/hooks/use-workspace-embed';
 import {
+  findWorkspaceTabIndex,
   isInternalWorkspaceHref,
   normalizeWorkspaceHref,
   stripEmbedParam,
   workspaceAreaFromPathname,
   workspaceSplitStorageKey,
+  workspaceTabMatches,
   workspaceTabsStorageKey,
   workspaceTitle,
   type WorkspaceArea,
   type WorkspaceTab,
+  type WorkspaceTitleContext,
 } from '@/lib/workspace';
 
 interface WorkspaceContextValue {
@@ -103,6 +108,7 @@ export function WorkspaceProvider({
   const router = useRouter();
   const pathname = usePathname();
   const search = useBrowserSearch();
+  const shell = useOptionalShellUser();
   const href = currentHref(pathname, search);
   const resolvedArea = area ?? workspaceAreaFromPathname(pathname);
 
@@ -111,10 +117,42 @@ export function WorkspaceProvider({
   const [splitHref, setSplitHrefState] = useState<string | null>(null);
   const [splitRatio, setSplitRatioState] = useState(50);
   const [hydrated, setHydrated] = useState(false);
+  const [adminTeamNames, setAdminTeamNames] = useState<Record<string, string>>({});
   /** Last tab the left pane was showing — used to update that tab in place on nav. */
   const activeTabHrefRef = useRef<string | null>(null);
   /** Set by openTab before router.push so the sync effect does not replace in place. */
   const pendingOpenRef = useRef<string | null>(null);
+  /** Set by focusTab before router.push so the sync effect does not clobber other tabs. */
+  const pendingFocusRef = useRef<string | null>(null);
+
+  const titleContext = useMemo<WorkspaceTitleContext>(() => {
+    const teamNames = { ...adminTeamNames };
+    for (const team of shell?.teams ?? []) {
+      teamNames[String(team.id)] = team.name;
+    }
+    return { teamNames };
+  }, [adminTeamNames, shell?.teams]);
+
+  useEffect(() => {
+    if (resolvedArea !== 'admin') return;
+
+    let cancelled = false;
+    fetch('/api/admin/teams')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.teams) return;
+        const next: Record<string, string> = {};
+        for (const team of json.teams as Array<{ id: number; name: string }>) {
+          next[String(team.id)] = team.name;
+        }
+        setAdminTeamNames(next);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedArea]);
 
   useEffect(() => {
     const storedTabs = readStoredTabs(resolvedArea);
@@ -125,6 +163,7 @@ export function WorkspaceProvider({
     setSplitRatioState(storedSplit.splitRatio);
     activeTabHrefRef.current = null;
     pendingOpenRef.current = null;
+    pendingFocusRef.current = null;
     setHydrated(true);
   }, [resolvedArea]);
 
@@ -132,25 +171,46 @@ export function WorkspaceProvider({
   // Do NOT append a tab on every navigation — only openTab (+ / Open) adds tabs.
   useEffect(() => {
     if (!hydrated) return;
-    const title = workspaceTitle(href);
+    const title = workspaceTitle(href, titleContext);
     setTabs((prev) => {
-      const existingIndex = prev.findIndex((tab) => tab.href === href);
+      const existingIndex = findWorkspaceTabIndex(prev, href);
       if (existingIndex >= 0) {
         pendingOpenRef.current = null;
+        pendingFocusRef.current = null;
         activeTabHrefRef.current = href;
         const existing = prev[existingIndex]!;
-        return existing.title === title
+        return existing.href === href && existing.title === title
           ? prev
-          : prev.map((tab, i) => (i === existingIndex ? { ...tab, title } : tab));
+          : prev.map((tab, i) => (i === existingIndex ? { ...tab, href, title } : tab));
       }
 
       // Explicit Open / + : openTab owns appending; skip in-place replace.
-      if (pendingOpenRef.current === href) {
+      if (pendingOpenRef.current && workspaceTabMatches(pendingOpenRef.current, href)) {
         pendingOpenRef.current = null;
         activeTabHrefRef.current = href;
-        return prev.some((tab) => tab.href === href)
-          ? prev
-          : [...prev, { href, title }];
+        return findWorkspaceTabIndex(prev, href) >= 0 ? prev : [...prev, { href, title }];
+      }
+
+      // Tab bar click: wait for URL to settle, then update only the focused tab.
+      if (pendingFocusRef.current) {
+        const focusHref = pendingFocusRef.current;
+        if (!workspaceTabMatches(focusHref, href)) {
+          return prev;
+        }
+        pendingFocusRef.current = null;
+        activeTabHrefRef.current = href;
+        const focusIndex = findWorkspaceTabIndex(prev, focusHref);
+        const resolvedFocusIndex =
+          focusIndex >= 0 ? focusIndex : findWorkspaceTabIndex(prev, href);
+        if (resolvedFocusIndex >= 0) {
+          const existing = prev[resolvedFocusIndex]!;
+          return existing.href === href && existing.title === title
+            ? prev
+            : prev.map((tab, i) =>
+                i === resolvedFocusIndex ? { ...tab, href, title } : tab,
+              );
+        }
+        return [...prev, { href, title }];
       }
 
       if (prev.length === 0) {
@@ -158,12 +218,30 @@ export function WorkspaceProvider({
         return [{ href, title }];
       }
 
-      const activeIndex = prev.findIndex((tab) => tab.href === activeTabHrefRef.current);
+      // Sidebar / in-tab navigation: mutate the tab that was already active.
+      const activeIndex =
+        activeTabHrefRef.current != null
+          ? findWorkspaceTabIndex(prev, activeTabHrefRef.current)
+          : -1;
       const indexToUpdate = activeIndex >= 0 ? activeIndex : 0;
       activeTabHrefRef.current = href;
       return prev.map((tab, i) => (i === indexToUpdate ? { href, title } : tab));
     });
-  }, [hydrated, href]);
+  }, [hydrated, href, titleContext]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setTabs((prev) => {
+      let changed = false;
+      const next = prev.map((tab) => {
+        const title = workspaceTitle(tab.href, titleContext);
+        if (tab.title === title) return tab;
+        changed = true;
+        return { ...tab, title };
+      });
+      return changed ? next : prev;
+    });
+  }, [hydrated, titleContext]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -186,29 +264,36 @@ export function WorkspaceProvider({
         activeTabHrefRef.current = normalized;
       }
       setTabs((prev) => {
-        if (prev.some((tab) => tab.href === normalized)) return prev;
-        return [...prev, { href: normalized, title: workspaceTitle(normalized) }];
+        if (findWorkspaceTabIndex(prev, normalized) >= 0) return prev;
+        return [...prev, { href: normalized, title: workspaceTitle(normalized, titleContext) }];
       });
-      if (!options?.background) router.push(normalized);
+      if (!options?.background) {
+        markNavigationPending();
+        router.push(normalized);
+      }
     },
-    [router],
+    [router, titleContext],
   );
 
   const closeTab = useCallback(
     (targetHref: string) => {
-      const next = tabs.filter((tab) => tab.href !== targetHref);
+      const next = tabs.filter((tab) => !workspaceTabMatches(tab.href, targetHref));
       let navigateTo: string | null = null;
-      if (targetHref === href && next.length > 0) {
-        const closedIndex = tabs.findIndex((tab) => tab.href === targetHref);
+      if (workspaceTabMatches(targetHref, href) && next.length > 0) {
+        const closedIndex = findWorkspaceTabIndex(tabs, targetHref);
         const fallback = next[Math.min(closedIndex, next.length - 1)] ?? next[0];
         navigateTo = fallback?.href ?? null;
       }
 
       setTabs(next);
-      setSplitHrefState((current) => (current === targetHref ? null : current));
+      setSplitHrefState((current) =>
+        current != null && workspaceTabMatches(current, targetHref) ? null : current,
+      );
 
       if (navigateTo) {
+        pendingFocusRef.current = navigateTo;
         activeTabHrefRef.current = navigateTo;
+        markNavigationPending();
         router.push(navigateTo);
       } else if (targetHref === href) {
         activeTabHrefRef.current = null;
@@ -220,7 +305,9 @@ export function WorkspaceProvider({
   const focusTab = useCallback(
     (targetHref: string) => {
       const normalized = normalizeWorkspaceHref(targetHref);
+      pendingFocusRef.current = normalized;
       activeTabHrefRef.current = normalized;
+      markNavigationPending();
       router.push(normalized);
     },
     [router],

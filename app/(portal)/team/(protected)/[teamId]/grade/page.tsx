@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import LoadingButton from '@/components/loading-button';
+import { NavLinkButton } from '@/components/nav-link-button';
 import ProgressBar from '@/components/progress-bar';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
@@ -80,8 +80,8 @@ export default function TeamApplicationGradingPage({
       <CenteredMessage
         title="Can't open grading"
         description={accessError}
-        ctaLabel="← Team overview"
-        onCtaClick={() => router.push(`/team/${teamId}`)}
+        ctaLabel="← Team Overview"
+        ctaHref={`/team/${teamId}`}
       />
     );
   }
@@ -102,7 +102,7 @@ export default function TeamApplicationGradingPage({
         title="No applications assigned"
         description="Nothing to grade yet. You'll see applicants here once an admin imports and assigns them to you."
         ctaLabel="← Overview"
-        onCtaClick={() => router.push(`/team/${teamId}`)}
+        ctaHref={`/team/${teamId}`}
       />
     );
   }
@@ -111,7 +111,7 @@ export default function TeamApplicationGradingPage({
     <PageContainer className="space-y-6">
       <PageHeader
         eyebrow={teamName || 'Your team'}
-        title="Application grading"
+        title="Application Grading"
         description={
           completeCopy
             ? undefined
@@ -120,9 +120,9 @@ export default function TeamApplicationGradingPage({
               : 'Score each assigned application. When you finish, you\'ll add color recommendations next.'
         }
         actions={
-          <LoadingButton variant="secondary" onClick={() => router.push(`/team/${teamId}`)}>
+          <NavLinkButton variant="secondary" href={`/team/${teamId}`}>
             ← Overview
-          </LoadingButton>
+          </NavLinkButton>
         }
       />
 
@@ -137,9 +137,9 @@ export default function TeamApplicationGradingPage({
                 {completeCopy.description}
               </CardDescription>
             </div>
-            <LoadingButton className="w-full sm:w-auto" onClick={() => router.push(nextStep.href)}>
+            <NavLinkButton className="w-full sm:w-auto" href={nextStep.href}>
               {completeCopy.ctaLabel}
-            </LoadingButton>
+            </NavLinkButton>
           </Card>
         )}
 
@@ -147,23 +147,21 @@ export default function TeamApplicationGradingPage({
           <ProgressBar
             value={data.progress.completed}
             max={data.progress.total}
-            label="Applications graded"
+            label="Applications Graded"
           />
           {!allDone && !gradingLocked && firstPending && (
-            <LoadingButton
+            <NavLinkButton
               className="w-full"
-              onClick={() =>
-                router.push(`/team/${teamId}/grade/${firstPending.applicationId}`)
-              }
+              href={`/team/${teamId}/grade/${firstPending.applicationId}`}
             >
               {data.progress.completed === 0 ? 'Start grading' : 'Continue grading'} →
-            </LoadingButton>
+            </NavLinkButton>
           )}
         </Card>
 
         <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>Your applications</CardTitle>
+            <CardTitle>Your Applications</CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-border/60 p-0">
             {data.assignments.map((a) => {

@@ -1,8 +1,7 @@
 'use client';
 
 import { use, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import LoadingButton from '@/components/loading-button';
+import { NavLinkButton } from '@/components/nav-link-button';
 import ProgressBar from '@/components/progress-bar';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
@@ -22,6 +21,7 @@ import { MicIcon } from 'lucide-react';
 import { useShellUser } from '@/components/shell-user-provider';
 import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { interviewCompleteGuidance } from '@/lib/next-step-guidance';
+import { greetingForName } from '@/lib/greeting';
 
 interface Assignment {
   applicationId: number;
@@ -107,8 +107,7 @@ export default function TeamInterviewsPage({
   params: Promise<{ teamId: string; stage: string }>;
 }) {
   const { teamId, stage } = use(params);
-  const router = useRouter();
-  const { teams } = useShellUser();
+  const { user, teams } = useShellUser();
   const hasMultipleTeams = teams.length > 1;
   const [data, setData] = useState<InterviewData | null>(null);
   const [error, setError] = useState('');
@@ -141,9 +140,7 @@ export default function TeamInterviewsPage({
         title="Can't open interviews"
         description={error}
         ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
-        onCtaClick={() =>
-          router.push(hasMultipleTeams ? '/team' : `/team/${teamId}`)
-        }
+        ctaHref={hasMultipleTeams ? '/team' : `/team/${teamId}`}
       />
     );
   }
@@ -164,37 +161,26 @@ export default function TeamInterviewsPage({
         title="No interviews assigned"
         description="An admin will add you on the schedule grid. Check back once your slots are set."
         ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
-        onCtaClick={() =>
-          router.push(hasMultipleTeams ? '/team' : `/team/${teamId}`)
-        }
+        ctaHref={hasMultipleTeams ? '/team' : `/team/${teamId}`}
       />
     );
   }
 
   return (
-    <PageContainer className="space-y-6">
-      <PageHeader
-        eyebrow="Interview queue"
-        title={data.stageLabel}
-        description={
-          completeCopy
-            ? undefined
-            : allDone
-              ? undefined
-              : stage === 'first_round'
-                ? 'Score each interview. When you finish, you\'ll add color recommendations next.'
-                : 'Score each interview on the rubric.'
-        }
-        actions={
-          hasMultipleTeams ? (
-            <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
-              ← Teams
-            </LoadingButton>
-          ) : undefined
-        }
-      />
-
+    <PageContainer>
       <PageSection>
+        <PageHeader
+          eyebrow="Interview queue"
+          title={greetingForName(user.name)}
+          actions={
+            hasMultipleTeams ? (
+              <NavLinkButton variant="secondary" href="/team">
+                ← Teams
+              </NavLinkButton>
+            ) : undefined
+          }
+        />
+
         {completeCopy && nextStep && (
           <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
             <div className="space-y-1">
@@ -203,42 +189,49 @@ export default function TeamInterviewsPage({
                 {completeCopy.description}
               </CardDescription>
             </div>
-            <LoadingButton className="w-full sm:w-auto" onClick={() => router.push(nextStep.href)}>
+            <NavLinkButton className="w-full sm:w-auto" href={nextStep.href}>
               {completeCopy.ctaLabel}
-            </LoadingButton>
+            </NavLinkButton>
           </Card>
         )}
 
-        <Card className="p-6">
-          <div className="mb-4 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-xl font-bold text-primary">
-              {data.grader.name[0].toUpperCase()}
+        <Card className="border-primary/15 bg-primary/[0.03] p-5 sm:p-6">
+          <div className="mb-1 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
+                {data.grader.name[0].toUpperCase()}
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold">{data.grader.name}</h2>
+                <p className="text-xs text-muted-foreground">{data.stageLabel}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold">{data.grader.name}</h2>
-              <p className="text-sm text-muted-foreground">{data.grader.email}</p>
-            </div>
+            {!allDone && firstPending && (
+              <NavLinkButton
+                size="sm"
+                href={`/team/${teamId}/interviews/${stage}/${firstPending.applicationId}`}
+              >
+                {data.progress.completed === 0 ? 'Start interviewing' : 'Continue'} →
+              </NavLinkButton>
+            )}
           </div>
           <ProgressBar
             value={data.progress.completed}
             max={data.progress.total}
-            label="Interviews completed"
+            label="Interviews Completed"
           />
-          {!allDone && firstPending && (
-            <LoadingButton
-              className="mt-4 w-full"
-              onClick={() =>
-                router.push(`/team/${teamId}/interviews/${stage}/${firstPending.applicationId}`)
-              }
-            >
-              {data.progress.completed === 0 ? 'Start interviewing' : 'Continue interviewing'} →
-            </LoadingButton>
+          {!allDone && !completeCopy && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {stage === 'first_round'
+                ? 'Score each interview. When you finish, you\'ll add color recommendations next.'
+                : 'Score each interview on the rubric.'}
+            </p>
           )}
         </Card>
 
         <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>Your interviews</CardTitle>
+            <CardTitle>Your Interviews</CardTitle>
             <CardDescription>
               {assignmentStageLabel(data.stage)} · grouped by interview slot
             </CardDescription>
@@ -256,7 +249,7 @@ export default function TeamInterviewsPage({
               return (
                 <div
                   key={session.key}
-                  className="overflow-hidden rounded-lg bg-muted/40"
+                  className="display-panel overflow-hidden"
                 >
                   {(timeLabel || session.location) && (
                     <div className="bg-muted px-4 py-2.5">
@@ -287,17 +280,13 @@ export default function TeamInterviewsPage({
                           />
                         )}
                         {scoreTargetId !== null && (
-                          <LoadingButton
+                          <NavLinkButton
                             variant="ghost"
                             className="text-sm"
-                            onClick={() =>
-                              router.push(
-                                `/team/${teamId}/interviews/${stage}/${scoreTargetId}`,
-                              )
-                            }
+                            href={`/team/${teamId}/interviews/${stage}/${scoreTargetId}`}
                           >
                             Score group →
-                          </LoadingButton>
+                          </NavLinkButton>
                         )}
                       </div>
                     </>
@@ -318,17 +307,13 @@ export default function TeamInterviewsPage({
                             color={workStatusBadgeColor(workStatus)}
                           />
                           {a.status === 'pending' && (
-                            <LoadingButton
+                            <NavLinkButton
                               variant="ghost"
                               className="text-sm"
-                              onClick={() =>
-                                router.push(
-                                  `/team/${teamId}/interviews/${stage}/${a.applicationId}`,
-                                )
-                              }
+                              href={`/team/${teamId}/interviews/${stage}/${a.applicationId}`}
                             >
                               Score →
-                            </LoadingButton>
+                            </NavLinkButton>
                           )}
                         </div>
                       </div>

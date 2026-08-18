@@ -40,13 +40,6 @@ export async function GET(
       );
     }
 
-    if (round.status !== stage) {
-      return NextResponse.json(
-        { error: `Team is not in ${stage.replace('_', ' ')} phase.` },
-        { status: 400 },
-      );
-    }
-
     const progress = await getTeamInterviewProgress(teamId, round.id, stage);
 
     return NextResponse.json({

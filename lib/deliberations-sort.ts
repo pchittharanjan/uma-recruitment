@@ -18,8 +18,8 @@ export const DELIBERATIONS_SORT_METRICS: {
   label: string;
 }[] = [
   { value: 'application', label: 'Application' },
-  { value: 'first', label: 'First' },
-  { value: 'final', label: 'Final' },
+  { value: 'first', label: 'First Interview' },
+  { value: 'final', label: 'Final Interview' },
   { value: 'everything', label: 'Everything' },
 ];
 

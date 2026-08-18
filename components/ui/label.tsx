@@ -8,7 +8,13 @@ function RequiredAsterisk({ className }: { className?: string }) {
   return (
     <>
       <span className="sr-only">required</span>
-      <span className={cn("text-destructive", className)} aria-hidden="true">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "font-heading text-[0.65em] font-semibold leading-none text-[#c0392b] relative -top-1",
+          className,
+        )}
+      >
         *
       </span>
     </>

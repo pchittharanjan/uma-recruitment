@@ -187,9 +187,8 @@ function InitiativeCard({ initiative, isOverlay, ...props }: InitiativeCardProps
     <Card
       size='sm'
       className={cn(
-        'overflow-hidden shadow-none transition-all',
-        !isOverlay && 'hover:-translate-y-0.5',
-        isOverlay && 'ring-primary/20 rotate-1 ring-2'
+        'overflow-hidden transition-colors',
+        isOverlay && 'ring-primary/20 ring-2'
       )}
     >
       <CardContent className='space-y-3'>

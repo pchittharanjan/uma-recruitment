@@ -69,8 +69,10 @@ async function handleGet(
     const existingScores: Record<string, number> = {};
     const existingNotes: Record<string, string> = {};
     for (const row of scoresResult.rows) {
-      existingScores[row.field_name as string] = row.score as number;
-      existingNotes[row.field_name as string] = (row.note as string | null) ?? '';
+      const field = row.field_name as string;
+      const score = row.score as number | null;
+      if (score != null) existingScores[field] = score;
+      existingNotes[field] = (row.note as string | null) ?? '';
     }
 
     const progressResult = await db.execute({
@@ -136,8 +138,10 @@ async function handleGet(
         const memberScores: Record<string, number> = {};
         const memberNotes: Record<string, string> = {};
         for (const row of memberScoresResult.rows) {
-          memberScores[row.field_name as string] = row.score as number;
-          memberNotes[row.field_name as string] = (row.note as string | null) ?? '';
+          const field = row.field_name as string;
+          const score = row.score as number | null;
+          if (score != null) memberScores[field] = score;
+          memberNotes[field] = (row.note as string | null) ?? '';
         }
 
         groupEntries.push({

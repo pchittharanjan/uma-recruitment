@@ -25,6 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { teamLinkClass } from '@/lib/team-colors';
+import { cn } from '@/lib/utils';
 
 interface Submission {
   id: number;
@@ -100,12 +102,13 @@ interface TeamReadinessRow {
       rowIndex: number;
       candidateName: string;
       stage: string;
-      outcome: 'advanced' | 'rejected' | 'pending';
+      outcome: 'advanced' | 'rejected' | 'on_list' | 'pending';
       average: number | null;
       rank: number | null;
     }>;
     advancedCount: number;
     rejectedCount: number;
+    onListCount: number;
     pendingCount: number;
     canRevert: boolean;
     revertBlockedReason: string | null;
@@ -124,13 +127,17 @@ export default function AdminAdvancementsPage() {
   const [approveError, setApproveError] = useState('');
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  const fetchData = useCallback(async (opts?: { force?: boolean }) => {
+  const fetchData = useCallback(async () => {
     const { status, ok, json } = await cachedJsonFetch<{
       submissions?: Submission[];
       activity?: ActivityEntry[];
       teamReadiness?: TeamReadinessRow[];
       error?: string;
-    }>('/api/admin/advancements?includeReadiness=1', { force: opts?.force });
+    }>('/api/admin/advancements?includeReadiness=1', {
+      // Always refetch — a Director submit in another tab (or via Test as Exec)
+      // otherwise stays hidden behind the 5-minute client cache.
+      force: true,
+    });
     if (status === 401) {
       router.push('/login');
       return;
@@ -177,7 +184,7 @@ export default function AdminAdvancementsPage() {
       setConfirmId(null);
       toast.success('Advancement approved');
       invalidateClientFetchCache('/api/admin/advancements');
-      await fetchData({ force: true });
+      await fetchData();
     } catch {
       setApproveError('Approval failed.');
       toast.error('Approval failed.');
@@ -200,43 +207,16 @@ export default function AdminAdvancementsPage() {
     <PageContainer className="space-y-8">
       <PageHeader
         eyebrow="Admin"
-        title="Team advancement submissions"
+        title="Team Advancement Submissions"
       />
 
       {approveError && <StatusBanner type="error" message={approveError} />}
 
       <PageSection>
-        <TeamAdvancementCapSettings />
-      </PageSection>
-
-      {teamReadiness.length > 0 && readinessStage && (
-        <PageSection>
-          <AdminAdvancementReadinessOverview
-            teams={teamReadiness}
-            fromStage={readinessStage}
-            onRefresh={fetchData}
-          />
-        </PageSection>
-      )}
-
-      {activity.length > 0 && (
-        <PageSection>
-          <Card>
-            <CardHeader className="gap-2">
-              <CardTitle className="text-base">Submission log</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <AdvancementActivityLog entries={activity} hideHeader />
-            </CardContent>
-          </Card>
-        </PageSection>
-      )}
-
-      <PageSection>
         {submissions.length === 0 ? (
           <Card className="pb-0">
             <CardHeader className="gap-2">
-              <CardTitle className="text-base">Pending approvals</CardTitle>
+              <CardTitle className="text-base">Pending Approvals</CardTitle>
               <CardDescription>
                 When a Director submits their advancement list, it will appear here for you to
                 review and approve.
@@ -255,7 +235,7 @@ export default function AdminAdvancementsPage() {
                     <CardTitle>
                       <Link
                         href={`/admin/teams/${sub.teamId}`}
-                        className="hover:underline"
+                        className={cn('hover:underline', teamLinkClass(sub.teamName))}
                       >
                         {sub.teamName}
                       </Link>
@@ -332,10 +312,37 @@ export default function AdminAdvancementsPage() {
         )}
       </PageSection>
 
+      {teamReadiness.length > 0 && readinessStage && (
+        <PageSection>
+          <AdminAdvancementReadinessOverview
+            teams={teamReadiness}
+            fromStage={readinessStage}
+            onRefresh={fetchData}
+          />
+        </PageSection>
+      )}
+
+      {activity.length > 0 && (
+        <PageSection>
+          <Card>
+            <CardHeader className="gap-2">
+              <CardTitle className="text-base">Submission Log</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-5">
+              <AdvancementActivityLog entries={activity} hideHeader />
+            </CardContent>
+          </Card>
+        </PageSection>
+      )}
+
+      <PageSection>
+        <TeamAdvancementCapSettings />
+      </PageSection>
+
       <DestructiveConfirmDialog
         open={confirmId !== null}
         onOpenChange={(open) => !open && setConfirmId(null)}
-        title="Incomplete grading"
+        title="Incomplete Grading"
         description="Some interview assignments are still pending. Approve anyway and apply this advancement list?"
         confirmLabel="Approve anyway"
         onConfirm={async () => {

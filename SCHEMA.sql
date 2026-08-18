@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS round_settings (
   interview_guides TEXT,
   normalization_factors TEXT,
   context_fields TEXT NOT NULL DEFAULT '[]',
+  portfolio_fields TEXT NOT NULL DEFAULT '[]',
   graders_per_application INTEGER NOT NULL DEFAULT 3 CHECK (graders_per_application >= 1),
   coffee_chat_start_date TEXT,
   application_due_date TEXT
@@ -123,6 +124,9 @@ CREATE TABLE IF NOT EXISTS coffee_chats (
   submitter_name TEXT NOT NULL,
   applicant_name TEXT NOT NULL,
   applicant_name_normalized TEXT NOT NULL,
+  applicant_email TEXT,
+  applicant_grade_level TEXT,
+  teams_interested TEXT NOT NULL DEFAULT '[]',
   vibes TEXT,
   green_flags TEXT,
   red_flags TEXT,
@@ -187,7 +191,7 @@ CREATE TABLE IF NOT EXISTS scores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
   field_name TEXT NOT NULL,
-  score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
+  score INTEGER CHECK (score IS NULL OR (score BETWEEN 1 AND 10)),
   note TEXT,
   UNIQUE (assignment_id, field_name)
 );

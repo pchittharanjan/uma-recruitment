@@ -4,7 +4,7 @@ function isHttpUrl(value: string): boolean {
 
 function ApplicationFieldValue({ value }: { value: string }) {
   if (!value.trim()) {
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">-</span>;
   }
 
   const trimmed = value.trim();
@@ -36,7 +36,7 @@ export function ApplicationFieldsList({
       {Object.entries(fields).map(([key, value]) => (
         <div
           key={key}
-          className="min-w-0 rounded-md bg-muted/40 px-3 py-3 shadow-sm sm:px-4"
+          className="display-panel min-w-0 p-4"
         >
           <p className="min-w-0 break-words text-sm font-semibold text-foreground/80">
             {key}

@@ -28,6 +28,8 @@ type NotificationItem = {
 const COUNT_POLL_MS = 3 * 60_000;
 /** Don't re-hit count on focus if we polled recently. */
 const FOCUS_MIN_GAP_MS = 60_000;
+/** Grace period when moving from trigger to portaled panel. */
+const HOVER_CLOSE_DELAY_MS = 150;
 
 function formatRelativeTime(unixSeconds: number): string {
   const diffMs = Date.now() - unixSeconds * 1000;
@@ -48,6 +50,24 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const lastCountAt = useRef(0);
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHoverCloseTimer = useCallback(() => {
+    if (hoverCloseTimer.current) {
+      clearTimeout(hoverCloseTimer.current);
+      hoverCloseTimer.current = null;
+    }
+  }, []);
+
+  const openOnHover = useCallback(() => {
+    clearHoverCloseTimer();
+    setOpen(true);
+  }, [clearHoverCloseTimer]);
+
+  const scheduleCloseOnHoverLeave = useCallback(() => {
+    clearHoverCloseTimer();
+    hoverCloseTimer.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS);
+  }, [clearHoverCloseTimer]);
 
   const loadCount = useCallback(async (force = false) => {
     if (document.visibilityState === 'hidden') return;
@@ -104,6 +124,8 @@ export function NotificationBell() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [loadCount]);
+
+  useEffect(() => () => clearHoverCloseTimer(), [clearHoverCloseTimer]);
 
   useEffect(() => {
     if (open) void loadList();
@@ -165,6 +187,8 @@ export function NotificationBell() {
             aria-label={
               badge ? `Notifications, ${unreadCount} unread` : 'Notifications'
             }
+            onMouseEnter={openOnHover}
+            onMouseLeave={scheduleCloseOnHoverLeave}
           />
         }
       >
@@ -179,14 +203,16 @@ export function NotificationBell() {
         align="end"
         sideOffset={6}
         className="w-[min(22rem,calc(100vw-1.5rem))] p-0"
+        onMouseEnter={openOnHover}
+        onMouseLeave={scheduleCloseOnHoverLeave}
       >
-        <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <p className="text-sm font-medium text-foreground">Notifications</p>
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <p className="font-heading text-sm font-medium text-foreground">Notifications</p>
           {unreadCount > 0 ? (
             <button
               type="button"
               disabled={loading}
-              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="font-heading text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
               onClick={() => void markAllRead()}
             >
               Mark all read
@@ -196,11 +222,11 @@ export function NotificationBell() {
         <DropdownMenuSeparator className="my-0" />
         <div className="max-h-[min(24rem,60vh)] overflow-y-auto">
           {items.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+            <p className="font-heading px-4 py-10 text-center text-sm text-muted-foreground">
               No notifications yet
             </p>
           ) : (
-            <ul className="py-1">
+            <ul className="py-1.5">
               {items.map((item) => {
                 const unread = item.readAt == null;
                 return (
@@ -208,16 +234,16 @@ export function NotificationBell() {
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors',
-                        'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
+                        'uma-hover-on-panel flex w-full flex-col gap-1 px-4 py-3.5 text-left normal-case',
+                        'focus-visible:bg-accent focus-visible:outline-none',
                         unread && 'bg-muted/40',
                       )}
                       onClick={() => void onItemClick(item)}
                     >
-                      <span className="flex items-start justify-between gap-2">
+                      <span className="flex items-start justify-between gap-3">
                         <span
                           className={cn(
-                            'text-sm leading-snug',
+                            'font-heading text-sm leading-snug',
                             unread ? 'font-medium text-foreground' : 'text-foreground',
                           )}
                         >
@@ -226,7 +252,7 @@ export function NotificationBell() {
                         {unread ? (
                           <span
                             aria-hidden
-                            className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary"
+                            className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
                           />
                         ) : null}
                       </span>
@@ -235,7 +261,7 @@ export function NotificationBell() {
                           {item.body}
                         </span>
                       ) : null}
-                      <span className="text-[0.7rem] text-muted-foreground/80">
+                      <span className="mt-0.5 text-[0.7rem] text-muted-foreground/70">
                         {formatRelativeTime(item.createdAt)}
                       </span>
                     </button>

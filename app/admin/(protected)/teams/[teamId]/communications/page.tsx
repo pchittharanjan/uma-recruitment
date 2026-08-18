@@ -6,7 +6,7 @@ import { CheckIcon, CopyIcon, MailIcon } from 'lucide-react';
 import LoadingButton from '@/components/loading-button';
 import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -208,7 +208,7 @@ export default function TeamCommunicationsPage({
     <PageContainer className="space-y-8">
       <PageHeader
         eyebrow={data.team.name}
-        title="Applicant outcome emails"
+        title="Applicant Outcome Emails"
       />
 
       {error && <StatusBanner message={error} type="error" />}
@@ -217,8 +217,9 @@ export default function TeamCommunicationsPage({
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle className="text-base">
-                {outcomeEmailPassCardTitle(fromStage)} ({data.passRecipients.length})
+              <CardTitle className="flex items-baseline gap-2.5 text-base">
+                {outcomeEmailPassCardTitle(fromStage)}
+                <TitleCount>{data.passRecipients.length}</TitleCount>
               </CardTitle>
               {data.passNotifiedAt && (
                 <p className="text-sm text-muted-foreground">
@@ -328,8 +329,9 @@ export default function TeamCommunicationsPage({
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle className="text-base">
-                Not advancing ({data.rejectRecipients.length})
+              <CardTitle className="flex items-baseline gap-2.5 text-base">
+                Not advancing
+                <TitleCount>{data.rejectRecipients.length}</TitleCount>
               </CardTitle>
               {data.rejectNotifiedAt && (
                 <p className="text-sm text-muted-foreground">

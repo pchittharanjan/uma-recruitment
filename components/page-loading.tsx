@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 export default function PageLoading({ className }: { className?: string }) {
   return (
     <PageContainer className={cn('space-y-8', className)}>
-      <div className="space-y-8" aria-busy="true" aria-label="Loading">
+      <div className="space-y-8" aria-busy="true" aria-label="Loading" data-page-loading="">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1 space-y-2.5">
             <Skeleton className="h-3 w-20" />

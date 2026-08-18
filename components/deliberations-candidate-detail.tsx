@@ -18,7 +18,7 @@ export function prefetchDeliberationsDetail(url: string): void {
 }
 
 function formatScore(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—';
+  if (value === null || !Number.isFinite(value)) return '-';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
@@ -89,7 +89,7 @@ function ReviewsSection({
         {reviews.map((review, index) => (
           <div
             key={`${review.reviewerName}-${index}`}
-            className="rounded-md bg-muted/40 px-3 py-3 shadow-sm"
+            className="display-panel px-3 py-3"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -103,7 +103,7 @@ function ReviewsSection({
               </p>
             </div>
             {Object.keys(review.scores).length > 0 && (
-              <div className="mt-2 divide-y divide-border rounded-md bg-muted/40">
+              <div className="mt-2 divide-y divide-border rounded-md border border-border bg-background">
                 {Object.entries(review.scores).map(([field, score]) => (
                   <div key={field} className="flex items-start gap-3 px-2.5 py-2">
                     <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground/80">
@@ -292,9 +292,9 @@ export function DeliberationsCandidateDetailPanel({
         </div>
       ) : null}
 
-      <ReviewsSection title="Application scores" reviews={detail.applicationReviews} />
-      <ReviewsSection title="First round interviews" reviews={detail.firstRoundReviews} />
-      <ReviewsSection title="Final round interviews" reviews={detail.finalRoundReviews} />
+      <ReviewsSection title="Application Scores" reviews={detail.applicationReviews} />
+      <ReviewsSection title="First Round Interviews" reviews={detail.firstRoundReviews} />
+      <ReviewsSection title="Final Round Interviews" reviews={detail.finalRoundReviews} />
 
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">

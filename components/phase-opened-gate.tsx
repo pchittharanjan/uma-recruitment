@@ -25,11 +25,17 @@ function cycleLabelFromNav(nav: {
   return 'cycle';
 }
 
-/** Match admin dashboard: empty pipeline still means coffee-chat / pre_application for portal users. */
+/** Most advanced round status among the user's teams (per-team is source of truth). */
 function effectivePipelineStatus(nav: TeamNavSnapshot): RoundStatus | null {
-  if (nav.status) return nav.status;
-  if (nav.teams.length > 0) return 'pre_application';
-  return null;
+  const statuses = nav.teams
+    .filter((team) => team.round)
+    .map((team) => team.round!.status as RoundStatus);
+  if (statuses.length === 0) {
+    return nav.teams.length > 0 ? 'pre_application' : null;
+  }
+  return statuses.reduce((latest, status) =>
+    statusIndex(status) > statusIndex(latest) ? status : latest,
+  );
 }
 
 function hasTeamPortalAccess(team: TeamNavTeam): boolean {
@@ -40,15 +46,15 @@ function hasTeamPortalAccess(team: TeamNavTeam): boolean {
 function phaseAccessible(
   phase: RoundStatus,
   team: TeamNavTeam,
-  globalStatus: RoundStatus | null,
+  orgPipelineStatus: RoundStatus | null,
 ): boolean {
-  if (globalStatus === 'closed' || team.round?.status === 'closed') {
+  if (team.round?.status === 'closed') {
     return hasTeamPortalAccess(team);
   }
 
   // Coffee chats are org-wide — any team-portal user with team access qualifies.
   if (phase === 'pre_application') {
-    if (globalStatus && statusIndex(globalStatus) < statusIndex('pre_application')) {
+    if (orgPipelineStatus && statusIndex(orgPipelineStatus) < statusIndex('pre_application')) {
       return false;
     }
     return hasTeamPortalAccess(team);
@@ -68,21 +74,23 @@ function phaseAccessible(
 function resolvePhaseHref(
   status: RoundStatus,
   teams: TeamNavTeam[],
-  globalStatus: RoundStatus | null,
-): string | null {
+  orgPipelineStatus: RoundStatus | null,
+): { href: string; teamName: string | null; isDirector: boolean } | null {
   if (status === 'pre_application') {
     for (const team of teams) {
-      if (phaseAccessible('pre_application', team, globalStatus)) {
-        return '/coffee-chats';
+      if (phaseAccessible('pre_application', team, orgPipelineStatus)) {
+        return { href: '/coffee-chats', teamName: team.name, isDirector: team.isDirector === true };
       }
     }
     return null;
   }
 
   for (const team of teams) {
-    if (!phaseAccessible(status, team, globalStatus)) continue;
+    if (!phaseAccessible(status, team, orgPipelineStatus)) continue;
     const href = teamPhaseHref(team.id, status);
-    if (href) return href;
+    if (href) {
+      return { href, teamName: team.name, isDirector: team.isDirector === true };
+    }
   }
   return null;
 }
@@ -97,11 +105,13 @@ export function PhaseOpenedGate({ userName }: { userName: string }) {
   const [status, setStatus] = useState<RoundStatus | null>(null);
   const [cycleLabel, setCycleLabel] = useState('');
   const [href, setHref] = useState('');
+  const [teamName, setTeamName] = useState<string | null>(null);
+  const [isDirector, setIsDirector] = useState(false);
 
   useEffect(() => {
     if (loading || !nav) return;
 
-    if (nav.finalSelectionComplete || nav.status === 'closed') {
+    if (nav.finalSelectionComplete || nav.pipelineClosed) {
       setOpen(false);
       return;
     }
@@ -126,7 +136,9 @@ export function PhaseOpenedGate({ userName }: { userName: string }) {
 
     setStatus(nextStatus);
     setCycleLabel(label);
-    setHref(destination);
+    setHref(destination.href);
+    setTeamName(destination.teamName);
+    setIsDirector(destination.isDirector);
     setOpen(true);
   }, [nav, loading]);
 
@@ -139,6 +151,8 @@ export function PhaseOpenedGate({ userName }: { userName: string }) {
       cycleLabel={cycleLabel}
       href={href}
       userName={userName}
+      teamName={teamName}
+      isDirector={isDirector}
       onOpenChange={setOpen}
     />
   );

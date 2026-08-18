@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import { NavLinkButton } from '@/components/nav-link-button';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -13,19 +14,21 @@ import { AdminInterviewProgressDetail } from '@/components/admin-interview-progr
 import { TeamGradingSetup } from '@/components/team-grading-setup';
 import { TeamStageControls } from '@/components/team-stage-controls';
 import { TeamTestAsExecPanel } from '@/components/team-test-as-exec-panel';
-import { phaseLabel } from '@/lib/stages';
+import { phaseLabel, parseAdminPhaseSlug } from '@/lib/stages';
+import type { RoundStatus } from '@/lib/db';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
 import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communications-stages';
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
-import type { RoundStatus } from '@/lib/db';
-import { PageContainer, PageHeader } from '@/components/page-shell';
+import { isAdminPhasePreview } from '@/lib/admin-phase-preview';
+import StatusBanner from '@/components/status-banner';
+import { PageContainer, PageHeader, TitleCount } from '@/components/page-shell';
 import { CenteredMessage } from '@/components/centered-message';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
-import { UploadIcon, LayoutGridIcon } from 'lucide-react';
+import { cachedJsonFetch, peekCachedJson, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { UploadIcon } from 'lucide-react';
 
 interface GraderProgress {
   id: number;
@@ -74,8 +77,10 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const { teamId } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [data, setData] = useState<TeamDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<TeamDashboardResponse | null>(() =>
+    peekCachedJson<TeamDashboardResponse>(`/api/admin/teams/${teamId}`),
+  );
+  const [loading, setLoading] = useState(() => !peekCachedJson(`/api/admin/teams/${teamId}`));
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState<'rowIndex' | 'average'>('rowIndex');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -85,27 +90,18 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const [savingNote, setSavingNote] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    if (!peekCachedJson(`/api/admin/teams/${teamId}`)) setLoading(true);
     setError('');
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
     try {
-      const res = await fetch(`/api/admin/teams/${teamId}`, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (res.status === 401) {
+      const { status, ok, json } = await cachedJsonFetch<TeamDashboardResponse & { error?: string }>(
+        `/api/admin/teams/${teamId}`,
+      );
+      if (status === 401) {
         router.push('/login');
         return;
       }
-      let json: TeamDashboardResponse & { error?: string };
-      try {
-        json = await res.json();
-      } catch {
-        throw new Error('Server returned an invalid response. Try refreshing.');
-      }
-      if (!res.ok) {
-        setError(json.error ?? `Failed to load team (${res.status}).`);
+      if (!ok || !json) {
+        setError(json?.error ?? `Failed to load team (${status}).`);
         return;
       }
       setData(json);
@@ -119,14 +115,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         });
       }
     } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') {
-        setError('Request timed out. Restart the dev server and try again.');
-      } else {
-        const message = e instanceof Error ? e.message : 'Failed to load team dashboard.';
-        setError(message);
-      }
+      const message = e instanceof Error ? e.message : 'Failed to load team dashboard.';
+      setError(message);
     } finally {
-      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [router, teamId]);
@@ -197,7 +188,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     } catch (e) {
       const message =
         e instanceof DOMException && e.name === 'AbortError'
-          ? 'Simulation timed out. Try again — if the dev server stopped, restart it with npm run dev.'
+          ? 'Simulation timed out. Try again. If the dev server stopped, restart it with npm run dev.'
           : 'Network error. If the page will not load, restart the dev server (npm run dev).';
       setSimulateMessage(message);
       toast.error(message);
@@ -238,13 +229,19 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   }
 
   const roundStatus = data.round.status;
+  const viewParam = searchParams.get('view');
+  const adminView = parseAdminPhaseSlug(viewParam ?? '') ?? roundStatus;
   const isApplicationPhase = roundStatus === 'application';
   const isClosed = roundStatus === 'closed';
+  const isDeliberationsLive = roundStatus === 'deliberations';
+  const isDeliberationsView = adminView === 'deliberations';
   // After close, keep the full team hub (apps + links) — don't dump admin into a stub.
-  const showApplicationHub = isApplicationPhase || isClosed;
-  const isFirstRound = roundStatus === 'first_round';
-  const isFinalRound = roundStatus === 'final_round';
-  const isInterviewPhase = isFirstRound || isFinalRound;
+  const showApplicationHub = adminView === 'application' || isClosed;
+  const isFirstRoundView = adminView === 'first_round';
+  const isFinalRoundView = adminView === 'final_round';
+  const isInterviewView = isFirstRoundView || isFinalRoundView;
+  const interviewStage = isFinalRoundView ? 'final_round' : 'first_round';
+  const phasePreview = isAdminPhasePreview(roundStatus, adminView);
 
   if (showApplicationHub && !data.dashboard) {
     return (
@@ -254,28 +251,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         description="Application data is not available yet."
         ctaLabel="Import spreadsheet"
         ctaHref="/admin/import"
-      />
-    );
-  }
-
-  if (!showApplicationHub && !isInterviewPhase) {
-    return (
-      <CenteredMessage
-        icon={LayoutGridIcon}
-        title={data.team.name}
-        description={
-          roundStatus === 'deliberations'
-            ? 'Use the deliberations board to move candidates toward offers.'
-            : 'Open the Dashboard for org-wide phase controls and team overview.'
-        }
-        ctaLabel={
-          roundStatus === 'deliberations' ? 'Open deliberations' : 'Go to dashboard'
-        }
-        ctaHref={
-          roundStatus === 'deliberations'
-            ? openTeamDeliberationsHref(Number(teamId))
-            : '/admin/dashboard'
-        }
       />
     );
   }
@@ -303,163 +278,163 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   const interviewStats = data.interviewStats ?? null;
   const sessionStatePreview =
-    isInterviewPhase && searchParams.get('preview') === 'session-states';
-  const schedulePath = isFinalRound
+    isInterviewView && searchParams.get('preview') === 'session-states';
+  const schedulePath = isFinalRoundView
     ? `/admin/teams/${teamId}/schedule/final-round`
     : `/admin/teams/${teamId}/schedule/first-round`;
-  const resultsPath = `/admin/teams/${teamId}/interview-results`;
+  const resultsPath = `/admin/teams/${teamId}/interview-results?stage=${interviewStage}`;
   const sampleApplicationId =
     showApplicationHub && dashboard ? dashboard.applications[0]?.id ?? null : null;
+  const pageDescription =
+    showApplicationHub && dashboard
+      ? `${phaseLabel(adminView)} · ${dashboard.applications.length} applications`
+      : `${phaseLabel(adminView)}${phasePreview ? ' · Preview' : ''}`;
 
   return (
     <PageContainer size="wide" className="space-y-8">
+      {phasePreview && (
+        <StatusBanner
+          type="info"
+          message={`Previewing ${phaseLabel(adminView).toLowerCase()} while the live pipeline is still in ${phaseLabel(roundStatus).toLowerCase()}. Team users cannot access this phase yet.`}
+        />
+      )}
       <PageHeader
         title={data.team.name}
-        description={
-          showApplicationHub && dashboard
-            ? `${phaseLabel(data.round.status)} · ${dashboard.applications.length} applications`
-            : phaseLabel(data.round.status)
-        }
-        actions={
-          <div className="flex flex-wrap gap-2">
+        description={pageDescription}
+        toolbar={
+          <>
             {showApplicationHub && (
-              <LoadingButton
+              <NavLinkButton
                 variant="secondary"
-                onClick={() => router.push(`/admin/teams/${teamId}/assignments`)}
+                href={`/admin/teams/${teamId}/assignments`}
               >
                 Edit assignments
-              </LoadingButton>
+              </NavLinkButton>
             )}
-            <LoadingButton
+            <NavLinkButton
               variant="secondary"
-              onClick={() =>
-                router.push(
-                  communicationsHref(
-                    outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
-                    Number(teamId),
-                  ),
-                )
-              }
+              href={communicationsHref(
+                outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
+                Number(teamId),
+              )}
             >
-              Communications
-            </LoadingButton>
-            {(isInterviewPhase || isClosed) && (
-              <>
-                <LoadingButton
-                  variant="secondary"
-                  onClick={() => router.push(`/admin/teams/${teamId}/interview-setup`)}
-                >
-                  Setup interview
-                </LoadingButton>
-                <LoadingButton
-                  variant="secondary"
-                  onClick={() =>
-                    router.push(
-                      isClosed ? `/admin/teams/${teamId}/schedule/first-round` : schedulePath,
-                    )
-                  }
-                >
-                  Schedule interviews
-                </LoadingButton>
-                <LoadingButton
-                  variant="secondary"
-                  onClick={() => router.push(resultsPath)}
-                >
-                  View results
-                </LoadingButton>
-              </>
-            )}
-            {isClosed && (
-              <LoadingButton
-                variant="secondary"
-                onClick={() => router.push(openTeamDeliberationsHref(Number(teamId)))}
-              >
-                Deliberations
-              </LoadingButton>
-            )}
+              Emails
+            </NavLinkButton>
+            <NavLinkButton
+              variant="secondary"
+              href={`/admin/teams/${teamId}/interview-setup`}
+            >
+              Interview Setup
+            </NavLinkButton>
+            <NavLinkButton
+              variant="secondary"
+              href={`/admin/teams/${teamId}/schedule/first-round`}
+            >
+              First Round Schedule
+            </NavLinkButton>
+            <NavLinkButton
+              variant="secondary"
+              href={`/admin/teams/${teamId}/schedule/final-round`}
+            >
+              Final Round Schedule
+            </NavLinkButton>
+            <NavLinkButton
+              variant="secondary"
+              href={openTeamDeliberationsHref(Number(teamId))}
+            >
+              Deliberations
+            </NavLinkButton>
             {showApplicationHub && (
               <a href={`/api/admin/teams/${teamId}/export`} download>
                 <LoadingButton variant="secondary">Export CSV</LoadingButton>
               </a>
             )}
-          </div>
+          </>
         }
       />
 
-      <TeamStageControls />
+      <div className="space-y-6">
+        <TeamStageControls teamId={Number(teamId)} />
 
-      {isInterviewPhase ? (
-        <div className="space-y-6">
-          {isFirstRound && (
-            <AdminAdvancementReadinessPanel teamId={teamId} fromStage="first_round" />
-          )}
+      {isInterviewView ? (
+        <>
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                <LoadingButton onClick={() => router.push(schedulePath)}>
-                  Open schedule
-                </LoadingButton>
-                <LoadingButton
-                  variant="secondary"
-                  onClick={() => router.push(resultsPath)}
-                >
+          <div className="uma-stack-toolbar">
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <NavLinkButton href={schedulePath}>Open Schedule</NavLinkButton>
+                <NavLinkButton variant="secondary" href={resultsPath}>
                   View results
-                </LoadingButton>
+                </NavLinkButton>
               </div>
               {interviewStats && interviewStats.scoring.total > 0 && (
                 <DestructiveConfirmDialog
-                  title="Simulate random interview scores?"
+                  title="Simulate Random Interview Scores?"
                   description={
                     <>
                       Fills every pending interviewer assignment for{' '}
-                      {isFinalRound ? 'final' : 'first'} round with random 1–5 scores based on the
+                      {isFinalRoundView ? 'final' : 'first'} round with random 1–5 scores based on the
                       interview guide rubric. For testing only.
                       <br />
                       <br />
                       Existing completed scores are not changed.
                     </>
                   }
-                  confirmLabel="Simulate scores"
+                  confirmLabel="Simulate Scores"
                   onConfirm={() =>
-                    handleSimulateScores(isFinalRound ? 'final_round' : 'first_round')
+                    handleSimulateScores(isFinalRoundView ? 'final_round' : 'first_round')
                   }
                   trigger={<LoadingButton variant="secondary" disabled={simulating} />}
-                  triggerLabel="Simulate scores"
+                  triggerLabel="Simulate Scores"
                 />
               )}
             </div>
             {simulateMessage && (
               <p className="text-sm text-muted-foreground">{simulateMessage}</p>
             )}
-            {interviewStats && interviewStats.candidateCount === 0 && !sessionStatePreview ? (
-              <p className="text-sm text-muted-foreground">
-                No applicants in This Stage Yet. Advance Applicants From the Application phase
-                first.
-              </p>
-            ) : (
-              <AdminInterviewProgressDetail
-                teamId={teamId}
-                stage={isFinalRound ? 'final_round' : 'first_round'}
-                sessionStatePreview={sessionStatePreview}
-              />
-            )}
+            <AdminInterviewProgressDetail
+              teamId={teamId}
+              stage={interviewStage}
+              sessionStatePreview={sessionStatePreview}
+            />
           </div>
-        </div>
+          {isFirstRoundView && (
+            <AdminAdvancementReadinessPanel teamId={teamId} fromStage="first_round" />
+          )}
+        </>
+      ) : isDeliberationsView ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Deliberations Board</CardTitle>
+            <CardDescription>
+              {isDeliberationsLive
+                ? 'Move candidates toward offers on the kanban board.'
+                : 'Preview the deliberations board before candidates arrive in this phase.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NavLinkButton href={openTeamDeliberationsHref(Number(teamId))}>
+              Open deliberations
+            </NavLinkButton>
+          </CardContent>
+        </Card>
       ) : dashboard ? (
       <Tabs defaultValue="progress" className="space-y-6">
-        <TabsList>
+        <TabsList className="max-w-full flex-wrap">
           <TabsTrigger value="progress">Progress</TabsTrigger>
-          <TabsTrigger value="grading">Grading setup</TabsTrigger>
+          <TabsTrigger value="grading">Grading Setup</TabsTrigger>
           <TabsTrigger value="applications">
-            Applications ({dashboard.applications.length})
+            Applications <TitleCount>{dashboard.applications.length}</TitleCount>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="progress" className="space-y-4">
+          {isApplicationPhase && (
+            <AdminAdvancementReadinessPanel teamId={teamId} fromStage="application" />
+          )}
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div>
-                <CardTitle>Grading progress</CardTitle>
+                <CardTitle>Grading Progress</CardTitle>
                 <CardDescription>
                   {dashboard.progress.completed} of {dashboard.progress.total} grader assignments
                   complete
@@ -467,7 +442,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
               </div>
               {isApplicationPhase && (
                 <DestructiveConfirmDialog
-                  title="Simulate random scores?"
+                  title="Simulate Random Scores?"
                   description={
                     <>
                       Fills every pending grader assignment with random 1–5 scores. For testing
@@ -477,10 +452,10 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                       Existing completed scores are not changed.
                     </>
                   }
-                  confirmLabel="Simulate scores"
+                  confirmLabel="Simulate Scores"
                   onConfirm={() => handleSimulateScores('application')}
                   trigger={<LoadingButton variant="secondary" size="sm" disabled={simulating} />}
-                  triggerLabel="Simulate scores"
+                  triggerLabel="Simulate Scores"
                 />
               )}
             </CardHeader>
@@ -497,7 +472,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   className="w-full gap-0 [&_[data-slot=progress-track]]:h-2"
                 />
               )}
-              <ul className="divide-y divide-border/60 rounded-lg bg-muted/35">
+              <ul className="divide-y divide-border rounded-lg border border-border bg-background">
                 {dashboard.graders.map((g) => {
                   const done = g.total > 0 && g.completed === g.total;
                   return (
@@ -578,7 +553,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   <col style={{ width: '8%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="border-b bg-muted/40">
+                  <tr className="border-b border-border bg-muted">
                     <th className="p-3 text-left font-medium text-muted-foreground">#</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Applicant</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Graders</th>
@@ -594,7 +569,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                     const isExpanded = expanded.has(app.id);
                     return (
                       <Fragment key={app.id}>
-                        <tr className="hover:bg-muted/30">
+                        <tr className="uma-hover-on-row">
                           <td className="p-3 tabular-nums text-muted-foreground">{app.rowIndex}</td>
                           <td className="min-w-0 p-3">
                             <div className="flex flex-wrap items-center gap-2">
@@ -630,7 +605,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                         </tr>
                         {isExpanded && (
                           <tr key={`${app.id}-detail`}>
-                            <td colSpan={5} className="bg-muted/50 p-4">
+                            <td colSpan={5} className="bg-background p-4">
                               <div className="space-y-4">
                                 <div>
                                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -687,6 +662,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         </TabsContent>
       </Tabs>
       ) : null}
+      </div>
     </PageContainer>
   );
 }

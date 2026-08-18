@@ -9,7 +9,9 @@ interface RecruitmentPhaseStepperProps {
   currentStatus: RoundStatus;
   selectedStatus?: RoundStatus;
   unlockedStages?: UnlockableStage[];
-  mode?: 'admin' | 'viewer';
+  /** admin/viewer reflect pipeline unlock state; browse is selection-only preview. */
+  mode?: 'admin' | 'viewer' | 'browse';
+  compact?: boolean;
   className?: string;
   onSelectPhase?: (status: RoundStatus) => void;
 }
@@ -19,9 +21,11 @@ export function RecruitmentPhaseStepper({
   selectedStatus,
   unlockedStages = [],
   mode = 'viewer',
+  compact = false,
   className,
   onSelectPhase,
 }: RecruitmentPhaseStepperProps) {
+  const isBrowse = mode === 'browse';
   const currentIdx = statusIndex(currentStatus);
   const activeSelection = selectedStatus ?? currentStatus;
   // After close, every prior stage stays browsable for admin (locks are grader-only).
@@ -30,11 +34,16 @@ export function RecruitmentPhaseStepper({
       ? PIPELINE_PHASES.map((p) => p.unlockKey).filter(Boolean)
       : unlockedStages,
   );
-  const interactive = mode === 'admin' && Boolean(onSelectPhase);
+  const interactive = (mode === 'admin' || isBrowse) && Boolean(onSelectPhase);
 
   return (
-    <div className={cn('w-full overflow-x-auto', className)}>
-      <ol className="flex min-w-max items-center gap-1">
+    <div className={cn('uma-scroll-strip w-full', className)}>
+      <ol
+        className={cn(
+          'uma-scroll-strip-inner flex-nowrap items-center',
+          compact ? 'gap-0.5' : 'gap-1',
+        )}
+      >
         {PIPELINE_PHASES.map((phase, index) => {
           const phaseIdx = statusIndex(phase.status);
           const isPipelineCurrent = phase.status === currentStatus;
@@ -44,30 +53,59 @@ export function RecruitmentPhaseStepper({
           const isUnlocked = unlockKey ? unlockSet.has(unlockKey) : true;
           const isFuture = phaseIdx > currentIdx;
 
+          const isLocked = !isBrowse && mode === 'admin' && Boolean(unlockKey) && !isUnlocked;
+
           const pillClassName = cn(
-            'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-            isSelected && 'bg-primary/12 text-primary',
-            !isSelected && isPipelineCurrent && 'bg-primary/[0.07] text-primary',
-            !isSelected && isPast && 'bg-muted/55 text-muted-foreground',
-            !isSelected && isFuture && 'text-muted-foreground/70',
-            interactive && 'cursor-pointer hover:bg-muted/60',
+            'flex shrink-0 items-center whitespace-nowrap rounded-lg border font-medium transition-colors',
+            compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-sm',
+            isBrowse
+              ? isSelected
+                ? 'border-primary/40 bg-primary/12 text-primary'
+                : 'border-border/70 bg-muted/30 text-muted-foreground'
+              : [
+                  isSelected && 'border-primary/40 bg-primary/12 text-primary',
+                  !isSelected && isPipelineCurrent && 'border-primary/30 bg-primary/[0.07] text-primary',
+                  !isSelected && isPast && 'border-border/70 bg-muted/40 text-muted-foreground',
+                  !isSelected && isFuture && 'border-border/70 bg-muted/30 text-muted-foreground/80',
+                  isLocked && !isSelected && !isPast && 'border-border/70 bg-muted/40',
+                ],
+            interactive && 'cursor-pointer hover:border-foreground/18 uma-hover-on-canvas',
           );
 
-          const content = (
+          const content = isBrowse ? (
+            <>
+              <span
+                className={cn(
+                  'shrink-0 rounded-full',
+                  compact ? 'size-1.5' : 'size-2',
+                  isSelected ? 'bg-primary' : 'bg-muted-foreground/45',
+                )}
+                aria-hidden
+              />
+              <span>{phase.label}</span>
+            </>
+          ) : (
             <>
               {isPast && !isPipelineCurrent ? (
-                <CheckIcon className="size-3.5 shrink-0 text-green-600" aria-hidden />
-              ) : mode === 'admin' && unlockKey && !isUnlocked ? (
-                <LockIcon className="size-3.5 shrink-0 text-amber-600" aria-hidden />
+                <CheckIcon
+                  className={cn('shrink-0 text-green-600', compact ? 'size-3' : 'size-3.5')}
+                  aria-hidden
+                />
+              ) : isLocked ? (
+                <LockIcon
+                  className={cn('shrink-0 text-amber-600', compact ? 'size-3' : 'size-3.5')}
+                  aria-hidden
+                />
               ) : (
                 <span
                   className={cn(
-                    'size-2 shrink-0 rounded-full',
+                    'shrink-0 rounded-full',
+                    compact ? 'size-1.5' : 'size-2',
                     isPipelineCurrent
                       ? 'bg-primary'
                       : isPast
                         ? 'bg-green-500'
-                        : 'bg-muted-foreground/30',
+                        : 'bg-muted-foreground/45',
                   )}
                 />
               )}
@@ -76,7 +114,7 @@ export function RecruitmentPhaseStepper({
           );
 
           return (
-            <li key={phase.status} className="flex items-center gap-1">
+            <li key={phase.status} className={cn('flex items-center', compact ? 'gap-0.5' : 'gap-1')}>
               {interactive ? (
                 <button
                   type="button"
@@ -90,7 +128,7 @@ export function RecruitmentPhaseStepper({
                 <div className={pillClassName}>{content}</div>
               )}
               {index < PIPELINE_PHASES.length - 1 && (
-                <span className="text-muted-foreground/40" aria-hidden>
+                <span className="px-0.5 text-foreground/45" aria-hidden>
                   →
                 </span>
               )}

@@ -19,7 +19,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <TooltipProvider>
           {children}
-          <Toaster richColors closeButton position="bottom-right" />
+          <Toaster closeButton position="bottom-right" />
         </TooltipProvider>
       </body>
     </html>

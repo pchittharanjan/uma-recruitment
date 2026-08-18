@@ -14,6 +14,7 @@ import { extractCandidateFromFields } from '@/lib/candidates';
 import { parseCsv } from '@/lib/csv';
 import { getOrgCoffeeChatDates } from '@/lib/org-coffee-chat-dates';
 import { cachedPerRequest } from '@/lib/request-cache';
+import { cachedProcess } from '@/lib/process-cache';
 import { getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { getOrgRubric, mergeOrgRubricIntoHeaders } from '@/lib/org-rubric';
 
@@ -30,6 +31,7 @@ export interface RoundSettings {
   score_fields: string[];
   custom_score_fields: string[];
   context_fields: string[];
+  portfolio_fields: string[];
   grader_instructions: string | null;
   interview_script_first_round: string | null;
   interview_guides: string | null;
@@ -61,6 +63,7 @@ export function rowToRoundSettings(row: ResultSet['rows'][number]): RoundSetting
     score_fields: parseJsonArray(row.score_fields),
     custom_score_fields: parseJsonArray(row.custom_score_fields),
     context_fields: parseJsonArray(row.context_fields),
+    portfolio_fields: parseJsonArray(row.portfolio_fields),
     grader_instructions: (row.grader_instructions as string | null) ?? null,
     interview_script_first_round: (row.interview_script_first_round as string | null) ?? null,
     interview_guides: (row.interview_guides as string | null) ?? null,
@@ -157,7 +160,8 @@ export async function teamHasApplicationPipeline(teamId: number): Promise<boolea
  * React-cached so layouts share one result per RSC request.
  */
 export const anyTeamHasActivePipeline = cache(async function anyTeamHasActivePipeline(): Promise<boolean> {
-  return cachedPerRequest('anyTeamHasActivePipeline', async () => {
+  return cachedPerRequest('anyTeamHasActivePipeline', () =>
+    cachedProcess('anyTeamHasActivePipeline', 15_000, async () => {
     const db = getDb();
     const result = await db.execute({
       sql: `SELECT EXISTS (
@@ -195,7 +199,8 @@ export const anyTeamHasActivePipeline = cache(async function anyTeamHasActivePip
             ) AS has_pipeline`,
     });
     return Boolean(result.rows[0]?.has_pipeline);
-  });
+    }),
+  );
 });
 
 export interface ImportRoundInput {
@@ -278,14 +283,15 @@ export async function importApplicationRound(input: ImportRoundInput): Promise<I
   await db.execute({
     sql: `INSERT INTO round_settings (
             round_id, csv_headers, score_fields, custom_score_fields, grader_instructions,
-            context_fields, graders_per_application, coffee_chat_start_date, application_due_date
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            context_fields, portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       roundId,
       JSON.stringify(parsed.headers),
       JSON.stringify(scoreFields),
       JSON.stringify(customScoreFields),
       input.graderInstructions?.trim() || null,
+      '[]',
       '[]',
       gradersPerApplication,
       orgDates.coffeeChatStartDate,
@@ -374,6 +380,7 @@ export interface RoundRubricInput {
   scoreFields: string[];
   customScoreFields: string[];
   contextFields: string[];
+  portfolioFields?: string[];
   graderInstructions?: string | null;
 }
 
@@ -392,19 +399,23 @@ export async function updateRoundRubric(
 
   const customScoreFields = input.customScoreFields.map((f) => f.trim()).filter(Boolean);
   const scored = new Set([...scoreFields, ...customScoreFields]);
-  const contextFields = input.contextFields.filter(
+  const portfolioFields = (input.portfolioFields ?? settings.portfolio_fields).filter(
     (f) => settings.csv_headers.includes(f) && !scored.has(f),
+  );
+  const contextFields = input.contextFields.filter(
+    (f) => settings.csv_headers.includes(f) && !scored.has(f) && !portfolioFields.includes(f),
   );
 
   const db = getDb();
   await db.execute({
     sql: `UPDATE round_settings
-          SET score_fields = ?, custom_score_fields = ?, context_fields = ?, grader_instructions = ?
+          SET score_fields = ?, custom_score_fields = ?, context_fields = ?, portfolio_fields = ?, grader_instructions = ?
           WHERE round_id = ?`,
     args: [
       JSON.stringify(scoreFields),
       JSON.stringify(customScoreFields),
       JSON.stringify(contextFields),
+      JSON.stringify(portfolioFields),
       input.graderInstructions?.trim() || null,
       roundId,
     ],

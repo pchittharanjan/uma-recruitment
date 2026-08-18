@@ -16,7 +16,9 @@ import {
 import type { RoundStatus } from '@/lib/db';
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
-import { phaseLabel } from '@/lib/stages';
+import { phaseLabelForTeam } from '@/lib/team-pipeline-profile';
+import { adminTeamPhaseHref, phaseLabel } from '@/lib/stages';
+import { teamDotClass, teamStageBadgeClass } from '@/lib/team-colors';
 import { cn } from '@/lib/utils';
 
 interface TeamRound {
@@ -37,18 +39,6 @@ export interface PhaseTeamSummary {
   };
 }
 
-function teamAccentClass(name: string): string {
-  switch (name) {
-    case 'Strategy':
-      return 'bg-blue-500';
-    case 'Events':
-      return 'bg-amber-500';
-    case 'Design':
-      return 'bg-violet-500';
-    default:
-      return 'bg-muted-foreground';
-  }
-}
 
 function interviewStatsForPhase(
   team: PhaseTeamSummary,
@@ -80,7 +70,7 @@ function ProgressCell({
         <span
           className={cn(
             'text-sm font-medium tabular-nums',
-            done ? 'text-emerald-700' : 'text-foreground',
+            done ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground',
           )}
         >
           {total === 0 ? emptyLabel : done ? doneLabel : `${completed} of ${total}`}
@@ -123,7 +113,7 @@ function TeamNameCell({
         <span
           className={cn(
             'size-2.5 shrink-0 rounded-full ring-2 ring-background',
-            teamAccentClass(team.name),
+            teamDotClass(team.name),
           )}
           aria-hidden
         />
@@ -150,15 +140,15 @@ function overviewTitle(status: RoundStatus): string {
     case 'pre_application':
       return 'Teams';
     case 'application':
-      return 'Application grading';
+      return 'Application Grading';
     case 'first_round':
       return 'First Round Interview';
     case 'final_round':
       return 'Final Round Interview';
     case 'deliberations':
-      return 'Team deliberations';
+      return 'Team Deliberations';
     case 'closed':
-      return 'Recruitment closed';
+      return 'Recruitment Closed';
     default:
       return 'Teams';
   }
@@ -177,13 +167,15 @@ export function AdminPhaseTeamOverview({
 
   const title = overviewTitle(viewPhase);
   const isInterviewView = viewPhase === 'first_round' || viewPhase === 'final_round';
+  const headerCellClass =
+    'uma-section-label px-4 py-3 align-middle leading-none text-foreground/75';
 
   if (viewPhase === 'closed') {
     return (
       <div className="space-y-1">
         <p className="uma-section-label">Team overview</p>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Cycle closed — teams are view-only. Browse phases in the sidebar; edits and outcome emails
+          Cycle closed. Teams are view-only. Browse phases in the sidebar; edits and outcome emails
           still work. Open Final selection for offers.
         </p>
       </div>
@@ -199,36 +191,33 @@ export function AdminPhaseTeamOverview({
         </h2>
       </div>
 
-      <div className="overflow-hidden rounded-xl bg-muted/35">
+      <div className="overflow-x-auto rounded-xl bg-surface-panel">
         <Table>
           <TableHeader>
-            <TableRow className="border-border/50 bg-muted/25 hover:bg-muted/25">
-              <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                Team
+            <TableRow className="border-border/60 bg-muted/50 hover:bg-muted/50">
+              <TableHead className={headerCellClass}>
+                <div className="flex items-center gap-3">
+                  <span className="size-2.5 shrink-0" aria-hidden />
+                  Team
+                </div>
               </TableHead>
               {viewPhase === 'application' && (
-                <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                <TableHead className={cn(headerCellClass, 'min-w-[10rem] whitespace-normal')}>
                   Grading
                 </TableHead>
               )}
               {isInterviewView && (
                 <>
-                  <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                    Scheduled
-                  </TableHead>
-                  <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                  <TableHead className={headerCellClass}>Scheduled</TableHead>
+                  <TableHead className={cn(headerCellClass, 'min-w-[10rem] whitespace-normal')}>
                     Interviews scored
                   </TableHead>
                 </>
               )}
               {viewPhase === 'deliberations' && (
-                <TableHead className="h-11 px-4 text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                  Status
-                </TableHead>
+                <TableHead className={headerCellClass}>Status</TableHead>
               )}
-              <TableHead className="h-11 px-4 text-right text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                {' '}
-              </TableHead>
+              <TableHead className={cn(headerCellClass, 'text-right')}>{' '}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -238,10 +227,7 @@ export function AdminPhaseTeamOverview({
               const { total, completed } = team.assignmentProgress;
 
               return (
-                <TableRow
-                  key={team.id}
-                  className="border-border/40 transition-colors last:border-0 hover:bg-muted/35"
-                >
+                <TableRow key={team.id}>
                   <TeamNameCell team={team} viewPhase={viewPhase} stats={stats} />
 
                   {viewPhase === 'application' && (
@@ -263,11 +249,11 @@ export function AdminPhaseTeamOverview({
                     <>
                       <TableCell className="px-4 py-4 tabular-nums text-sm">
                         {!hasRound || !stats ? (
-                          '—'
+                          '-'
                         ) : stats.candidateCount === 0 ? (
                           <span className="text-muted-foreground">No applicants</span>
                         ) : stats.slotCount === 0 ? (
-                          <span className="text-amber-800">
+                          <span className="text-amber-800 dark:text-amber-200">
                             0/{stats.candidateCount} scheduled
                           </span>
                         ) : (
@@ -276,7 +262,7 @@ export function AdminPhaseTeamOverview({
                       </TableCell>
                       <TableCell className="px-4 py-4 whitespace-normal">
                         {!hasRound || !stats ? (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         ) : (
                           <ProgressCell
                             total={stats.scoring.total}
@@ -292,7 +278,14 @@ export function AdminPhaseTeamOverview({
                   {viewPhase === 'deliberations' && (
                     <TableCell className="px-4 py-4">
                       {hasRound ? (
-                        <StageBadge label="Active" color="orange" />
+                        <span
+                          className={cn(
+                            'inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-medium',
+                            teamStageBadgeClass(team.name),
+                          )}
+                        >
+                          {phaseLabelForTeam(team.round!.status, team.name)}
+                        </span>
                       ) : (
                         <StageBadge label="No round" color="gray" />
                       )}
@@ -323,7 +316,7 @@ export function AdminPhaseTeamOverview({
                           size="sm"
                           className="transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
                           nativeButton={false}
-                          render={<Link href={`/admin/teams/${team.id}`} />}
+                          render={<Link href={adminTeamPhaseHref(team.id, viewPhase)} />}
                         >
                           Open team
                           <ArrowRightIcon
@@ -354,7 +347,7 @@ export function AdminPhaseTeamOverview({
                           size="sm"
                           className="transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
                           nativeButton={false}
-                          render={<Link href={`/admin/teams/${team.id}`} />}
+                          render={<Link href={adminTeamPhaseHref(team.id, viewPhase)} />}
                         >
                           Open team
                           <ArrowRightIcon
@@ -363,7 +356,7 @@ export function AdminPhaseTeamOverview({
                           />
                         </Button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">Waiting for global import</span>
+                        <span className="text-sm text-muted-foreground">Waiting for import</span>
                       )}
                     </TableCell>
                 </TableRow>

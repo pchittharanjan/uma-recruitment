@@ -1,5 +1,6 @@
 import {
   filterFieldsForBlindReview,
+  filterPortfolioFieldsForBlindReview,
   resolveContextFields,
 } from '@/lib/blind';
 import { getDb, type AssignmentStage, type User } from '@/lib/db';
@@ -484,7 +485,21 @@ export function serializeApplicationFields(
 ): Record<string, string> {
   if (!blind) return fields;
   const allScoreFields = [...settings.score_fields, ...settings.custom_score_fields];
-  return filterFieldsForBlindReview(fields, allScoreFields, resolveContextFields(settings));
+  return filterFieldsForBlindReview(fields, allScoreFields, settings.portfolio_fields ?? []);
+}
+
+export function serializePortfolioFields(
+  fields: Record<string, string>,
+  settings: RoundSettings,
+  blind: boolean,
+): Record<string, string> {
+  const portfolioFields = settings.portfolio_fields ?? [];
+  if (!blind) {
+    return Object.fromEntries(
+      portfolioFields.filter((k) => k in fields).map((k) => [k, fields[k]]),
+    );
+  }
+  return filterPortfolioFieldsForBlindReview(fields, portfolioFields);
 }
 
 export function graderContextFieldsForSettings(_settings: RoundSettings): string[] {

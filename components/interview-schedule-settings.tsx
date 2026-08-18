@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDownIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import {
+  SettingsPanel,
+  settingsControlClass,
+  settingsDateFieldWidth,
+  settingsTimeFieldWidth,
+} from '@/components/settings-panel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { RoundStatus } from '@/lib/db';
@@ -94,67 +99,44 @@ export function InterviewScheduleSettings({
     }
   };
 
+  const dateValue = isFirstRound ? (config?.firstRoundDate ?? '') : (config?.finalRoundDate ?? '');
+  const timeValue = isFirstRound ? (config?.firstRoundStartTime ?? '') : (config?.finalRoundStartTime ?? '');
+
   if (!config && !loading) {
     return error ? <p className="text-sm text-destructive">{error}</p> : null;
   }
 
   return (
-    <div className="display-panel">
-      <button
-        type="button"
-        className="flex w-full items-start justify-between gap-3 text-left"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <div className="space-y-1">
-          <p className="text-sm font-medium">{roundLabel} Interview day</p>
+    <SettingsPanel
+      label={`${roundLabel} interview day`}
+      open={open}
+      onOpenChange={setOpen}
+      loading={loading}
+      collapsedSummary={dateValue || undefined}
+    >
+      {loading || !config ? (
+        <div className="flex flex-wrap items-end gap-3" role="status" aria-label="Loading">
+          <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+          <div className={cn(settingsTimeFieldWidth, 'space-y-1')}>
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-8 w-full" />
+          </div>
         </div>
-        <ChevronDownIcon
-          className={cn(
-            'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
-
-      {open && (
-        <div className="mt-4 space-y-4">
-          {loading || !config ? (
-            <div className="space-y-4" role="status" aria-label="Loading">
-              <div className="grid gap-4 rounded-md bg-muted/30 p-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-          <div className="grid gap-4 rounded-md border border-primary/30 bg-primary/5 p-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="interviewDate" required>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className={cn(settingsDateFieldWidth, 'space-y-1')}>
+              <Label htmlFor="interviewDate" className="text-sm" required>
                 Interview date
               </Label>
               <Input
                 id="interviewDate"
                 type="date"
-                value={
-                  isFirstRound ? (config.firstRoundDate ?? '') : (config.finalRoundDate ?? '')
-                }
+                className={settingsControlClass}
+                value={dateValue}
                 onChange={(e) =>
                   setConfig((prev) =>
                     prev
@@ -166,14 +148,15 @@ export function InterviewScheduleSettings({
                 }
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="interviewStartTime" required>
+            <div className={cn(settingsTimeFieldWidth, 'space-y-1')}>
+              <Label htmlFor="interviewStartTime" className="text-sm" required>
                 First block starts
               </Label>
               <Input
                 id="interviewStartTime"
                 type="time"
-                value={isFirstRound ? config.firstRoundStartTime : config.finalRoundStartTime}
+                className={settingsControlClass}
+                value={timeValue}
                 onChange={(e) =>
                   setConfig((prev) =>
                     prev
@@ -185,16 +168,14 @@ export function InterviewScheduleSettings({
                 }
               />
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="blockMinutes" required>
-                Block length (minutes)
+            <div className="w-[8.5rem] space-y-1">
+              <Label htmlFor="blockMinutes" className="text-sm" required>
+                Block minutes
               </Label>
               <Input
                 id="blockMinutes"
                 type="number"
+                className={settingsControlClass}
                 min={15}
                 max={120}
                 step={5}
@@ -211,14 +192,15 @@ export function InterviewScheduleSettings({
                 }
               />
             </div>
-            {isFirstRound && (
-              <div className="space-y-2">
-                <Label htmlFor="groupSize" required>
-                  Max group size
+            {isFirstRound ? (
+              <div className="w-[7.5rem] space-y-1">
+                <Label htmlFor="groupSize" className="text-sm" required>
+                  Group size
                 </Label>
                 <Input
                   id="groupSize"
                   type="number"
+                  className={settingsControlClass}
                   min={2}
                   max={12}
                   value={config.groupSize}
@@ -231,32 +213,27 @@ export function InterviewScheduleSettings({
                   }
                 />
               </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <LoadingButton size="sm" disabled={saving} onClick={handleSave}>
+            ) : null}
+            <LoadingButton size="sm" className="ml-auto" disabled={saving} onClick={handleSave}>
               Save {roundLabel.toLowerCase()} schedule
             </LoadingButton>
           </div>
 
-          {success && <p className="text-sm text-green-700 dark:text-green-400">{success}</p>}
+          {success && <p className="text-sm text-success">{success}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <p className="text-sm text-muted-foreground">
             Per-team slot assignments live on each team&apos;s{' '}
             <Link
               href={`/admin/dashboard?view=${viewingStatus}`}
-              className="underline underline-offset-2"
+              className="font-medium text-primary underline underline-offset-2 hover:text-primary-hover"
             >
               schedule pages
             </Link>
             .
           </p>
-            </>
-          )}
-        </div>
+        </>
       )}
-    </div>
+    </SettingsPanel>
   );
 }

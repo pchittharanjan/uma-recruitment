@@ -1,5 +1,6 @@
-import { getDb } from '@/lib/db';
-import { interviewScoreFieldsFromGuide } from '@/lib/interview-guide';
+import { getDb, getTeamById } from '@/lib/db';
+import { advancedStageForTeam } from '@/lib/team-pipeline-profile';
+import { interviewScoreFieldsFromGuide, interviewWeightedTotal } from '@/lib/interview-guide';
 import {
   getInterviewGuideForRound,
   type InterviewSlotStage,
@@ -35,8 +36,11 @@ export interface InterviewResultsData {
 
 function assignmentTotal(
   scores: Record<string, number>,
+  guide: Parameters<typeof interviewWeightedTotal>[1],
   scoreFields: string[],
 ): number | null {
+  const weighted = interviewWeightedTotal(scores, guide);
+  if (weighted !== null) return weighted;
   if (scoreFields.length === 0) return null;
   const values = scoreFields.map((field) => scores[field]).filter((v) => v !== undefined);
   if (values.length !== scoreFields.length) return null;
@@ -104,8 +108,10 @@ export async function buildInterviewResults(
   const scoresByAssignment: Record<number, Record<string, number>> = {};
   for (const row of scoresResult.rows) {
     const assignmentId = row.assignment_id as number;
+    const score = row.score as number | null;
+    if (score == null) continue;
     if (!scoresByAssignment[assignmentId]) scoresByAssignment[assignmentId] = {};
-    scoresByAssignment[assignmentId][row.field_name as string] = row.score as number;
+    scoresByAssignment[assignmentId][row.field_name as string] = score;
   }
 
   const candidateMap = new Map<number, Omit<InterviewResultsCandidate, 'rank' | 'average'>>();
@@ -130,7 +136,7 @@ export async function buildInterviewResults(
         interviewerName: row.interviewer_name as string,
         status: row.asgn_status as string,
         scores,
-        total: assignmentTotal(scores, scoreFields),
+        total: assignmentTotal(scores, interviewGuide, scoreFields),
         comment: (row.asgn_comment as string | null) ?? null,
       });
     }
@@ -206,12 +212,15 @@ export async function applyInterviewAdvancementSelection(
   roundId: number,
   advancedApplicationIds: number[],
 ): Promise<void> {
+  const team = await getTeamById(teamId);
+  const teamName = team?.name ?? 'Strategy';
+  const targetStage = advancedStageForTeam('first_round', teamName);
   const { ranked } = await computeInterviewRankings(teamId, roundId, 'first_round');
   const advancedSet = new Set(advancedApplicationIds);
   const db = getDb();
 
   for (const app of ranked) {
-    const stage = advancedSet.has(app.id) ? 'final_round' : 'rejected';
+    const stage = advancedSet.has(app.id) ? targetStage : 'rejected';
     await db.execute({
       sql: `UPDATE applications SET final_score = ?, rank = ?, stage = ?
             WHERE id = ? AND team_id = ? AND stage = 'first_round'`,

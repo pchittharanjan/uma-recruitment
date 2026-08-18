@@ -89,8 +89,8 @@ export async function saveOrgCoffeeChatDates(dates: OrgCoffeeChatDates): Promise
       await db.execute({
         sql: `INSERT INTO round_settings (
                 round_id, csv_headers, score_fields, custom_score_fields, context_fields,
-                graders_per_application, coffee_chat_start_date, application_due_date
-              ) VALUES (?, '[]', '[]', '[]', '[]', ?, ?, ?)`,
+                portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
+              ) VALUES (?, '[]', '[]', '[]', '[]', '[]', ?, ?, ?)`,
         args: [
           roundId,
           DEFAULT_GRADERS_PER_APPLICATION,

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { phasePageEyebrow, type UnlockableStage } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
+import { teamDotClass } from '@/lib/team-colors';
 import { cn } from '@/lib/utils';
 
 interface TeamRound {
@@ -36,18 +37,6 @@ interface TeamSummary {
   assignmentProgress: { total: number; completed: number };
 }
 
-function teamAccentClass(name: string): string {
-  switch (name) {
-    case 'Strategy':
-      return 'bg-blue-500';
-    case 'Events':
-      return 'bg-amber-500';
-    case 'Design':
-      return 'bg-violet-500';
-    default:
-      return 'bg-muted-foreground';
-  }
-}
 
 function AssignmentProgressCell({
   total,
@@ -66,7 +55,7 @@ function AssignmentProgressCell({
         <span
           className={cn(
             'text-sm font-medium tabular-nums',
-            done ? 'text-emerald-700' : 'text-foreground',
+            done ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground',
           )}
         >
           {total === 0 ? 'No assignments' : done ? 'All graded' : `${pending} left`}
@@ -125,7 +114,7 @@ export default function ApplicationPhasePage() {
     <PageContainer className="space-y-8">
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
-        title="Grading progress"
+        title="Grading Progress"
         actions={
           hasAnyApplications ? (
             <Button
@@ -151,20 +140,25 @@ export default function ApplicationPhasePage() {
 
       {error && <StatusBanner type="error" message={error} />}
 
+      <StatusBanner
+        type="info"
+        message="Design teams: classify link columns (Google Drive, Figma, portfolio) as portfolio fields at import so graders can review work during application grading without seeing names or email."
+      />
+
       {!graderUnlocked && (
         <StatusBanner
           type="info"
           message="Application grading is locked for graders. Unlock it from the dashboard when you're ready."
-          actionLabel="Open stage access"
-          actionHref="/admin/dashboard#stage-access"
+          actionLabel="Click to unlock each phase"
+          actionHref="/admin/dashboard#pipeline-controls"
         />
       )}
 
       <PageSection>
-        <div className="overflow-hidden rounded-xl bg-muted/40">
+        <div className="display-panel overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="border-border/60 hover:bg-transparent">
+              <TableRow className="border-border bg-background hover:bg-background">
                 <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Team
                 </TableHead>
@@ -172,7 +166,7 @@ export default function ApplicationPhasePage() {
                   Applicants
                 </TableHead>
                 <TableHead className="h-11 px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Grading progress
+                  Grading Progress
                 </TableHead>
                 <TableHead className="h-11 px-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {' '}
@@ -187,14 +181,14 @@ export default function ApplicationPhasePage() {
                 return (
                   <TableRow
                     key={team.id}
-                    className="group border-border/40 transition-colors last:border-0 hover:bg-muted/35"
+                    className="group border-border transition-colors last:border-0"
                   >
                     <TableCell className="px-4 py-4 whitespace-normal">
                       <div className="flex items-center gap-3">
                         <span
                           className={cn(
                             'size-2.5 shrink-0 rounded-full ring-2 ring-background',
-                            teamAccentClass(team.name),
+                            teamDotClass(team.name),
                           )}
                           aria-hidden
                         />
@@ -203,7 +197,7 @@ export default function ApplicationPhasePage() {
                     </TableCell>
                     <TableCell className="px-4 py-4">
                       {!hasRound ? (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-sm text-muted-foreground">-</span>
                       ) : (
                         <span className="text-sm tabular-nums">{team.applicationCount}</span>
                       )}

@@ -1,12 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   ClipboardListIcon,
   MicIcon,
   UserCheckIcon,
 } from 'lucide-react';
-import LoadingButton from '@/components/loading-button';
+import { NavLinkButton } from '@/components/nav-link-button';
 import ProgressBar from '@/components/progress-bar';
 import { RecruitmentPhaseStepper } from '@/components/recruitment-phase-stepper';
 import StageBadge from '@/components/stage-badge';
@@ -131,7 +130,7 @@ function personalSummary(data: TeamOverviewData): string {
         : currentStage === 'first_round' || currentStage === 'final_round'
           ? 'interviews to score'
           : 'work';
-    return `The team is in ${phase.phaseLabel}. You don't have any ${emptyNoun} yet — check back when work is assigned to you.`;
+    return `The team is in ${phase.phaseLabel}. You don't have any ${emptyNoun} yet. Check back when work is assigned to you.`;
   }
   if (scopedSummary.totalPending === 0) {
     const adv = data.advancement;
@@ -198,7 +197,7 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
       {
         dismissKey: `${prefix}:advancement-submitted`,
         type: 'info',
-        message: `Advancement list submitted (${adv.topN} applicant${adv.topN === 1 ? '' : 's'}). Awaiting Admin approval — scores are locked.`,
+        message: `Advancement list submitted (${adv.topN} applicant${adv.topN === 1 ? '' : 's'}). Awaiting Admin approval. Scores are locked.`,
       },
     ];
   }
@@ -282,7 +281,6 @@ export function TeamPersonalDashboard({
   teamId: string;
   hasMultipleTeams: boolean;
 }) {
-  const router = useRouter();
   const gradingLocked = data.gradingEditLock?.locked ?? false;
   const interviewLocked = data.interviewEditLock?.locked ?? false;
   const notices = dashboardNotices(data, teamId);
@@ -302,9 +300,9 @@ export function TeamPersonalDashboard({
           <div className="flex flex-wrap items-center gap-2">
             <StageBadge label={data.phase.phaseLabel} color="blue" />
             {hasMultipleTeams && (
-              <LoadingButton variant="secondary" onClick={() => router.push('/team')}>
+              <NavLinkButton variant="secondary" href="/team">
                 ← Teams
-              </LoadingButton>
+              </NavLinkButton>
             )}
           </div>
         }
@@ -327,7 +325,7 @@ export function TeamPersonalDashboard({
 
       {data.summary.totalAssigned > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card className="bg-linear-to-t from-primary/5 to-card">
+          <Card>
             <CardHeader className="pb-2">
               <CardDescription>{statsCardLabel}</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -335,7 +333,7 @@ export function TeamPersonalDashboard({
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-linear-to-t from-primary/5 to-card">
+          <Card>
             <CardHeader className="pb-2">
               <CardDescription>Completed</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -343,7 +341,7 @@ export function TeamPersonalDashboard({
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card className="bg-linear-to-t from-primary/5 to-card">
+          <Card>
             <CardHeader className="pb-2">
               <CardDescription>Pending</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums">
@@ -408,7 +406,7 @@ export function TeamPersonalDashboard({
                     <ProgressBar
                       value={area.progress.completed}
                       max={area.progress.total}
-                      label="Your progress"
+                      label="Your Progress"
                     />
 
                     {area.upcomingScheduledAt && (
@@ -443,9 +441,9 @@ export function TeamPersonalDashboard({
                 {showFooter && (
                   <CardFooter className="flex flex-wrap items-center justify-end gap-2 pt-4">
                     {userHadWork && (
-                      <LoadingButton variant="secondary" onClick={() => router.push(area.href)}>
+                      <NavLinkButton variant="secondary" href={area.href}>
                         View all
-                      </LoadingButton>
+                      </NavLinkButton>
                     )}
                     {showWorkDetails &&
                       allDone &&
@@ -454,9 +452,9 @@ export function TeamPersonalDashboard({
                       !data.advancement.readOnly &&
                       !gradingLocked &&
                       data.advancement.submissionStatus == null && (
-                        <LoadingButton onClick={() => router.push(data.advancement!.href)}>
+                        <NavLinkButton href={data.advancement.href}>
                           {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
-                        </LoadingButton>
+                        </NavLinkButton>
                       )}
                     {showWorkDetails &&
                       allDone &&
@@ -465,18 +463,18 @@ export function TeamPersonalDashboard({
                       !data.advancement.readOnly &&
                       !interviewLocked &&
                       data.advancement.submissionStatus == null && (
-                        <LoadingButton onClick={() => router.push(data.advancement!.href)}>
+                        <NavLinkButton href={data.advancement.href}>
                           {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
-                        </LoadingButton>
+                        </NavLinkButton>
                       )}
                     {showWorkDetails &&
                       area.gradeHref &&
                       area.pendingCount > 0 &&
                       !(area.stage === 'application' && gradingLocked) &&
                       !(isFirstRound && interviewLocked) && (
-                        <LoadingButton onClick={() => router.push(area.gradeHref!)}>
+                        <NavLinkButton href={area.gradeHref}>
                           {area.progress.completed === 0 ? 'Start' : 'Continue'} →
-                        </LoadingButton>
+                        </NavLinkButton>
                       )}
                   </CardFooter>
                 )}
@@ -486,7 +484,7 @@ export function TeamPersonalDashboard({
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>No active work</CardTitle>
+              <CardTitle>No Active Work</CardTitle>
               <CardDescription>
                 You don&apos;t have access to any open phases for this team yet, or nothing has
                 been assigned to you.
@@ -496,9 +494,9 @@ export function TeamPersonalDashboard({
         )}
       </div>
 
-      <Card className="bg-muted/25">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recruitment phases</CardTitle>
+          <CardTitle className="text-base">Recruitment Phases</CardTitle>
         </CardHeader>
         <CardContent>
           <RecruitmentPhaseStepper

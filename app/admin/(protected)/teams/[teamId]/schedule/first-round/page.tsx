@@ -22,7 +22,7 @@ export default function FirstRoundSchedulePage({
   return (
     <TeamInterviewScheduleEditor
       apiPath={`/api/admin/teams/${teamId}/schedule/first-round`}
-      title="First Round Interview schedule"
+      title="First Round Interview Schedule"
       stage="first_round"
     />
   );

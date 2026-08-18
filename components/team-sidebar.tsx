@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { TeamNavUser } from '@/components/team-nav-user';
+import { SidebarBrandHeader } from '@/components/sidebar-brand-header';
 import { TeamSidebarPhaseNav } from '@/components/team-sidebar-phase-nav';
 import {
   Sidebar,
@@ -13,30 +13,15 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { teamOverviewHref } from '@/lib/stages';
+import { teamDotClass } from '@/lib/team-colors';
+import { cn } from '@/lib/utils';
 import { ClipboardListIcon } from 'lucide-react';
-
-function BrandLogo() {
-  return (
-    <div className="flex size-5 shrink-0 items-center justify-center">
-      <Image
-        src="/uma-logo.png"
-        alt=""
-        width={20}
-        height={20}
-        className="max-h-5 max-w-5 object-contain brightness-0"
-      />
-    </div>
-  );
-}
 
 export function TeamSidebar({
   user,
@@ -57,49 +42,11 @@ export function TeamSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="shrink-0 gap-1 p-2 pb-3">
-        <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:hidden">
-          <SidebarMenu className="min-w-0 flex-1">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="h-9 w-full justify-start gap-2.5 hover:bg-transparent active:bg-transparent"
-                tooltip={mounted ? 'Recruitment Hub' : undefined}
-                render={<Link href="/team" />}
-              >
-                <BrandLogo />
-                <span className="truncate text-[0.9375rem] font-semibold leading-none tracking-tight">
-                  Recruitment Hub
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <SidebarTrigger className="size-8 shrink-0 text-muted-foreground max-md:hidden" />
-        </div>
-
-        <div className="hidden w-full flex-col gap-1 group-data-[collapsible=icon]:flex">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="hover:bg-transparent active:bg-transparent"
-                tooltip={mounted ? 'Recruitment Hub' : undefined}
-                render={<Link href="/team" />}
-              >
-                <BrandLogo />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <SidebarTrigger className="size-8 text-muted-foreground max-md:hidden" />
-              }
-            />
-            <TooltipContent side="right" align="center" hidden={!mounted}>
-              Expand Sidebar
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </SidebarHeader>
+      <SidebarBrandHeader
+        href="/team"
+        tooltip={mounted ? 'Recruitment Hub' : undefined}
+        showExpandTooltip={mounted}
+      />
 
       <SidebarContent>
         {teams.length > 0 && (
@@ -119,10 +66,16 @@ export function TeamSidebar({
                     <SidebarMenuItem key={team.id}>
                       <SidebarMenuButton
                         isActive={teamActive}
-                        tooltip={mounted ? `${team.name} — Overview` : undefined}
+                        tooltip={mounted ? `${team.name} - Overview` : undefined}
                         render={<Link href={teamHref} />}
                       >
-                        <ClipboardListIcon />
+                        <span
+                          className={cn(
+                            'size-2 shrink-0 rounded-full',
+                            teamDotClass(team.name),
+                          )}
+                          aria-hidden
+                        />
                         <span>{team.name}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

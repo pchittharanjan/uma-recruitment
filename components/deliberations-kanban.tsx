@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentProps, PointerEvent as ReactPointerEvent } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
 import {
   ArrowDownWideNarrowIcon,
@@ -10,6 +10,7 @@ import {
   Columns2Icon,
   GripVerticalIcon,
   MoreHorizontalIcon,
+  Settings2Icon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +38,7 @@ import {
   KanbanBoard,
   KanbanColumn,
   KanbanColumnContent,
+  KanbanColumnHandle,
   KanbanItem,
   KanbanItemHandle,
   KanbanOverlay,
@@ -83,25 +88,25 @@ const COLUMN_META: Record<
   pool: {
     title: 'Pool',
     accent: 'bg-sky-600',
-    description: 'All deliberation candidates',
+    description: 'All Final Round Candidates',
     card: 'border-sky-300 bg-sky-100 text-foreground',
   },
   considering: {
     title: 'Considering',
     accent: 'bg-amber-600',
-    description: 'Shortlist in discussion',
+    description: 'Candidates under discussion',
     card: 'border-amber-300 bg-amber-100 text-foreground',
   },
   accept: {
     title: 'Accept',
     accent: 'bg-green-600',
-    description: 'Offer slots',
+    description: 'Candidates to offer',
     card: 'border-green-300 bg-green-100 text-foreground',
   },
 };
 
 const REJECTED_CARD =
-  'border-red-400 bg-red-100 text-foreground shadow-sm';
+  'border-red-400 bg-red-100 text-foreground';
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -111,8 +116,161 @@ function initials(name: string): string {
 }
 
 function formatScore(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—';
+  if (value === null || !Number.isFinite(value)) return '-';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function parseCapInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const n = Number.parseInt(trimmed, 10);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+function AcceptCapBadge({
+  count,
+  acceptLimit,
+  allowOverCap,
+  canEdit,
+  teamId,
+  readOnly,
+  onSaved,
+}: {
+  count: number;
+  acceptLimit: number | null;
+  allowOverCap: boolean;
+  canEdit: boolean;
+  teamId: number;
+  readOnly: boolean;
+  onSaved: (cap: number | null, allowOver: boolean) => void;
+}) {
+  const atCapacity = acceptLimit != null && count >= acceptLimit;
+  const [open, setOpen] = useState(false);
+  const [draftCap, setDraftCap] = useState('');
+  const [draftOver, setDraftOver] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraftCap(acceptLimit === null ? '' : String(acceptLimit));
+    setDraftOver(allowOverCap);
+  }, [open, acceptLimit, allowOverCap]);
+
+  const badge = (
+    <Badge
+      variant={atCapacity && !allowOverCap ? 'destructive' : 'outline'}
+      className={cn(
+        'font-semibold tabular-nums',
+        (!atCapacity || allowOverCap) && 'border-foreground/25 bg-white text-foreground',
+      )}
+    >
+      {acceptLimit != null ? `${count}/${acceptLimit}` : count}
+    </Badge>
+  );
+
+  if (!canEdit || readOnly) return badge;
+
+  const handleSave = async () => {
+    const cap = parseCapInput(draftCap);
+    if (draftCap.trim() && cap === null) {
+      toast.error('Offer limit must be a positive whole number, or leave blank for no limit.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/advancement-caps', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId,
+          deliberationsCap: cap,
+          deliberationsAllowOverCap: draftOver,
+        }),
+      });
+      const json = (await res.json()) as {
+        team?: { deliberationsCap?: number | null; deliberationsAllowOverCap?: boolean };
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error || 'Failed to save offer limit.');
+        return;
+      }
+      onSaved(json.team?.deliberationsCap ?? cap, Boolean(json.team?.deliberationsAllowOverCap));
+      toast.success('Offer limit saved.');
+      setOpen(false);
+    } catch {
+      toast.error('Network error: could not save offer limit.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {badge}
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-foreground/70 hover:text-foreground"
+              aria-label="Edit offer limit"
+            />
+          }
+        >
+          <Settings2Icon className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-56 space-y-3 p-3"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor={`accept-cap-${teamId}`} className="text-xs font-medium">
+              Offer limit
+            </Label>
+            <Input
+              id={`accept-cap-${teamId}`}
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="No limit"
+              className="h-8"
+              value={draftCap}
+              onChange={(e) => setDraftCap(e.target.value)}
+            />
+            <p className="text-[0.7rem] leading-snug text-muted-foreground">
+              Blank = no cap on Accept. Set a number to show the slot count (e.g. 0/6).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`accept-over-${teamId}`}
+              checked={draftOver}
+              onCheckedChange={(checked) => setDraftOver(checked === true)}
+            />
+            <Label
+              htmlFor={`accept-over-${teamId}`}
+              className="cursor-pointer text-xs font-normal text-muted-foreground"
+            >
+              Can go over limit
+            </Label>
+          </div>
+          <LoadingButton
+            type="button"
+            size="sm"
+            className="w-full"
+            loading={saving}
+            onClick={handleSave}
+          >
+            Save limit
+          </LoadingButton>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 function ScoreChip({ label, value }: { label: string; value: number | null }) {
@@ -180,10 +338,10 @@ function ApplicantCard({
         if (!isOverlay) onPrefetch?.(candidate);
       }}
       className={cn(
-        'overflow-hidden border shadow-sm ring-0 transition-shadow',
+        'overflow-hidden border ring-0 transition-colors',
         candidate.rejected ? REJECTED_CARD : meta.card,
-        !isOverlay && 'rotate-0 cursor-pointer hover:-translate-y-0.5 hover:shadow-md',
-        isOverlay && 'shadow-md ring-2 ring-primary/25',
+        !isOverlay && 'cursor-pointer hover:border-foreground/15',
+        isOverlay && 'ring-2 ring-primary/25',
         inCompare && !isOverlay && 'ring-2 ring-foreground/40',
       )}
     >
@@ -295,6 +453,11 @@ interface DelibColumnProps extends Omit<ComponentProps<typeof KanbanColumn>, 'ch
   value: DeliberationsColumnId;
   candidates: DeliberationsCandidate[];
   acceptLimit: number | null;
+  allowOverCap?: boolean;
+  teamId?: number;
+  canEditAcceptCap?: boolean;
+  readOnly?: boolean;
+  onAcceptCapSaved?: (cap: number | null, allowOver: boolean) => void;
   compareIds?: Set<string>;
   isOverlay?: boolean;
   onOpenCandidate?: (candidate: DeliberationsCandidate) => void;
@@ -307,6 +470,11 @@ function DelibColumn({
   value,
   candidates,
   acceptLimit,
+  allowOverCap = false,
+  teamId,
+  canEditAcceptCap = false,
+  readOnly = false,
+  onAcceptCapSaved,
   compareIds,
   isOverlay,
   onOpenCandidate,
@@ -316,44 +484,39 @@ function DelibColumn({
   ...props
 }: DelibColumnProps) {
   const meta = COLUMN_META[value];
-  const atCapacity =
-    value === 'accept' && acceptLimit != null && candidates.length >= acceptLimit;
   const rejectedCount = candidates.filter((c) => c.rejected).length;
 
   return (
     <KanbanColumn value={value} disabled {...props}>
       <div
         className={cn(
-          'flex h-full flex-col rounded-xl border p-2.5 shadow-sm',
+          'flex h-full flex-col rounded-xl border p-2.5',
           COLUMN_WELL,
         )}
       >
-        <div className="flex items-start justify-between gap-3 px-1 py-1">
-          <div className="min-w-0 space-y-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className={cn('size-2.5 shrink-0 rounded-full', meta.accent)} />
-              <h2 className="truncate text-sm font-bold tracking-tight text-foreground">
-                {meta.title}
-              </h2>
-            </div>
-            <p className="text-xs text-foreground/75">{meta.description}</p>
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5 px-1 py-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className={cn('size-2.5 shrink-0 rounded-full', meta.accent)} />
+            <h2 className="text-sm font-bold leading-snug tracking-tight text-foreground">
+              {meta.title}
+            </h2>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
             {rejectedCount > 0 ? (
               <Badge className="border-0 bg-red-600 font-semibold tabular-nums text-white">
                 {rejectedCount} rejected
               </Badge>
             ) : null}
-            {value === 'accept' && acceptLimit != null ? (
-              <Badge
-                variant={atCapacity ? 'destructive' : 'outline'}
-                className={cn(
-                  'font-semibold tabular-nums',
-                  !atCapacity && 'border-foreground/25 bg-white text-foreground',
-                )}
-              >
-                {candidates.length}/{acceptLimit}
-              </Badge>
+            {value === 'accept' ? (
+              <AcceptCapBadge
+                count={candidates.length}
+                acceptLimit={acceptLimit}
+                allowOverCap={allowOverCap}
+                canEdit={canEditAcceptCap && teamId != null}
+                teamId={teamId ?? 0}
+                readOnly={readOnly}
+                onSaved={(cap, over) => onAcceptCapSaved?.(cap, over)}
+              />
             ) : (
               <Badge
                 variant="outline"
@@ -362,13 +525,23 @@ function DelibColumn({
                 {candidates.length}
               </Badge>
             )}
-            <span className="inline-flex size-6 items-center justify-center text-foreground/55">
+            <KanbanColumnHandle className="inline-flex size-6 items-center justify-center text-foreground/55 opacity-100">
               <GripVerticalIcon className="size-3.5" aria-hidden />
-            </span>
+            </KanbanColumnHandle>
           </div>
+          <p className="w-full min-w-0 text-pretty text-xs leading-snug text-foreground/75">
+            {meta.description}
+          </p>
         </div>
 
         <KanbanColumnContent value={value} className="mt-2 min-h-80 gap-2.5">
+          {candidates.length === 0 && value === 'pool' ? (
+            <div className="mx-1 flex min-h-32 items-center justify-center rounded-lg border border-dashed border-foreground/20 bg-muted/30 px-3 py-8">
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                No candidates in this phase yet
+              </p>
+            </div>
+          ) : null}
           {candidates.map((candidate) => (
             <ApplicantCard
               key={candidate.id}
@@ -448,10 +621,12 @@ export function DeliberationsKanban({
   teamId,
   initialColumns,
   initialSavedLayout = null,
-  acceptLimit,
-  allowOverCap = false,
+  acceptLimit: initialAcceptLimit,
+  allowOverCap: initialAllowOverCap = false,
   teamName,
   canSave = true,
+  canEditAcceptCap = false,
+  canFinalize,
   readOnly = false,
   selectionComplete = false,
   saveUrl,
@@ -469,6 +644,10 @@ export function DeliberationsKanban({
   teamName: string;
   /** Admin-only: persist shared board. Non-admins can still rearrange locally. */
   canSave?: boolean;
+  /** Admin-only: edit Accept offer limit from the board. Defaults to canSave. */
+  canEditAcceptCap?: boolean;
+  /** Admin-only: lock Accept → offers. Hidden during phase preview. Defaults to canSave. */
+  canFinalize?: boolean;
   /** Pipeline closed / archive — no local rearranges either. */
   readOnly?: boolean;
   /** True when Accept offers are already locked. */
@@ -487,6 +666,15 @@ export function DeliberationsKanban({
   const boardSaveUrl = saveUrl ?? `/api/admin/teams/${teamId}/deliberations`;
   const boardFinalizeUrl =
     finalizeUrl ?? `/api/admin/teams/${teamId}/deliberations/finalize`;
+  const allowFinalize = canFinalize ?? canSave;
+  const effectiveCanEditAcceptCap = canEditAcceptCap ?? canSave;
+  const [acceptLimit, setAcceptLimit] = useState(initialAcceptLimit);
+  const [allowOverCap, setAllowOverCap] = useState(initialAllowOverCap);
+
+  useEffect(() => {
+    setAcceptLimit(initialAcceptLimit);
+    setAllowOverCap(initialAllowOverCap);
+  }, [initialAcceptLimit, initialAllowOverCap]);
   const detailUrl =
     resolveDetailUrl ??
     ((applicationId: number) =>
@@ -556,7 +744,7 @@ export function DeliberationsKanban({
     if (readOnly || locked) {
       toast.error(
         readOnly
-          ? 'Recruitment is closed — this board is view-only.'
+          ? 'Recruitment is closed. This board is view-only.'
           : 'Final selection is locked for this team.',
       );
       return;
@@ -605,7 +793,7 @@ export function DeliberationsKanban({
       setSavedLayout(json.layout ?? layout);
       toast.success('Board saved.');
     } catch {
-      toast.error('Network error — could not save board.');
+      toast.error('Network error: could not save board.');
     } finally {
       setSaving(false);
     }
@@ -639,17 +827,17 @@ export function DeliberationsKanban({
       setSavedLayout(layout);
       toast.success(
         json.message ??
-          `Final selection locked — ${json.offeredCount ?? acceptCount} offer(s).`,
+          `Final selection locked: ${json.offeredCount ?? acceptCount} offer(s).`,
       );
       onFinalized?.();
     } catch (err) {
       if (!(err instanceof Error)) {
-        toast.error('Network error — could not complete final selection.');
+        toast.error('Network error: could not complete final selection.');
         throw new Error('Finalize failed');
       }
       // API failures already toasted; rethrow so the confirm dialog stays open.
       if (!err.message || err.message === 'Failed to fetch') {
-        toast.error('Network error — could not complete final selection.');
+        toast.error('Network error: could not complete final selection.');
       }
       throw err;
     } finally {
@@ -664,7 +852,7 @@ export function DeliberationsKanban({
     overIndex,
   }: KanbanMoveEvent) => {
     if (readOnly) {
-      toast.error('Recruitment is closed — this board is view-only.');
+      toast.error('Recruitment is closed. This board is view-only.');
       return;
     }
     if (locked) {
@@ -697,7 +885,7 @@ export function DeliberationsKanban({
       !allowOverCap &&
       destItems.length >= acceptLimit
     ) {
-      toast.error(`Accept is full — offer limit is ${acceptLimit} for ${teamName}.`);
+      toast.error(`Accept is full: offer limit is ${acceptLimit} for ${teamName}.`);
       return;
     }
 
@@ -721,7 +909,7 @@ export function DeliberationsKanban({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="display-panel flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Sort by</span>
           <ToggleGroup
@@ -779,7 +967,7 @@ export function DeliberationsKanban({
                 variant="outline"
                 className="border-emerald-500/40 text-emerald-700"
               >
-                Final selection locked
+                Final Selection Locked
               </Badge>
             ) : null}
             {isDirty && !locked ? (
@@ -793,7 +981,7 @@ export function DeliberationsKanban({
             >
               Save
             </LoadingButton>
-            {!locked ? (
+            {!locked && allowFinalize ? (
               <>
                 <LoadingButton
                   type="button"
@@ -815,7 +1003,7 @@ export function DeliberationsKanban({
                       else on this board as not selected.
                     </>
                   }
-                  confirmLabel="Lock final selection"
+                  confirmLabel="Lock Final Selection"
                   onConfirm={handleFinalize}
                 />
               </>
@@ -823,7 +1011,7 @@ export function DeliberationsKanban({
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Local preview — admin saves &amp; advances
+            Local preview: admin saves &amp; advances
           </p>
         )}
       </div>
@@ -837,7 +1025,7 @@ export function DeliberationsKanban({
         }}
       />
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overscroll-x-contain">
         <Kanban
           value={displayColumns}
           onValueChange={(value) => {
@@ -852,13 +1040,21 @@ export function DeliberationsKanban({
           onMove={handleMove}
           className="w-full"
         >
-          <KanbanBoard className="grid auto-rows-fr grid-cols-[repeat(3,minmax(16rem,1fr))] gap-3">
+          <KanbanBoard className="grid w-max min-w-full auto-rows-fr grid-cols-[repeat(3,minmax(18rem,1fr))] gap-3">
             {columnOrder.map((columnId) => (
               <DelibColumn
                 key={columnId}
                 value={columnId}
                 candidates={displayColumns[columnId] ?? []}
                 acceptLimit={acceptLimit}
+                allowOverCap={allowOverCap}
+                teamId={teamId}
+                canEditAcceptCap={effectiveCanEditAcceptCap}
+                readOnly={readOnly}
+                onAcceptCapSaved={(cap, over) => {
+                  setAcceptLimit(cap);
+                  setAllowOverCap(over);
+                }}
                 compareIds={compareIdSet}
                 onOpenCandidate={(candidate) => setSelectedId(candidate.id)}
                 onPrefetchCandidate={(candidate) =>
@@ -879,6 +1075,7 @@ export function DeliberationsKanban({
                     value={columnId}
                     candidates={displayColumns[columnId] ?? []}
                     acceptLimit={acceptLimit}
+                    allowOverCap={allowOverCap}
                     isOverlay
                   />
                 );

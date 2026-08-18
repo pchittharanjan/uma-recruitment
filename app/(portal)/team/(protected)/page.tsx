@@ -73,7 +73,7 @@ export default function TeamHomePage() {
       <CenteredMessage
         title="No team access yet"
         description="Ask an Admin to grant you access to a team, then refresh this page."
-        ctaLabel="Coffee chats"
+        ctaLabel="Coffee Chats"
         ctaHref="/coffee-chats"
       />
     );
@@ -84,7 +84,7 @@ export default function TeamHomePage() {
       <PageSection>
         <PageHeader
           eyebrow="Team portal"
-          title="Your teams"
+          title="Your Teams"
           description={phaseOneLiner(status)}
           actions={<StageBadge label={label} color="blue" />}
         />

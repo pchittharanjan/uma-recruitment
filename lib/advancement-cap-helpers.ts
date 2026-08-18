@@ -81,7 +81,7 @@ function advancementTargetLabel(fromStage: AdvancementCapStage): string {
     case 'first_round':
       return 'Final Round Interview';
     case 'deliberations':
-      return 'Final selection';
+      return 'Final Selection';
   }
 }
 

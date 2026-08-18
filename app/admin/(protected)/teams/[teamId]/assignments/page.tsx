@@ -190,7 +190,7 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
     <PageContainer size="wide" className="space-y-8">
       <PageHeader
         eyebrow={data.team.name}
-        title="Edit assignments"
+        title="Edit Assignments"
       />
 
       <PageSection>

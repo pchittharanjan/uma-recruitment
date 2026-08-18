@@ -20,7 +20,6 @@ import { forbidden, unauthorized } from '@/lib/auth';
 import { userHasTeamAccess } from '@/lib/access';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { isTeamDirector } from '@/lib/directors';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
@@ -54,8 +53,7 @@ export async function GET(req: NextRequest) {
     });
     const submission = await getLatestAdvancementSubmission(teamId, round.id, fromStage);
     const history = await listAdvancementSubmissionHistory(teamId, round.id, fromStage);
-    const globalState = await getGlobalPipelineState();
-    const readOnly = isAdvancementReadOnly(globalState.status, fromStage);
+    const readOnly = isAdvancementReadOnly(round.status, fromStage);
     const canSubmit =
       user.role === 'exec' && (await isTeamDirector(user.id, teamId));
     const isDirector = canSubmit;

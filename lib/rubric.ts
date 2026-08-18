@@ -1,4 +1,5 @@
 import type { TeamName } from '@/lib/db';
+import { teamBadgeClass } from '@/lib/team-colors';
 import { splitRowsByTeam, type TeamSplitConfig } from '@/lib/team-split';
 
 /** Collapse whitespace/newlines so Google Forms headers match reliably. */
@@ -54,6 +55,73 @@ const CONTEXT_PATTERNS: RegExp[] = [
   /calnet/,
 ];
 
+const PORTFOLIO_PATTERNS: RegExp[] = [
+  /portfolio/,
+  /google drive/,
+  /drive\.google/,
+  /figma/,
+  /share a link/,
+  /design along/,
+  /behance/,
+  /dribbble/,
+  /website url/,
+  /work sample/,
+];
+
+const URL_VALUE_PATTERN = /^https?:\/\//i;
+
+export function detectPortfolioHeaders(
+  headers: string[],
+  rows: Record<string, string>[],
+  contextHeaders: Set<string>,
+): Set<string> {
+  const portfolio = new Set<string>();
+  for (const header of headers) {
+    if (isContextColumn(header, contextHeaders)) continue;
+    const normalized = normalizeHeaderText(header);
+    if (PORTFOLIO_PATTERNS.some((p) => p.test(normalized))) {
+      portfolio.add(header);
+      continue;
+    }
+    if (rows.length === 0) continue;
+    const filled = rows.filter((r) => (r[header] ?? '').trim().length > 0);
+    if (filled.length === 0) continue;
+    const urlLike = filled.filter((r) => URL_VALUE_PATTERN.test((r[header] ?? '').trim())).length;
+    if (urlLike / filled.length >= 0.6 && normalized.length < 120) {
+      portfolio.add(header);
+    }
+  }
+  return portfolio;
+}
+
+export function suggestPortfolioFieldsByTeam(
+  headers: string[],
+  rows: Record<string, string>[],
+  teamSplitConfig: TeamSplitConfig,
+  contextHeaders: Set<string>,
+): Record<TeamName, string[]> {
+  const { byTeam } = splitRowsByTeam(rows, headers, teamSplitConfig);
+  const globalPortfolio = detectPortfolioHeaders(headers, rows, contextHeaders);
+  const result: Record<TeamName, string[]> = {
+    Strategy: [],
+    Events: [],
+    Design: [],
+  };
+
+  for (const team of ['Strategy', 'Events', 'Design'] as TeamName[]) {
+    const teamRows = byTeam[team].map((r) => r.fields);
+    const teamPortfolio = detectPortfolioHeaders(headers, teamRows, contextHeaders);
+    const merged = new Set([...globalPortfolio, ...teamPortfolio]);
+    result[team] = headers.filter((h) => {
+      if (!merged.has(h)) return false;
+      if (teamRows.length === 0) return false;
+      return columnFillRate(teamRows, h) >= SUGGEST_THRESHOLD;
+    });
+  }
+
+  return result;
+}
+
 export function detectContextHeaders(headers: string[]): Set<string> {
   return new Set(
     headers.filter((h) => CONTEXT_PATTERNS.some((p) => p.test(normalizeHeaderText(h)))),
@@ -103,6 +171,8 @@ export function suggestScoreFieldsByTeam(
     for (const header of headers) {
       if (isContextColumn(header, contextHeaders)) continue;
       if (teamRows.length === 0) continue;
+      const normalized = normalizeHeaderText(header);
+      if (PORTFOLIO_PATTERNS.some((p) => p.test(normalized))) continue;
       if (columnFillRate(teamRows, header) >= SUGGEST_THRESHOLD) {
         scored.push(header);
       }
@@ -233,16 +303,8 @@ export function scopeBadgeClass(kind: QuestionScopeKind, scoringTeams: TeamName[
       return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200';
     case 'single_team': {
       const team = scoringTeams[0];
-      if (team === 'Strategy') {
-        return 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200';
-      }
-      if (team === 'Events') {
-        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200';
-      }
-      if (team === 'Design') {
-        return 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200';
-      }
-      return 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200';
+      if (team) return teamBadgeClass(team);
+      return 'bg-muted text-muted-foreground';
     }
     case 'multi_team':
       return 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200';
@@ -259,6 +321,20 @@ export function buildScoreFieldSets(
   contextHeaders: Set<string>,
 ): Record<TeamName, Set<string>> {
   const suggested = suggestScoreFieldsByTeam(headers, rows, config, contextHeaders);
+  return {
+    Strategy: new Set(suggested.Strategy),
+    Events: new Set(suggested.Events),
+    Design: new Set(suggested.Design),
+  };
+}
+
+export function buildPortfolioFieldSets(
+  headers: string[],
+  rows: Record<string, string>[],
+  config: TeamSplitConfig,
+  contextHeaders: Set<string>,
+): Record<TeamName, Set<string>> {
+  const suggested = suggestPortfolioFieldsByTeam(headers, rows, config, contextHeaders);
   return {
     Strategy: new Set(suggested.Strategy),
     Events: new Set(suggested.Events),

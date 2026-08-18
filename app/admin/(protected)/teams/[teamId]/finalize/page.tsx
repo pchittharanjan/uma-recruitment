@@ -77,7 +77,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
     <PageContainer className="space-y-8">
       <PageHeader
         eyebrow={data.team.name}
-        title="Final results"
+        title="Final Results"
         description={`${ranked.length} applications ranked`}
         actions={
           <a href={`/api/admin/teams/${teamId}/export`} download>
@@ -131,7 +131,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
                   return (
                     <tr
                       key={app.id}
-                      className={isTied ? 'cursor-pointer bg-yellow-50/60 hover:bg-yellow-50' : 'hover:bg-muted/30'}
+                      className={isTied ? 'cursor-pointer bg-yellow-50/60 hover:bg-yellow-50' : undefined}
                       onClick={isTied ? () => setExpandedId(expandedId === app.id ? null : app.id) : undefined}
                     >
                       <td className="p-4">

@@ -10,6 +10,7 @@ import {
   parseDeliberationsBoardLayout,
   saveDeliberationsBoardLayout,
 } from '@/lib/deliberations';
+import { adminCanFinalizePhase, isAdminPhasePreview } from '@/lib/admin-phase-preview';
 import { assertPipelineWritable, isPipelineClosed } from '@/lib/pipeline-writable';
 
 export async function GET(
@@ -39,12 +40,16 @@ export async function GET(
       isDeliberationsFinalSelectionComplete(teamId, round.id),
       isPipelineClosed(),
     ]);
+    const phasePreview = isAdminPhasePreview(round.status, 'deliberations');
+    const canFinalize = adminCanFinalizePhase(round.status, 'deliberations');
 
     return NextResponse.json({
       team,
       round,
       board,
       canSave: true,
+      canFinalize,
+      phasePreview,
       selectionComplete,
       pipelineClosed,
       // Don't put the admin board into read-only mode when closed.

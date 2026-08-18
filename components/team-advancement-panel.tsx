@@ -8,7 +8,7 @@ import LoadingButton from '@/components/loading-button';
 import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
 import { AdvancementActivityLog } from '@/components/advancement-activity-log';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdvancementRankColGroup } from '@/components/advancement-rank-table-columns';
@@ -53,6 +53,7 @@ import {
   advancementStepGuide,
   recommendationsCompleteMessage,
 } from '@/lib/next-step-guidance';
+import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 
 interface RankedApplicant {
   applicationId: number;
@@ -594,6 +595,7 @@ export function TeamAdvancementPanel({
         return;
       }
       toast.success('Advancement list submitted');
+      invalidateClientFetchCache('/api/admin/advancements');
       await fetchData();
     } catch {
       setSubmitError('Submission failed.');
@@ -813,7 +815,7 @@ export function TeamAdvancementPanel({
       {isPending && data.submission && (
         <StatusBanner
           type="info"
-          message={`${data.submission.submittedBy.name} submitted ${data.submission.topN} applicant${data.submission.topN === 1 ? '' : 's'} on ${new Date(data.submission.submittedAt * 1000).toLocaleString()} — waiting for Admin approval.`}
+          message={`${data.submission.submittedBy.name} submitted ${data.submission.topN} applicant${data.submission.topN === 1 ? '' : 's'} on ${new Date(data.submission.submittedAt * 1000).toLocaleString()}, waiting for Admin approval.`}
         />
       )}
 
@@ -858,7 +860,7 @@ export function TeamAdvancementPanel({
       {isApproved && data.submission && (
         <StatusBanner
           type="success"
-          message={`Admin approved the list of ${data.submission.topN} applicant${data.submission.topN === 1 ? '' : 's'} submitted by ${data.submission.submittedBy.name}.`}
+          message={`${data.submission.reviewedBy?.name ?? 'Admin'} approved the list of ${data.submission.topN} applicant${data.submission.topN === 1 ? '' : 's'} submitted by ${data.submission.submittedBy.name}.`}
         />
       )}
 
@@ -897,7 +899,7 @@ export function TeamAdvancementPanel({
                         ? `Select at least ${minAdvanceCount} to advance (up to ${maxAdvanceCount})`
                         : `Select at least ${minAdvanceCount} to advance (you may keep up to ${maxAdvanceCount} from your pending list)`}
                     {allowOverCap && advancementCap !== null
-                      ? ` — over the usual limit of ${advancementCap}`
+                      ? `, over the usual limit of ${advancementCap}`
                       : ''}
                     . Panel color signals are advisory.
                   </CardDescription>
@@ -1075,8 +1077,9 @@ export function TeamAdvancementPanel({
                     checked={Boolean(filterMyInterviewees)}
                     onCheckedChange={(checked) => setFilterMyInterviewees(checked === true)}
                   />
-                  <Label htmlFor="filter-my-interviewees" className="cursor-pointer text-sm">
-                    My interviewees only ({myIntervieweeCount})
+                  <Label htmlFor="filter-my-interviewees" className="flex cursor-pointer items-baseline gap-2.5 text-sm">
+                    My interviewees only
+                    <TitleCount>{myIntervieweeCount}</TitleCount>
                   </Label>
                 </div>
               )}
@@ -1353,7 +1356,7 @@ export function TeamAdvancementPanel({
                                   {expanded ? 'Hide' : 'View'}
                                 </Button>
                               ) : (
-                                <span className="text-sm text-muted-foreground">—</span>
+                                <span className="text-sm text-muted-foreground">-</span>
                               )}
                             </TableCell>
                           )}
@@ -1413,7 +1416,7 @@ export function TeamAdvancementPanel({
         <PageSection>
           <Card>
             <CardHeader className="gap-2">
-              <CardTitle className="text-base">Submission log</CardTitle>
+              <CardTitle className="text-base">Submission Log</CardTitle>
             </CardHeader>
             <CardContent className="pt-5">
               <AdvancementActivityLog entries={data.history} hideHeader />

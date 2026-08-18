@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { CircleHelpIcon, PencilIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -17,19 +17,18 @@ export function GradingEditControl({
   lockMessage: string;
   label?: string;
 }) {
-  const router = useRouter();
   const href = `/team/${teamId}/grade/${applicationId}`;
 
   if (!locked) {
     return (
-      <button
-        type="button"
-        onClick={() => router.push(href)}
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      <Link
+        href={href}
+        prefetch
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground uma-hover-on-panel hover:text-foreground"
         aria-label={label}
       >
         <PencilIcon className="size-4" />
-      </button>
+      </Link>
     );
   }
 

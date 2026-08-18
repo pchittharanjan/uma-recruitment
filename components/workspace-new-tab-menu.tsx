@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   CoffeeIcon,
@@ -44,8 +44,9 @@ const DESTINATION_ICONS: Record<string, typeof LayoutDashboardIcon> = {
   Deliberations: LayoutGridIcon,
   Import: UploadIcon,
   Emails: MailIcon,
-  'Final selection': FlagIcon,
+  'Final Selection': FlagIcon,
 };
+const HOVER_CLOSE_DELAY_MS = 150;
 
 export function WorkspaceNewTabMenu({
   className,
@@ -61,6 +62,7 @@ export function WorkspaceNewTabMenu({
   const { area, tabs, activeHref, openTab } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Explicit null means empty pane — do not fall back to the left/active href.
   const selectedHref = currentHref === undefined ? activeHref : currentHref;
 
@@ -75,6 +77,28 @@ export function WorkspaceNewTabMenu({
     if (!q) return destinations;
     return destinations.filter((item) => item.title.toLowerCase().includes(q));
   }, [destinations, query]);
+
+  const clearHoverCloseTimer = useCallback(() => {
+    if (hoverCloseTimer.current) {
+      clearTimeout(hoverCloseTimer.current);
+      hoverCloseTimer.current = null;
+    }
+  }, []);
+
+  const openOnHover = useCallback(() => {
+    clearHoverCloseTimer();
+    setOpen(true);
+  }, [clearHoverCloseTimer]);
+
+  const scheduleCloseOnHoverLeave = useCallback(() => {
+    clearHoverCloseTimer();
+    hoverCloseTimer.current = setTimeout(() => {
+      setOpen(false);
+      setQuery('');
+    }, HOVER_CLOSE_DELAY_MS);
+  }, [clearHoverCloseTimer]);
+
+  useEffect(() => () => clearHoverCloseTimer(), [clearHoverCloseTimer]);
 
   const handleSelect = (href: string) => {
     const normalized = normalizeWorkspaceHref(href);
@@ -112,13 +136,20 @@ export function WorkspaceNewTabMenu({
               className,
             )}
             title="Open another page"
+            onMouseEnter={openOnHover}
+            onMouseLeave={scheduleCloseOnHoverLeave}
           />
         }
       >
         <PlusIcon data-icon="inline-start" className="size-3.5" />
         Open
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-56 p-0">
+      <DropdownMenuContent
+        align="start"
+        className="min-w-56 p-0"
+        onMouseEnter={openOnHover}
+        onMouseLeave={scheduleCloseOnHoverLeave}
+      >
         <div className="p-2">
           <Input
             placeholder="Open a page…"

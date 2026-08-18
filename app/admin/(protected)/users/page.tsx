@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDownIcon,
@@ -17,9 +18,11 @@ import LoadingButton from '@/components/loading-button';
 import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import PageLoading from '@/components/page-loading';
-import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { useShellUser } from '@/components/shell-user-provider';
 import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { teamBadgeClass } from '@/lib/team-colors';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -104,11 +107,26 @@ type SortDir = 'asc' | 'desc';
 function teamsSortLabel(user: UserRow): string {
   if (user.role === 'admin') return 'All teams';
   if (user.teams.length === 0) return '';
-  return user.teams.map((t) => t.name).join(', ');
+  return user.teams
+    .map((t) => t.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    .join(', ');
+}
+
+function isTeamDirector(user: UserRow): boolean {
+  return user.role !== 'admin' && user.teams.some((t) => t.isDirector);
 }
 
 function firstNameToken(name: string): string {
   return name.trim().split(/\s+/)[0] ?? '';
+}
+
+function compareName(a: UserRow, b: UserRow): number {
+  const byFirst = firstNameToken(a.name).localeCompare(firstNameToken(b.name), undefined, {
+    sensitivity: 'base',
+  });
+  if (byFirst !== 0) return byFirst;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
 function compareUsers(a: UserRow, b: UserRow, key: SortKey, dir: SortDir): number {
@@ -123,15 +141,16 @@ function compareUsers(a: UserRow, b: UserRow, key: SortKey, dir: SortDir): numbe
     case 'role': {
       cmp = displayRole(a).localeCompare(displayRole(b), undefined, { sensitivity: 'base' });
       if (cmp !== 0) return dir === 'asc' ? cmp : -cmp;
-      // Secondary: always A→Z by first name within each role group
-      const byFirst = firstNameToken(a.name).localeCompare(firstNameToken(b.name), undefined, {
-        sensitivity: 'base'});
-      if (byFirst !== 0) return byFirst;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return compareName(a, b);
     }
-    case 'teams':
+    case 'teams': {
       cmp = teamsSortLabel(a).localeCompare(teamsSortLabel(b), undefined, { sensitivity: 'base' });
-      break;
+      if (cmp !== 0) return dir === 'asc' ? cmp : -cmp;
+      const aDirector = isTeamDirector(a);
+      const bDirector = isTeamDirector(b);
+      if (aDirector !== bDirector) return aDirector ? -1 : 1;
+      return compareName(a, b);
+    }
   }
   return dir === 'asc' ? cmp : -cmp;
 }
@@ -689,9 +708,9 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="Users"
         actions={
-          <Button onClick={() => router.push('/admin/users/new')}>
+          <Button nativeButton={false} render={<Link href="/admin/users/new" prefetch />}>
             <PlusIcon className="size-4" />
-            Add users
+            Add Users
           </Button>
         }
       />
@@ -701,7 +720,10 @@ export default function AdminUsersPage() {
       <PageSection>
         <Card className="pb-0">
           <CardHeader>
-            <CardTitle>Everyone ({users.length})</CardTitle>
+            <CardTitle className="flex items-baseline gap-2.5">
+              Everyone
+              <TitleCount>{users.length}</TitleCount>
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {users.length === 0 ? (
@@ -709,7 +731,7 @@ export default function AdminUsersPage() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="h-11 bg-muted/40 hover:bg-muted/40">
+                  <TableRow className="h-11 bg-muted hover:bg-muted">
                     <SortableHeader
                       label="Name"
                       sortKey="name"
@@ -738,14 +760,14 @@ export default function AdminUsersPage() {
                       dir={sortDir}
                       onSort={handleSort}
                     />
-                    <TableHead className="h-11 px-4 py-2 align-middle text-right font-medium text-muted-foreground">
-                      <div className="flex h-full w-full items-center justify-end leading-tight">Actions</div>
+                    <TableHead className="h-11 w-[1%] px-4 py-2 align-middle whitespace-nowrap text-left font-medium text-muted-foreground">
+                      <div className="flex h-full items-center leading-tight">Actions</div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedUsers.map((user) => (
-                    <TableRow key={user.id} className="h-12 hover:bg-muted/20">
+                    <TableRow key={user.id} className="h-12">
                       <TableCell className="px-4 py-2 align-middle font-medium">
                         <div className="flex h-full items-center leading-tight">{user.name}</div>
                       </TableCell>
@@ -775,11 +797,12 @@ export default function AdminUsersPage() {
                           ) : user.teams.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-1 leading-tight">
                               {user.teams.map((t) => (
-                                <StageBadge
+                                <Badge
                                   key={t.id}
-                                  label={t.isDirector ? `${t.name} · Director` : t.name}
-                                  color={t.isDirector ? 'orange' : 'gray'}
-                                />
+                                  className={cn('border-0 font-medium', teamBadgeClass(t.name))}
+                                >
+                                  {t.isDirector ? `${t.name} · Director` : t.name}
+                                </Badge>
                               ))}
                             </div>
                           ) : (
@@ -789,8 +812,8 @@ export default function AdminUsersPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-2 align-middle text-right">
-                        <div className="flex h-full w-full items-center justify-end gap-1">
+                      <TableCell className="w-[1%] px-4 py-2 align-middle whitespace-nowrap">
+                        <div className="flex h-full items-center justify-end gap-1">
                           {(user.role === 'exec' || user.role === 'ad_hoc_exec') && (
                             <Button
                               type="button"
@@ -808,7 +831,7 @@ export default function AdminUsersPage() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="leading-none"
+                            className="leading-none px-2.5 hover:bg-foreground/10 hover:text-foreground"
                             onClick={() => openEdit(user)}
                           >
                             <PencilIcon className="size-3.5" />
@@ -819,7 +842,7 @@ export default function AdminUsersPage() {
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="leading-none text-destructive hover:text-destructive"
+                              className="leading-none px-2.5 text-destructive hover:bg-destructive/15 hover:text-destructive"
                               onClick={() => setRemovingUser(user)}
                             >
                               <Trash2Icon className="size-3.5" />
@@ -968,10 +991,10 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                         return (
                           <TableRow key={row.rowNumber}>
                             <TableCell>{row.rowNumber}</TableCell>
-                            <TableCell>{row.source.fullName || '—'}</TableCell>
-                            <TableCell>{row.source.berkeleyEmail || '—'}</TableCell>
-                            <TableCell>{row.source.role || '—'}</TableCell>
-                            <TableCell>{selectedTeamsLabel || '—'}</TableCell>
+                            <TableCell>{row.source.fullName || '-'}</TableCell>
+                            <TableCell>{row.source.berkeleyEmail || '-'}</TableCell>
+                            <TableCell>{row.source.role || '-'}</TableCell>
+                            <TableCell>{selectedTeamsLabel || '-'}</TableCell>
                             <TableCell
                               className={cn(
                                 'text-sm',

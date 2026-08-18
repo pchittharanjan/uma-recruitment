@@ -22,9 +22,9 @@ export default async function ImportLayout({ children }: { children: React.React
       if (canAdvanceToApplication) {
         return (
           <ImportBlocked
-            message="Import is only available in the Application phase. Move all teams forward to unlock CSV import."
-            ctaLabel="Move All teams to Application →"
-            advancePipeline
+            message="Import is only available once teams are in the Application phase. Advance each team from the Dashboard pipeline controls."
+            ctaLabel="Open Dashboard"
+            ctaHref="/admin/dashboard#pipeline-controls"
           />
         );
       }
@@ -33,7 +33,7 @@ export default async function ImportLayout({ children }: { children: React.React
         return (
           <ImportBlocked
             message="No recruiting cycle yet. Set coffee chat dates on the Dashboard (or Coffee Chats) to start teams, then move to Application."
-            ctaLabel="Go to dashboard"
+            ctaLabel="Go to Dashboard"
             ctaHref="/admin/dashboard"
           />
         );
@@ -42,8 +42,8 @@ export default async function ImportLayout({ children }: { children: React.React
       return (
         <ImportBlocked
           message={`Import is only available in the Application phase. Teams are currently in ${phaseLabel(pipeline.status)}. Use the Dashboard phase controls if you need to change stages.`}
-          ctaLabel="Go to dashboard"
-          ctaHref="/admin/dashboard#move-all-teams"
+          ctaLabel="Go to Dashboard"
+          ctaHref="/admin/dashboard#pipeline-controls"
         />
       );
     }

@@ -12,7 +12,7 @@ const containerSizes: Record<ContainerSize, string> = {
 };
 
 const containerPadding =
-  'w-full px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-9 xl:px-12 2xl:px-14';
+  'uma-page-root w-full min-w-0 px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-9 xl:px-12 2xl:px-14';
 
 export function PageShell({
   children,
@@ -91,45 +91,68 @@ export function PagePanel({
   );
 }
 
+/** Scrollable action row — use under PageHeader for many nav links or toolbars. */
+export function PageToolbar({
+  children,
+  className,
+  wrap = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** Allow wrapping on very narrow screens; default keeps a single scroll row. */
+  wrap?: boolean;
+}) {
+  return (
+    <div className={cn('uma-scroll-strip w-full', className)}>
+      <div
+        className={cn(
+          'uma-scroll-strip-inner',
+          wrap ? 'flex-wrap' : 'flex-nowrap',
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function PageHeader({
   eyebrow,
   title,
   description,
   actions,
+  toolbar,
   className,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  /** Full-width row below the title — ideal for phase links and secondary nav. */
+  toolbar?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-4 pb-1 sm:flex-row sm:items-end sm:justify-between',
-        className,
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        {eyebrow && (
-          <p className="uma-section-label mb-2">{eyebrow}</p>
-        )}
+    <div className={cn('flex min-w-0 flex-col gap-3 pb-1', className)}>
+      {eyebrow ? <p className="uma-section-label">{eyebrow}</p> : null}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1
           className={cn(
-            'font-heading text-[1.65rem] leading-tight tracking-tight sm:text-[1.85rem]',
-            eyebrow && 'mt-0',
+            'min-w-0 font-heading text-[1.65rem] leading-tight tracking-tight sm:text-[1.85rem]',
           )}
         >
           {title}
         </h1>
-        {description && (
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        )}
+        {actions ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        ) : null}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {description ? (
+        <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
+      {toolbar ? <PageToolbar>{toolbar}</PageToolbar> : null}
     </div>
   );
 }
@@ -139,11 +162,26 @@ export const PageSection = forwardRef<
   { children: React.ReactNode; className?: string }
 >(function PageSection({ children, className }, ref) {
   return (
-    <section ref={ref} className={cn('space-y-6', className)}>
+    <section ref={ref} className={cn('uma-page-root min-w-0 space-y-6', className)}>
       {children}
     </section>
   );
 });
+
+/** Quiet count beside a title — use instead of “(12)” in headings and labels. */
+export function TitleCount({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span className={cn('text-sm font-normal tabular-nums text-muted-foreground', className)}>
+      {children}
+    </span>
+  );
+}
 
 export function Stat({
   label,
@@ -156,8 +194,8 @@ export function Stat({
 }) {
   return (
     <div className={className}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-medium tracking-tight tabular-nums text-foreground">
+      <p className="font-heading text-xs text-muted-foreground">{label}</p>
+      <p className="font-heading mt-1 text-2xl font-medium tracking-tight tabular-nums text-foreground">
         {value}
       </p>
     </div>

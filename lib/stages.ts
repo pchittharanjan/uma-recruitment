@@ -82,13 +82,13 @@ export function phaseLabel(status: RoundStatus): string {
 /** Small label above page titles on phase-scoped views (e.g. "Application phase"). */
 export function phasePageEyebrow(status: RoundStatus): string {
   if (status === 'closed') return 'Closed';
-  return `${phaseLabel(status)} phase`;
+  return `${phaseLabel(status)} Phase`;
 }
 
 export function assignmentStageLabel(stage: AssignmentStage): string {
   switch (stage) {
     case 'application':
-      return 'Application grading';
+      return 'Application Grading';
     case 'first_round':
       return 'First Round Interview';
     case 'final_round':
@@ -114,10 +114,10 @@ export function workItemNoun(stage: AssignmentStage, count: number): string {
 export function yourWorkCardLabel(stage: AssignmentStage): string {
   switch (stage) {
     case 'application':
-      return 'Your applications';
+      return 'Your Applications';
     case 'first_round':
     case 'final_round':
-      return 'Your interviews';
+      return 'Your Interviews';
     default:
       return 'Your work';
   }
@@ -198,8 +198,8 @@ export function workActionVerb(stage: AssignmentStage): 'grade' | 'score' {
 export type WorkStatus = 'not_started' | 'in_progress' | 'completed';
 
 export const WORK_STATUS_DISPLAY: Record<WorkStatus, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
   completed: 'Completed',
 };
 
@@ -323,6 +323,15 @@ export function isAdminPhaseNavActive(pathname: string, phaseStatus: RoundStatus
 /** Team overview dashboard (phase-neutral). */
 export function teamOverviewHref(teamId: number): string {
   return `/team/${teamId}`;
+}
+
+/** Admin team hub with optional phase preview (`?view=first-round`, etc.). */
+export function adminTeamPhaseHref(teamId: number, status: RoundStatus): string {
+  const slug = ADMIN_PHASE_SLUGS[status];
+  if (slug && isAdminDashboardPhase(status)) {
+    return `/admin/teams/${teamId}?view=${slug}`;
+  }
+  return `/admin/teams/${teamId}`;
 }
 
 /** Exec team portal destination for a pipeline phase (null when not available to Exec). */

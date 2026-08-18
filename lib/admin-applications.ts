@@ -29,6 +29,7 @@ export async function listAdminApplications(
   applications: AdminApplicationRow[];
   teams: Team[];
   total: number;
+  allCount: number;
   limit: number;
   offset: number;
   hasMore: boolean;
@@ -84,6 +85,14 @@ export async function listAdminApplications(
     args,
   });
   const total = (countResult.rows[0]?.total as number) ?? 0;
+
+  const allCountResult = await db.execute({
+    sql: `SELECT COUNT(*) AS total
+          FROM applications app
+          JOIN rounds r ON r.id = app.round_id
+          WHERE r.status != 'closed'`,
+  });
+  const allCount = (allCountResult.rows[0]?.total as number) ?? total;
 
   // List payload skips app.fields when candidate email is usable — detail fetch loads fields.
   const result = await db.execute({
@@ -159,6 +168,7 @@ export async function listAdminApplications(
     applications,
     teams,
     total,
+    allCount,
     limit,
     offset,
     hasMore: offset + applications.length < total,
@@ -234,6 +244,24 @@ function parseApplicationFields(raw: unknown): Record<string, string> {
   return {};
 }
 
+export async function reclaimApplicationIds(): Promise<void> {
+  const db = getDb();
+  const max = await db.execute({
+    sql: 'SELECT COALESCE(MAX(id), 0) AS max_id FROM applications',
+  });
+  const seq = (max.rows[0]?.max_id as number) ?? 0;
+  const updated = await db.execute({
+    sql: `UPDATE sqlite_sequence SET seq = ? WHERE name = 'applications'`,
+    args: [seq],
+  });
+  if (updated.rowsAffected === 0) {
+    await db.execute({
+      sql: `INSERT INTO sqlite_sequence (name, seq) VALUES ('applications', ?)`,
+      args: [seq],
+    });
+  }
+}
+
 export async function deleteAdminApplication(
   applicationId: number,
   teamId: number,
@@ -243,5 +271,8 @@ export async function deleteAdminApplication(
     sql: 'DELETE FROM applications WHERE id = ? AND team_id = ?',
     args: [applicationId, teamId],
   });
+  if (result.rowsAffected > 0) {
+    await reclaimApplicationIds();
+  }
   return result.rowsAffected > 0;
 }

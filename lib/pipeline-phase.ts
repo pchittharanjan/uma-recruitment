@@ -1,4 +1,4 @@
-import { getDb, getTeams, rowToRound, type Round, type RoundStatus } from '@/lib/db';
+import { getDb, getTeamById, getTeams, rowToRound, type Round, type RoundStatus } from '@/lib/db';
 import { cachedPerRequest } from '@/lib/request-cache';
 import {
   lockRoundStage,
@@ -12,11 +12,21 @@ import {
   type UnlockableStage,
   UNLOCKABLE_STAGES,
 } from '@/lib/stages';
+import {
+  COHORT_STRATEGY_EVENTS,
+  getTeamPipelineProfile,
+  nextPipelineStatusForTeam,
+  phaseLabelForTeam,
+} from '@/lib/team-pipeline-profile';
+
+/** Teams that share bulk-advance actions on the admin dashboard. */
+export { COHORT_STRATEGY_EVENTS } from '@/lib/team-pipeline-profile';
 
 export interface TeamPipelineRound {
   teamId: number;
   teamName: string;
   round: Round | null;
+  unlockedStages: UnlockableStage[];
 }
 
 export interface GlobalPipelineState {
@@ -64,11 +74,18 @@ export async function getActiveRoundsByTeam(): Promise<TeamPipelineRound[]> {
     roundByTeam.set(round.team_id, round);
   }
 
-  return teams.map((team) => ({
-    teamId: team.id,
-    teamName: team.name,
-    round: roundByTeam.get(team.id) ?? null,
-  }));
+  const roundIds = [...roundByTeam.values()].map((r) => r.id);
+  const unlocksByRound = await loadUnlocksByRoundIds(roundIds);
+
+  return teams.map((team) => {
+    const round = roundByTeam.get(team.id) ?? null;
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      round,
+      unlockedStages: round ? (unlocksByRound.get(round.id) ?? []) : [],
+    };
+  });
 }
 
 async function loadUnlocksByRoundIds(
@@ -121,6 +138,7 @@ async function getGlobalPipelineStateUncached(): Promise<GlobalPipelineState> {
     .map((t) => ({ teamId: t.teamId, teamName: t.teamName }));
 
   const rounds = withRound.map((t) => t.round);
+  const teamsWithUnlocks = teams;
 
   // When every active round has been closed, surface status=closed instead of null.
   // (getActiveRoundForTeam now falls back to closed rounds, so this path is rare.)
@@ -136,7 +154,7 @@ async function getGlobalPipelineStateUncached(): Promise<GlobalPipelineState> {
         nextStatus: null,
         // Archive mode: all prior phases remain navigable for viewing.
         unlockedStages: [...UNLOCKABLE_STAGES],
-        teams,
+        teams: teamsWithUnlocks,
         teamsWithoutRound,
         statusDrift: false,
         driftedTeams: [],
@@ -168,7 +186,7 @@ async function getGlobalPipelineStateUncached(): Promise<GlobalPipelineState> {
     status,
     nextStatus: status ? nextRoundStatus(status) : null,
     unlockedStages,
-    teams,
+    teams: teamsWithUnlocks,
     teamsWithoutRound,
     statusDrift: driftedTeams.length > 0,
     driftedTeams,
@@ -207,8 +225,7 @@ export async function advanceGlobalPipeline(
     throw new Error('Unable to determine current phase.');
   }
 
-  const next = nextRoundStatus(state.status);
-  if (!next) {
+  if (!nextRoundStatus(state.status)) {
     throw new Error('Already at the final phase.');
   }
 
@@ -221,23 +238,130 @@ export async function advanceGlobalPipeline(
   }
 
   const db = getDb();
-  const roundIds = rounds.map((r) => r.id);
-  const placeholders = roundIds.map(() => '?').join(', ');
-  await db.execute({
-    sql: `UPDATE rounds SET status = ? WHERE id IN (${placeholders})`,
-    args: [next, ...roundIds],
-  });
+  for (const entry of state.teams) {
+    if (!entry.round) continue;
+    const next = nextPipelineStatusForTeam(entry.round.status, entry.teamName);
+    if (!next) continue;
+    await db.execute({
+      sql: 'UPDATE rounds SET status = ? WHERE id = ?',
+      args: [next, entry.round.id],
+    });
+    if (
+      getTeamPipelineProfile(entry.teamName).autoUnlockDeliberations &&
+      next === 'deliberations'
+    ) {
+      await unlockRoundStage(entry.round.id, 'deliberations', _unlockedBy);
+    }
+  }
 
-  // Do not auto-unlock grader access. Admins set up the phase (import, schedule,
-  // rubric, …) while the stage stays locked; they open grading from Stage access.
-  const unlockStage = unlockKeyForStatus(next);
-  if (unlockStage) {
+  // Do not auto-unlock grader access (except Design deliberations above).
+  // Admins set up the phase while the stage stays locked; they open grading from Stage access.
+  const sampleNext = state.teams.find((t) => t.round)
+    ? nextPipelineStatusForTeam(
+        state.teams.find((t) => t.round)!.round!.status,
+        state.teams.find((t) => t.round)!.teamName,
+      )
+    : null;
+  const unlockStage = sampleNext ? unlockKeyForStatus(sampleNext) : null;
+  if (unlockStage && unlockStage !== 'deliberations') {
     warnings.push(
-      `${phaseLabel(next)} is ready for setup. Unlock it under Stage access when graders should start.`,
+      `${phaseLabel(sampleNext!)} is ready for setup. Click to unlock each phase on the dashboard when graders should start.`,
     );
   }
 
   return loadStateWithWarnings(warnings);
+}
+
+/** Advance selected teams to each team's profile-specific next phase. */
+export async function advanceTeamsPipeline(
+  teamIds: number[],
+  unlockedBy: number,
+): Promise<GlobalPipelineActionResult> {
+  if (teamIds.length === 0) {
+    throw new Error('No teams selected.');
+  }
+
+  const state = await getGlobalPipelineState();
+  const warnings: string[] = [];
+  const idSet = new Set(teamIds);
+  const targets = state.teams.filter((t) => idSet.has(t.teamId) && t.round);
+
+  if (targets.length === 0) {
+    throw new Error('No active rounds found for the selected teams.');
+  }
+
+  const missingRound = state.teams.filter((t) => idSet.has(t.teamId) && !t.round);
+  if (missingRound.length > 0) {
+    warnings.push(
+      `${missingRound.map((t) => t.teamName).join(', ')} have no active round yet.`,
+    );
+  }
+
+  const db = getDb();
+  let advancedCount = 0;
+
+  for (const entry of targets) {
+    const round = entry.round!;
+    const next = nextPipelineStatusForTeam(round.status, entry.teamName);
+    if (!next) {
+      warnings.push(`${entry.teamName} is already at the final phase.`);
+      continue;
+    }
+
+    await db.execute({
+      sql: 'UPDATE rounds SET status = ? WHERE id = ?',
+      args: [next, round.id],
+    });
+    advancedCount += 1;
+
+    if (
+      getTeamPipelineProfile(entry.teamName).autoUnlockDeliberations &&
+      next === 'deliberations'
+    ) {
+      await unlockRoundStage(round.id, 'deliberations', unlockedBy);
+    } else {
+      const unlockStage = unlockKeyForStatus(next);
+      if (unlockStage) {
+        warnings.push(
+          `${phaseLabelForTeam(next, entry.teamName)} is ready for ${entry.teamName}. Unlock it when graders should start.`,
+        );
+      }
+    }
+  }
+
+  if (advancedCount === 0) {
+    throw new Error('Selected teams are already at the final phase.');
+  }
+
+  return loadStateWithWarnings(warnings);
+}
+
+/** Resolve team ids for Strategy + Events (bulk cohort advance). */
+export async function strategyEventsTeamIds(): Promise<number[]> {
+  const teams = await getTeams();
+  return teams
+    .filter((t) => (COHORT_STRATEGY_EVENTS as readonly string[]).includes(t.name))
+    .map((t) => t.id);
+}
+
+/** One-line admin summary: "Strategy: Final Round · Events: … · Design: …". */
+export function formatTeamStatusSummary(teams: TeamPipelineRound[]): string {
+  const withRound = teams.filter((t) => t.round);
+  if (withRound.length === 0) return 'Not started';
+  return withRound
+    .map((t) => `${t.teamName}: ${phaseLabelForTeam(t.round!.status, t.teamName)}`)
+    .join(' · ');
+}
+
+/** Default dashboard browse phase — slowest active team (legacy canonical behavior). */
+export function suggestedDashboardViewPhase(teams: TeamPipelineRound[]): RoundStatus {
+  const statuses = teams.filter((t) => t.round).map((t) => t.round!.status);
+  if (statuses.length === 0) return 'pre_application';
+  const active = statuses.filter((s) => s !== 'closed');
+  if (active.length === 0) return 'deliberations';
+  return active.reduce((lowest, status) =>
+    statusIndex(status) < statusIndex(lowest) ? status : lowest,
+  );
 }
 
 /** Unlock a grader stage on every active round. */
@@ -309,4 +433,125 @@ export async function applyGlobalPipelineToRound(
   for (const stage of state.unlockedStages) {
     await unlockRoundStage(roundId, stage, unlockedBy);
   }
+}
+
+export interface TeamPipelineActionResult {
+  teamId: number;
+  teamName: string;
+  round: Round;
+  status: RoundStatus;
+  nextStatus: RoundStatus | null;
+  unlockedStages: UnlockableStage[];
+  warnings: string[];
+}
+
+async function loadTeamActionResult(
+  teamId: number,
+  teamName: string,
+  round: Round,
+  warnings: string[],
+): Promise<TeamPipelineActionResult> {
+  const unlocks = await loadUnlocksByRoundIds([round.id]);
+  return {
+    teamId,
+    teamName,
+    round,
+    status: round.status,
+    nextStatus: nextPipelineStatusForTeam(round.status, teamName),
+    unlockedStages: unlocks.get(round.id) ?? [],
+    warnings,
+  };
+}
+
+/** Advance one team's round to its profile-specific next phase. */
+export async function advanceTeamPipeline(
+  teamId: number,
+  unlockedBy: number,
+): Promise<TeamPipelineActionResult> {
+  const team = await getTeamById(teamId);
+  if (!team) throw new Error('Team not found.');
+
+  const round = (await getActiveRoundsByTeam()).find((t) => t.teamId === teamId)?.round;
+  if (!round) {
+    throw new Error(`${team.name} has no active round. Import applications first.`);
+  }
+
+  const next = nextPipelineStatusForTeam(round.status, team.name);
+  if (!next) {
+    throw new Error(`${team.name} is already at the final phase.`);
+  }
+
+  const db = getDb();
+  await db.execute({
+    sql: 'UPDATE rounds SET status = ? WHERE id = ?',
+    args: [next, round.id],
+  });
+
+  const warnings: string[] = [];
+  const profile = getTeamPipelineProfile(team.name);
+  if (profile.autoUnlockDeliberations && next === 'deliberations') {
+    await unlockRoundStage(round.id, 'deliberations', unlockedBy);
+    warnings.push(`Deliberations unlocked for ${team.name}.`);
+  } else {
+    const unlockStage = unlockKeyForStatus(next);
+    if (unlockStage) {
+      warnings.push(
+        `${phaseLabel(next)} is ready for ${team.name}. Unlock it when graders should start.`,
+      );
+    }
+  }
+
+  const updated = { ...round, status: next };
+  return loadTeamActionResult(teamId, team.name, updated, warnings);
+}
+
+/** Unlock a grader stage for one team. */
+export async function unlockTeamStage(
+  teamId: number,
+  stage: UnlockableStage,
+  unlockedBy: number,
+): Promise<TeamPipelineActionResult> {
+  if (!UNLOCKABLE_STAGES.includes(stage)) {
+    throw new Error('Invalid stage.');
+  }
+
+  const team = await getTeamById(teamId);
+  if (!team) throw new Error('Team not found.');
+
+  const entry = (await getActiveRoundsByTeam()).find((t) => t.teamId === teamId);
+  const round = entry?.round;
+  if (!round) {
+    throw new Error(`${team.name} has no active round.`);
+  }
+
+  await unlockRoundStage(round.id, stage, unlockedBy);
+
+  if (stage === 'application') {
+    const { notifyApplicationUnlocked } = await import('@/lib/notifications');
+    await notifyApplicationUnlocked([round.id]);
+  }
+
+  return loadTeamActionResult(teamId, team.name, round, []);
+}
+
+/** Lock a grader stage for one team. */
+export async function lockTeamStage(
+  teamId: number,
+  stage: UnlockableStage,
+): Promise<TeamPipelineActionResult> {
+  if (!UNLOCKABLE_STAGES.includes(stage)) {
+    throw new Error('Invalid stage.');
+  }
+
+  const team = await getTeamById(teamId);
+  if (!team) throw new Error('Team not found.');
+
+  const entry = (await getActiveRoundsByTeam()).find((t) => t.teamId === teamId);
+  const round = entry?.round;
+  if (!round) {
+    throw new Error(`${team.name} has no active round.`);
+  }
+
+  await lockRoundStage(round.id, stage);
+  return loadTeamActionResult(teamId, team.name, round, []);
 }

@@ -23,6 +23,7 @@ import {
   DELIBERATIONS_WORKSPACE_PATH,
   openTeamDeliberationsHref,
 } from '@/lib/deliberations-workspace';
+import { getTeamPipelineProfile, teamUsesInterviewStage } from '@/lib/team-pipeline-profile';
 
 export interface PhaseChecklistStep {
   id: string;
@@ -32,13 +33,6 @@ export interface PhaseChecklistStep {
   actionLabel: string;
   href: string;
   detail?: string;
-  /**
-   * When true, the CTA POSTs global phase advance instead of only linking.
-   * Use for "Move all teams…" steps so the label matches the action.
-   */
-  advancePipeline?: boolean;
-  /** Optional redirect after a successful advancePipeline click. */
-  advanceRedirectTo?: string;
 }
 
 async function countCoffeeChats(): Promise<number> {
@@ -81,8 +75,14 @@ async function interviewProgressByTeam(
   );
 }
 
-function nextRoundLabel(stage: 'first_round' | 'final_round'): string {
-  return stage === 'first_round' ? 'Final Round Interview' : 'Deliberations';
+function nextRoundLabel(stage: 'first_round' | 'final_round', teamName?: string): string {
+  if (stage === 'first_round') {
+    if (teamName && getTeamPipelineProfile(teamName).skipFinalRoundPhase) {
+      return 'Deliberations';
+    }
+    return 'Final Round Interview';
+  }
+  return 'Deliberations';
 }
 
 function interviewDashboardHref(stage: 'first_round' | 'final_round'): string {
@@ -164,18 +164,16 @@ async function buildPreApplicationChecklist(): Promise<PhaseChecklistStep[]> {
       id: 'coffee-notes',
       title: 'Collect coffee chat notes',
       completed: coffeeChatCount > 0,
-      actionLabel: 'View submissions',
+      actionLabel: 'View Submissions',
       href: '/admin/coffee-chats',
       detail: coffeeChatCount > 0 ? `${coffeeChatCount} logged` : undefined,
     },
     {
       id: 'move-to-application',
-      title: 'Move all teams into Application',
+      title: 'Advance teams to Application',
       completed: moveComplete,
-      actionLabel: 'Move teams',
-      href: '/admin/dashboard#move-all-teams',
-      advancePipeline: !moveComplete && teamCount > 0,
-      advanceRedirectTo: '/admin/import',
+      actionLabel: 'Open Dashboard',
+      href: '/admin/dashboard#pipeline-controls',
       detail: teamDetail(teamsOnApplication, teamCount),
     },
   ];
@@ -213,28 +211,50 @@ async function buildApplicationChecklist(
   const totalAssignments = stats.reduce((sum, s) => sum + s.assignmentProgress.total, 0);
   const completedAssignments = stats.reduce((sum, s) => sum + s.assignmentProgress.completed, 0);
 
+  const designTeams = withRound.filter((t) => getTeamPipelineProfile(t.teamName).skipFinalRoundPhase);
+  const settingsByTeamId = new Map(
+    withRound.map((t, i) => [t.teamId, rubricResults[i]] as const),
+  );
+  const designPortfolioConfigured = designTeams.filter(
+    (t) => (settingsByTeamId.get(t.teamId)?.portfolio_fields.length ?? 0) > 0,
+  ).length;
+
   return [
     {
       id: 'import-apps',
       title: 'Upload Application CSV',
       completed: teamCount > 0 && importedCount === teamCount,
-      actionLabel: 'Open import flow',
+      actionLabel: 'Open Import Flow',
       href: '/admin/import',
       detail: teamDetail(importedCount, teamCount),
     },
+    ...(designTeams.length > 0
+      ? [
+          {
+            id: 'design-portfolio-rubric',
+            title: 'Classify Design portfolio links at import',
+            description:
+              'Mark Google Drive / Figma / portfolio columns as portfolio fields (not context). Ask applicants to anonymize file names before grading.',
+            completed: designPortfolioConfigured === designTeams.length,
+            actionLabel: 'Open Import Flow',
+            href: '/admin/import',
+            detail: teamDetail(designPortfolioConfigured, designTeams.length),
+          } satisfies PhaseChecklistStep,
+        ]
+      : []),
     {
       id: 'rubric',
-      title: 'Configure grading rubric',
+      title: 'Configure Grading Rubric',
       completed: teamCount > 0 && rubricCount === teamCount,
-      actionLabel: 'Team setup',
+      actionLabel: 'Team Setup',
       href: '/admin/dashboard',
       detail: teamDetail(rubricCount, teamCount),
     },
     {
       id: 'assignments',
-      title: 'Generate grader assignments',
+      title: 'Generate Grader Assignments',
       completed: teamCount > 0 && assignedCount === teamCount,
-      actionLabel: 'View assignments',
+      actionLabel: 'View Assignments',
       href: '/admin/dashboard',
       detail: teamDetail(assignedCount, teamCount),
     },
@@ -242,17 +262,17 @@ async function buildApplicationChecklist(
       id: 'unlock-grading',
       title: 'Unlock Application for graders',
       completed: gradingUnlocked,
-      actionLabel: 'Open stage access',
-      href: '/admin/dashboard#stage-access',
+      actionLabel: 'Click to unlock each phase',
+      href: '/admin/dashboard#pipeline-controls',
       description:
         'Keep this locked while you finish import and setup. Unlock when team members should start grading.',
       detail: gradingUnlocked ? 'Open for grading' : 'Locked',
     },
     {
       id: 'grading',
-      title: 'Finish Application grading',
+      title: 'Finish Application Grading',
       completed: totalAssignments > 0 && completedAssignments === totalAssignments,
-      actionLabel: 'Track progress',
+      actionLabel: 'Track Progress',
       href: adminPhaseHref('application'),
       detail: `${completedAssignments}/${totalAssignments} assignments`,
     },
@@ -260,7 +280,7 @@ async function buildApplicationChecklist(
       id: 'advance-submit',
       title: 'Directors submit advancement lists',
       completed: teamCount > 0 && submittedTeams === teamCount,
-      actionLabel: 'View submissions',
+      actionLabel: 'View Submissions',
       href: '/admin/advancements',
       detail: teamDetail(submittedTeams, teamCount),
     },
@@ -268,7 +288,7 @@ async function buildApplicationChecklist(
       id: 'advance-approve',
       title: 'Approve advancement lists',
       completed: teamCount > 0 && approvedTeams === teamCount && pending.length === 0,
-      actionLabel: 'Review queue',
+      actionLabel: 'Review Queue',
       href: '/admin/advancements',
       detail:
         pending.length > 0
@@ -277,13 +297,13 @@ async function buildApplicationChecklist(
     },
     {
       id: 'email-outcomes',
-      title: 'Email applicants',
+      title: 'Email Applicants',
       completed:
         teamCount > 0 &&
         approvedTeams === teamCount &&
         pending.length === 0 &&
         emailedTeams === teamCount,
-      actionLabel: 'Send emails',
+      actionLabel: 'Send Emails',
       href: communicationsHref('application'),
       detail: teamDetail(emailedTeams, teamCount),
     },
@@ -294,10 +314,11 @@ async function buildInterviewChecklist(
   stage: 'first_round' | 'final_round',
   withRound: Array<TeamPipelineRound & { round: NonNullable<TeamPipelineRound['round']> }>,
 ): Promise<PhaseChecklistStep[]> {
+  const eligibleTeams = withRound.filter((t) => teamUsesInterviewStage(t.teamName, stage));
   const label = phaseLabel(stage);
   const nextLabel = nextRoundLabel(stage);
-  const teamProgress = await interviewProgressByTeam(withRound, stage);
-  const teamCount = withRound.length;
+  const teamProgress = await interviewProgressByTeam(eligibleTeams, stage);
+  const teamCount = eligibleTeams.length;
   const teamsScheduled = teamProgress.filter((t) => t.scheduledComplete).length;
   const dashboardHref = interviewDashboardHref(stage);
   // Prefer a team that still needs slots; fall back to first team / dashboard overview.
@@ -312,7 +333,7 @@ async function buildInterviewChecklist(
       id: `${stage}-schedule`,
       title: `Schedule ${label}`,
       completed: teamCount > 0 && teamsScheduled === teamCount,
-      actionLabel: 'Schedule interviews',
+      actionLabel: 'Schedule Interviews',
       href: scheduleHref,
       detail: teamDetail(teamsScheduled, teamCount),
     },
@@ -320,18 +341,15 @@ async function buildInterviewChecklist(
 
   // First Round only: confirm every team's round status has left Application.
   if (stage === 'first_round') {
-    const teamsOnStage = withRound.filter((t) =>
+    const teamsOnStage = eligibleTeams.filter((t) =>
       isRoundAtOrPastStatus(t.round.status, 'first_round'),
     ).length;
     steps.push({
       id: `${stage}-move-teams`,
-      title: 'Move all teams into First Round Interview',
+      title: 'Advance teams into First Round Interview',
       completed: teamCount > 0 && teamsOnStage === teamCount,
-      actionLabel: 'Move teams',
-      // Keep First Round view (bare /admin/dashboard falls back to live pipeline = Application).
-      href: `${adminPhaseHref('first_round')}#move-all-teams`,
-      advancePipeline: !(teamCount > 0 && teamsOnStage === teamCount),
-      advanceRedirectTo: adminPhaseHref('first_round'),
+      actionLabel: 'Open Dashboard',
+      href: `${adminPhaseHref('first_round')}#pipeline-controls`,
       detail: teamDetail(teamsOnStage, teamCount),
     });
   }
@@ -340,9 +358,9 @@ async function buildInterviewChecklist(
     const { total, completed } = team.scoring;
     steps.push({
       id: `${stage}-score-${team.teamId}`,
-      title: `${team.teamName} interviews scored`,
+      title: `${team.teamName} Interviews Scored`,
       completed: team.scoringComplete,
-      actionLabel: 'Track scoring',
+      actionLabel: 'Track Scoring',
       href: dashboardHref,
       detail: total > 0 ? `${completed}/${total} scored` : 'No assignments yet',
     });
@@ -354,12 +372,12 @@ async function buildInterviewChecklist(
     const allScoringDone =
       teamCount > 0 && teamProgress.every((t) => t.scoringComplete || t.candidateCount === 0);
 
-    const roundIds = withRound.map((t) => t.round.id);
+    const roundIds = eligibleTeams.map((t) => t.round.id);
     const submittedTeams = await teamsWithSubmittedAdvancement(roundIds, 'first_round');
     const approvedTeams = await teamsWithApprovedAdvancement(roundIds, 'first_round');
     const pending = (await listPendingAdvancementSubmissions('first_round')).length;
     const emailedTeams = await countTeamsWithCompleteOutcomeEmails(
-      withRound.map((t) => ({ teamId: t.teamId, roundId: t.round.id })),
+      eligibleTeams.map((t) => ({ teamId: t.teamId, roundId: t.round.id })),
       'first_round',
     );
 
@@ -368,7 +386,7 @@ async function buildInterviewChecklist(
         id: `${stage}-advance-submit`,
         title: 'Directors submit advancement lists',
         completed: teamCount > 0 && allScoringDone && submittedTeams === teamCount,
-        actionLabel: 'View submissions',
+        actionLabel: 'View Submissions',
         href: '/admin/advancements',
         detail: allScoringDone
           ? teamDetail(submittedTeams, teamCount)
@@ -382,7 +400,7 @@ async function buildInterviewChecklist(
           allScoringDone &&
           approvedTeams === teamCount &&
           pending === 0,
-        actionLabel: 'Review queue',
+        actionLabel: 'Review Queue',
         href: '/admin/advancements',
         detail: !allScoringDone
           ? 'Finish scoring first'
@@ -392,14 +410,14 @@ async function buildInterviewChecklist(
       },
       {
         id: `${stage}-email-outcomes`,
-        title: 'Email applicants',
+        title: 'Email Applicants',
         completed:
           teamCount > 0 &&
           allScoringDone &&
           approvedTeams === teamCount &&
           pending === 0 &&
           emailedTeams === teamCount,
-        actionLabel: 'Send emails',
+        actionLabel: 'Send Emails',
         href: communicationsHref('first_round'),
         detail: teamDetail(emailedTeams, teamCount),
       },
@@ -426,14 +444,17 @@ async function buildDeliberationsChecklist(
   return [
     {
       id: 'delib-unlock',
-      title: 'Turn on Deliberations for execs',
+      title: 'Unlock Deliberations',
       completed: delibsUnlocked,
-      actionLabel: 'Go to dashboard',
-      href: `${adminPhaseHref('deliberations')}#stage-access`,
+      actionLabel: 'Click to unlock each phase',
+      href: `${adminPhaseHref('deliberations')}#pipeline-controls`,
+      description:
+        'Use the Team Phases cards on the dashboard to unlock Deliberations for each team when execs should start.',
+      detail: delibsUnlocked ? 'Open for execs' : 'Locked',
     },
     {
       id: 'delib-teams',
-      title: 'Complete final selection',
+      title: 'Begin Deliberations',
       completed: teamCount > 0 && finalizedTeams === teamCount,
       actionLabel: 'Open Deliberations',
       href: openDeliberationsHref,
@@ -461,7 +482,7 @@ async function buildClosedChecklist(
       id: 'closed-email-outcomes',
       title: 'Email final outcomes',
       completed: teamCount > 0 && emailedTeams === teamCount,
-      actionLabel: 'Send emails',
+      actionLabel: 'Send Emails',
       href: communicationsHref('final_round'),
       detail: teamDetail(emailedTeams, teamCount),
     },

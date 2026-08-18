@@ -22,7 +22,7 @@ export default function FinalRoundSchedulePage({
   return (
     <TeamInterviewScheduleEditor
       apiPath={`/api/admin/teams/${teamId}/schedule/final-round`}
-      title="Final Round Interview schedule"
+      title="Final Round Interview Schedule"
       stage="final_round"
     />
   );

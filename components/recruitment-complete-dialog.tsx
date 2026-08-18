@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-const DISMISS_KEY_PREFIX = 'uma-recruitment-complete-dismissed:';
+const DISMISS_KEY_PREFIX = 'uma-recruitment-complete-dismissed:v2:';
 
 function dismissKey(cycleLabel: string) {
   return `${DISMISS_KEY_PREFIX}${cycleLabel}`;

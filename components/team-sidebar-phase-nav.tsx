@@ -31,10 +31,14 @@ import { cn } from '@/lib/utils';
 import type { RoundStatus } from '@/lib/db';
 import {
   isTeamPhaseNavActive,
-  PIPELINE_PHASES,
   statusIndex,
   teamPhaseHref,
 } from '@/lib/stages';
+import {
+  getTeamPipelineProfile,
+  phaseLabelForTeam,
+  pipelinePhasesForTeam,
+} from '@/lib/team-pipeline-profile';
 
 const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: string }>>> = {
   pre_application: CoffeeIcon,
@@ -47,14 +51,13 @@ const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: strin
 function phaseAccessible(
   phase: RoundStatus,
   team: TeamNavTeam,
-  globalStatus: RoundStatus | null,
 ): boolean {
-  if (!globalStatus || !team.round) return false;
+  if (!team.round) return false;
   const teamStatus = team.round.status;
-  const unlockKey = PIPELINE_PHASES.find((p) => p.status === phase)?.unlockKey;
+  const unlockKey = pipelinePhasesForTeam(team.name).find((p) => p.status === phase)?.unlockKey;
 
   // Closed archive: any team access unlocks every prior phase for browsing.
-  if (globalStatus === 'closed' || teamStatus === 'closed') {
+  if (teamStatus === 'closed') {
     if (team.grantedStages === 'all') return true;
     if (team.grantedStages.length > 0) return true;
     return false;
@@ -115,7 +118,6 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
   if (!mounted) return null;
 
   const navTeams = nav?.teams ?? [];
-  const globalStatus = nav?.status ?? null;
   const finalSelectionComplete = Boolean(nav?.finalSelectionComplete);
   const isExec = Boolean(nav?.isExec);
 
@@ -123,12 +125,13 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
   const activeTeam =
     navTeams.find((t) => t.id === pathTeamId) ?? navTeams.find((t) => t.id === teams[0]?.id) ?? null;
 
-  if (!globalStatus || !activeTeam?.round) return null;
+  if (!activeTeam?.round) return null;
 
   const teamStatus = activeTeam.round.status;
   const currentIdx = statusIndex(teamStatus);
-  const pipelineClosed = globalStatus === 'closed';
-  const visiblePhases = PIPELINE_PHASES.filter((p) => p.status !== 'closed');
+  const pipelineClosed = teamStatus === 'closed';
+  const visiblePhases = pipelinePhasesForTeam(activeTeam.name);
+  const profile = getTeamPipelineProfile(activeTeam.name);
   const finalActive = pathname.startsWith('/team/final-selection');
 
   return (
@@ -146,7 +149,8 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             });
             const Icon = PHASE_ICONS[phase.status];
             const href = teamPhaseHref(activeTeam.id, phase.status);
-            const accessible = phaseAccessible(phase.status, activeTeam, globalStatus);
+            const accessible = phaseAccessible(phase.status, activeTeam);
+            const phaseLabelText = phaseLabelForTeam(phase.status, activeTeam.name);
             const applicationPast =
               phase.status === 'application' &&
               statusIndex(teamStatus) > statusIndex('application');
@@ -163,12 +167,12 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
 
             if (!accessible || !href) {
               const reason = isFuture
-                ? `${phase.label} — Not Open Yet`
-                : `${phase.label} — Not Available for Your Role`;
+                ? `${phaseLabelText} - Not Open Yet`
+                : `${phaseLabelText} - Not Available for Your Role`;
               return (
                 <DisabledPhaseItem
                   key={phase.status}
-                  label={phase.label}
+                  label={phaseLabelText}
                   icon={Icon}
                   reason={reason}
                 />
@@ -179,7 +183,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
               <SidebarMenuItem key={phase.status}>
                 <SidebarMenuButton
                   isActive={isNavActive && !advanceActive && !firstRoundAdvanceActive}
-                  tooltip={phase.label}
+                  tooltip={phaseLabelText}
                   className={cn(
                     isPast && !isPipelineCurrent && !isNavActive && 'text-muted-foreground',
                   )}
@@ -200,7 +204,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                       isPipelineCurrent && 'font-medium text-primary',
                     )}
                   >
-                    {phase.label}
+                    {phaseLabelText}
                   </span>
                 </SidebarMenuButton>
                 {phase.status === 'application' && isExec && (
@@ -219,7 +223,9 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                           className={cn(advancePast && 'text-muted-foreground')}
                         />
                         <span className={cn(advancePast && 'text-muted-foreground')}>
-                          Advance to First Round Interview
+                          {profile.skipFinalRoundPhase
+                            ? 'Advance to Interview'
+                            : 'Advance to First Round Interview'}
                         </span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -241,7 +247,9 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                           className={cn(firstRoundAdvancePast && 'text-muted-foreground')}
                         />
                         <span className={cn(firstRoundAdvancePast && 'text-muted-foreground')}>
-                          Advance to Final Round Interview
+                          {profile.skipFinalRoundPhase
+                            ? 'Advance to Deliberations'
+                            : 'Advance to Final Round Interview'}
                         </span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -254,11 +262,11 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={finalActive}
-                tooltip="Final selection"
+                tooltip="Final Selection"
                 render={<Link href="/team/final-selection" />}
               >
                 <CheckIcon className="size-4 shrink-0 text-green-600" />
-                <span>Final selection</span>
+                <span>Final Selection</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ) : null}

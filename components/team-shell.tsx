@@ -54,7 +54,7 @@ function TeamShellInner({
         <SidebarTrigger
           className={cn(
             'fixed top-3.5 left-3.5 z-20 md:hidden',
-            'size-8 bg-card/90 shadow-sm backdrop-blur-md',
+            'size-8 border border-border bg-card/90 backdrop-blur-md',
           )}
         />
         <PipelineClosedBanner statusUrl="/api/team/nav" />

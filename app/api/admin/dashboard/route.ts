@@ -5,7 +5,11 @@ import { getTeams, initDb } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
 import { getTeamRoundStats } from '@/lib/rounds';
 import { DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
-import { getGlobalPipelineState } from '@/lib/pipeline-phase';
+import {
+  formatTeamStatusSummary,
+  getGlobalPipelineState,
+  suggestedDashboardViewPhase,
+} from '@/lib/pipeline-phase';
 import {
   getTeamInterviewRoundStats,
   type TeamInterviewRoundStats,
@@ -26,14 +30,16 @@ async function handleGet(req: NextRequest) {
 
     const teams = await getTeams();
     const globalState = await getGlobalPipelineState();
-    const pipelineStatus = globalState.status ?? 'pre_application';
+    const pipelineStatus = suggestedDashboardViewPhase(globalState.teams);
+    const teamStatusSummary = formatTeamStatusSummary(globalState.teams);
     const roundByTeam = new Map(
-      globalState.teams.map((t) => [t.teamId, t.round] as const),
+      globalState.teams.map((t) => [t.teamId, t] as const),
     );
 
     const teamsWithRounds = await Promise.all(
       teams.map(async (team) => {
-        const round = roundByTeam.get(team.id) ?? null;
+        const pipelineEntry = roundByTeam.get(team.id);
+        const round = pipelineEntry?.round ?? null;
         const stats = round
           ? await getTeamRoundStats(team.id, round.id)
           : {
@@ -43,8 +49,9 @@ async function handleGet(req: NextRequest) {
             };
         const displayRound = round
           ? {
-              ...round,
-              status: globalState.status ?? round.status,
+              id: round.id,
+              label: round.label,
+              status: round.status,
             }
           : null;
         let interviewStatsByStage: {
@@ -61,7 +68,7 @@ async function handleGet(req: NextRequest) {
         return {
           ...team,
           round: displayRound,
-          unlockedStages: globalState.unlockedStages,
+          unlockedStages: pipelineEntry?.unlockedStages ?? [],
           interviewStatsByStage,
           ...stats,
         };
@@ -87,6 +94,7 @@ async function handleGet(req: NextRequest) {
 
     return NextResponse.json({
       pipelineStatus,
+      teamStatusSummary,
       teams: teamsWithRounds,
       applicationCount,
       assignmentProgress,

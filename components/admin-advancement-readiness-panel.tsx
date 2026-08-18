@@ -60,11 +60,9 @@ function submissionBadge(status: AdvancementStatusData['submission']['status']) 
 export function AdminAdvancementReadinessPanel({
   teamId,
   fromStage,
-  compact = false,
 }: {
   teamId: string | number;
   fromStage: AdvancementFromStage;
-  compact?: boolean;
 }) {
   const router = useRouter();
   const [data, setData] = useState<AdvancementStatusData | null>(null);
@@ -103,9 +101,9 @@ export function AdminAdvancementReadinessPanel({
   if (loading) {
     return (
       <Card>
-        <CardHeader className={cn(compact && 'pb-3')}>
-          <CardTitle className={cn(compact && 'text-base')}>
-            {fromStage === 'application' ? 'Color signals' : 'Interview signals'}
+        <CardHeader className="border-b border-border">
+          <CardTitle>
+            {fromStage === 'application' ? 'Color signals' : 'Color Recommendations'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -131,14 +129,14 @@ export function AdminAdvancementReadinessPanel({
 
   return (
     <Card>
-      <CardHeader className={cn(compact && 'pb-3')}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className={cn(compact && 'text-base')}>
-              {fromStage === 'application' ? 'Color signals' : 'Interview signals'}
+      <CardHeader className="border-b border-border">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <CardTitle>
+              {fromStage === 'application' ? 'Color signals' : 'Color Recommendations'}
             </CardTitle>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {submissionBadge(data.submission.status)}
             {!data.allVerdictsComplete && data.graders.length > 0 && (
               <StageBadge
@@ -152,7 +150,7 @@ export function AdminAdvancementReadinessPanel({
           </div>
         </div>
         {data.submission.status === 'submitted' && data.submission.submittedBy && (
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Submitted by {data.submission.submittedBy}
             {data.submission.submittedAt
               ? ` on ${new Date(data.submission.submittedAt * 1000).toLocaleString()}`
@@ -161,7 +159,7 @@ export function AdminAdvancementReadinessPanel({
           </p>
         )}
         {data.submission.status === 'approved' && data.submission.reviewedAt && (
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Approved{' '}
             {new Date(data.submission.reviewedAt * 1000).toLocaleString()}
             {data.submission.topN ? ` · ${data.submission.topN} advanced` : ''}
@@ -174,7 +172,7 @@ export function AdminAdvancementReadinessPanel({
             No grader assignments yet for this stage.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg bg-muted/35">
+          <div className="overflow-x-auto rounded-lg border border-border/40">
             <Table className="table-fixed">
               <colgroup>
                 <col style={{ width: showBreakdown ? '36%' : '50%' }} />
@@ -182,32 +180,36 @@ export function AdminAdvancementReadinessPanel({
                 {showBreakdown ? <col style={{ width: '36%' }} /> : null}
               </colgroup>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
+                <TableRow className="border-border/40 bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="h-10 px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground">
                     Grader
                   </TableHead>
-                  <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
-                    Signals
+                  <TableHead className="h-10 px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground">
+                    Recommendations
                   </TableHead>
                   {showBreakdown && (
-                    <TableHead className="text-right text-xs font-medium tracking-wide text-muted-foreground">
+                    <TableHead className="h-10 px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                       Breakdown
                     </TableHead>
                   )}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.graders.map((g) => {
+                {data.graders.map((g, index) => {
                   const done = g.pending === 0 && g.total > 0;
                   return (
-                    <TableRow key={g.userId}>
-                      <TableCell>
+                    <TableRow
+                      key={g.userId}
+                      className={cn(
+                        'border-border/30',
+                        index % 2 === 1 && 'bg-muted/15',
+                      )}
+                    >
+                      <TableCell className="px-4 py-3">
                         <p className="font-medium">{g.name}</p>
-                        {!compact && (
-                          <p className="text-xs text-muted-foreground">{g.email}</p>
-                        )}
+                        <p className="mt-0.5 text-xs text-muted-foreground">{g.email}</p>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-4 py-3">
                         <span
                           className={cn(
                             'text-sm tabular-nums',
@@ -216,13 +218,13 @@ export function AdminAdvancementReadinessPanel({
                         >
                           {g.total === 0
                             ? 'No assignments'
-                            : `${g.verdictSet}/${g.total} set · ${g.pending} left`}
+                            : `${g.verdictSet}/${g.total} set · ${g.pending} remaining`}
                         </span>
                       </TableCell>
                       {showBreakdown && (
-                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                        <TableCell className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
                           {g.verdictSet === 0 ? (
-                            '—'
+                            '-'
                           ) : (
                             <>
                               <span className="text-green-700">{g.green} green</span>

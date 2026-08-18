@@ -6,8 +6,7 @@ import {
   CalendarDaysIcon,
   CheckIcon,
   ChevronDownIcon,
-  ClockIcon,
-  UserIcon,
+  UserCheckIcon,
   UsersIcon,
 } from 'lucide-react';
 import StageBadge from '@/components/stage-badge';
@@ -21,11 +20,13 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-} from '@/components/ui/avatar';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   groupAssignmentsIntoSessions,
@@ -115,13 +116,6 @@ function dayKeyForSession(scheduledAt: string): string {
   const date = new Date(scheduledAt);
   if (Number.isNaN(date.getTime())) return scheduledAt;
   return date.toISOString().slice(0, 10);
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function groupSlotsIntoSessions(slots: SlotProgress[]): SessionGroup[] {
@@ -308,45 +302,46 @@ function MicroProgressRing({
   );
 }
 
-function SectionHeader({
+function SectionHeader({ children }: { children: ReactNode }) {
+  return (
+    <h4 className="mb-3 text-xs font-medium tracking-wide text-muted-foreground">
+      {children}
+    </h4>
+  );
+}
+
+const SESSION_META_CHIP_CLASS =
+  'inline-flex shrink-0 items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted-foreground';
+
+const SESSION_CARD_CLASS =
+  'w-full min-w-[14rem] max-w-[19rem] shrink-0 rounded-md border border-border/70 bg-muted/20 px-3 py-2.5 sm:w-[19rem]';
+
+const SESSION_CARD_BODY_CLASS = 'flex h-full flex-col justify-center gap-2';
+
+/** Internal section dividers — one step stronger than border/40 so rows stay readable. */
+const SECTION_BORDER = 'border-border/65';
+const SECTION_ROW_BORDER = 'border-border/55';
+
+function SessionMetaChip({
+  names,
+  label,
   icon: Icon,
-  children,
 }: {
-  icon: typeof UserIcon;
-  children: ReactNode;
+  names: string[];
+  label: string;
+  icon: typeof UsersIcon;
 }) {
-  return (
-    <div className="mb-2.5 flex items-center gap-2 pb-2">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      <h4 className="text-sm font-semibold tracking-tight text-foreground">{children}</h4>
-    </div>
-  );
-}
-
-function SessionInterviewersControl({ session }: { session: SessionGroup }) {
-  const interviewers = session.interviewers;
-  const count = interviewers.length;
-
-  if (count === 0) {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        <UsersIcon className="size-3.5 shrink-0" aria-hidden />
-        No interviewers
-      </span>
-    );
-  }
-
-  const triggerLabel =
-    count === 1 ? '1 interviewer' : `${count} interviewers`;
-
   return (
     <Tooltip>
       <TooltipTrigger
-        className="inline-flex shrink-0 items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          SESSION_META_CHIP_CLASS,
+          'outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
         render={<button type="button" />}
       >
-        <UsersIcon className="size-3.5 shrink-0" aria-hidden />
-        {triggerLabel}
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {label}
       </TooltipTrigger>
       <TooltipContent
         side="top"
@@ -354,79 +349,8 @@ function SessionInterviewersControl({ session }: { session: SessionGroup }) {
         className="flex w-48 max-w-[var(--available-width)] flex-col items-start gap-1 px-3 py-2"
       >
         <ul className="w-full space-y-1 text-background/90">
-          {interviewers.map((interviewer) => (
-            <li
-              key={`${session.key}-iv-${interviewer.userId}`}
-              className="truncate leading-snug"
-            >
-              {interviewer.name}
-            </li>
-          ))}
-        </ul>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function SessionCandidateSummary({
-  session,
-  compact = false,
-}: {
-  session: SessionGroup;
-  compact?: boolean;
-}) {
-  const names = session.slots.map((slot) => slot.candidateName);
-  const count = names.length;
-  const visibleNames = names.slice(0, 3);
-  const overflow = count - visibleNames.length;
-  const soloName = count === 1 ? names[0] : null;
-
-  if (!session.isGroup && soloName) {
-    return (
-      <span className="whitespace-nowrap text-sm text-muted-foreground">
-        {soloName}
-      </span>
-    );
-  }
-
-  const triggerLabel = compact
-    ? `${count} applicants`
-    : count === 1
-      ? '1 applicant'
-      : `${count} applicants`;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        render={<button type="button" />}
-      >
-        {!compact ? (
-          <AvatarGroup className="*:data-[slot=avatar]:size-6 *:data-[slot=avatar]:ring-1">
-            {visibleNames.map((name, index) => (
-              <Avatar key={`${session.key}-${index}`} size="sm">
-                <AvatarFallback className="text-xs font-medium">
-                  {getInitials(name)}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {overflow > 0 && (
-              <AvatarGroupCount className="size-6 text-xs">+{overflow}</AvatarGroupCount>
-            )}
-          </AvatarGroup>
-        ) : null}
-        <span className="whitespace-nowrap text-sm text-muted-foreground">
-          {triggerLabel}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        align="start"
-        className="flex w-48 max-w-[var(--available-width)] flex-col items-start gap-1 px-3 py-2"
-      >
-        <ul className="w-full space-y-1 text-background/90">
-          {names.map((name) => (
-            <li key={`${session.key}-${name}`} className="truncate leading-snug">
+          {names.map((name, index) => (
+            <li key={`${name}-${index}`} className="truncate leading-snug">
               {name}
             </li>
           ))}
@@ -436,37 +360,56 @@ function SessionCandidateSummary({
   );
 }
 
+function SessionInterviewersControl({ session }: { session: SessionGroup }) {
+  const interviewers = session.interviewers;
+  const count = interviewers.length;
+
+  if (count === 0) {
+    return (
+      <span className={SESSION_META_CHIP_CLASS}>
+        <UserCheckIcon className="size-3.5 shrink-0" aria-hidden />
+        No interviewers
+      </span>
+    );
+  }
+
+  return (
+    <SessionMetaChip
+      icon={UserCheckIcon}
+      label={count === 1 ? '1 Interviewer' : `${count} Interviewers`}
+      names={interviewers.map((interviewer) => interviewer.name)}
+    />
+  );
+}
+
+function SessionCandidateSummary({ session }: { session: SessionGroup }) {
+  const names = session.slots.map((slot) => slot.candidateName);
+  const count = names.length;
+
+  if (count === 0) {
+    return (
+      <span className={SESSION_META_CHIP_CLASS}>
+        <UsersIcon className="size-3.5 shrink-0" aria-hidden />
+        No applicants
+      </span>
+    );
+  }
+
+  return (
+    <SessionMetaChip
+      icon={UsersIcon}
+      label={count === 1 ? '1 Applicant' : `${count} Applicants`}
+      names={names}
+    />
+  );
+}
+
 function getAggregateSessionStatus(sessions: SessionGroup[]): SessionStatus {
   if (sessions.length === 0) return 'scheduled';
   const statuses = sessions.map(getSessionStatus);
   if (statuses.every((s) => s === 'completed')) return 'completed';
   if (statuses.some((s) => s === 'in_progress' || s === 'completed')) return 'in_progress';
   return 'scheduled';
-}
-
-function InterviewerProgressCard({ interviewer }: { interviewer: InterviewerProgress }) {
-  const done = interviewer.pending === 0 && interviewer.total > 0;
-
-  return (
-    <div className="rounded-md bg-muted/35 px-3 py-2.5">
-      <p className="truncate text-sm font-medium text-foreground">{interviewer.name}</p>
-      <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm">
-        <span
-          className={cn(
-            'shrink-0 font-semibold tabular-nums',
-            done ? 'text-emerald-700' : 'text-foreground',
-          )}
-        >
-          {interviewer.completed}/{interviewer.total}
-        </span>
-        <span className="truncate text-muted-foreground">
-          {interviewer.pending === 0
-            ? 'All interviews scored'
-            : `${interviewer.pending} pending`}
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function SessionStatusCompact({ session }: { session: SessionGroup }) {
@@ -492,9 +435,7 @@ function SessionStatusCompact({ session }: { session: SessionGroup }) {
         aria-label={`${statusLabel}: ${session.scoredCount} of ${session.interviewerCount} scored`}
       >
         <CheckIcon className="size-3.5 shrink-0 text-emerald-600" aria-hidden />
-        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-sm font-medium text-emerald-800">
-          Completed
-        </span>
+        <StageBadge label="Completed" color="green" />
         <span className="text-sm font-medium tabular-nums text-muted-foreground">
           {scoreLabel}
         </span>
@@ -534,6 +475,9 @@ function SessionStatusCompact({ session }: { session: SessionGroup }) {
   );
 }
 
+const SESSION_TIMELINE_GRID =
+  'grid grid-cols-[minmax(5.5rem,auto)_minmax(0,1fr)]';
+
 function SessionInterviewCell({
   session,
   index,
@@ -541,23 +485,19 @@ function SessionInterviewCell({
   session: SessionGroup;
   index: number;
 }) {
-  const candidateCount = session.slots.length;
-  const soloName = candidateCount === 1 ? session.slots[0].candidateName : null;
-
   return (
-    <div className="flex h-full min-w-[16rem] flex-1 flex-col justify-center gap-1 px-3 py-2.5 sm:px-4">
-      <div className="flex items-center gap-2 whitespace-nowrap">
+    <div
+      className={cn(
+        SESSION_CARD_BODY_CLASS,
+        SESSION_CARD_CLASS,
+      )}
+    >
+      <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
         <span className="shrink-0 text-sm font-medium text-muted-foreground">
           Interview {index + 1}
         </span>
         <SessionInterviewersControl session={session} />
-        {session.isGroup ? (
-          <SessionCandidateSummary session={session} compact />
-        ) : soloName ? (
-          <span className="whitespace-nowrap text-sm text-muted-foreground">
-            {soloName}
-          </span>
-        ) : null}
+        <SessionCandidateSummary session={session} />
       </div>
       <div className="flex min-h-[1.25rem] items-center">
         <SessionStatusCompact session={session} />
@@ -566,49 +506,39 @@ function SessionInterviewCell({
   );
 }
 
-function TimeBlockTimelineRow({
-  block,
-  isLast,
-}: {
-  block: TimeBlockGroup;
-  isLast: boolean;
-}) {
+function TimeBlockTimelineRow({ block }: { block: TimeBlockGroup }) {
   const blockStatus = getAggregateSessionStatus(block.sessions);
   const accent = statusAccent[blockStatus];
 
   return (
-    <div className="flex flex-col sm:flex-row">
-      <div className="relative flex w-full shrink-0 items-stretch sm:w-[10rem]">
+    <div className={cn(SESSION_TIMELINE_GRID, 'items-center')}>
+      <div className={cn('flex items-center gap-2 self-center px-3 py-3 sm:border-r sm:px-4', SECTION_BORDER)}>
         <div
           className={cn(
-            'absolute bottom-0 left-[5px] top-0 w-px bg-border/50',
-            isLast && 'bottom-1/2',
+            'size-2 shrink-0 rounded-full ring-2 ring-card',
+            accent.dot,
           )}
         />
-        <div className="relative z-[1] flex w-full items-start gap-2.5 px-3 py-2.5 sm:pr-3">
-          <div
-            className={cn(
-              'mt-1.5 size-2 shrink-0 rounded-full ring-2 ring-card',
-              accent.dot,
-            )}
-          />
-          <div className="min-w-[5.5rem]">
-            <p className="text-sm font-medium tabular-nums leading-tight text-foreground">
-              {formatCompactTime(block.scheduledAt)}
+        <div className="min-w-0">
+          <p className="text-sm font-medium tabular-nums leading-tight text-foreground">
+            {formatCompactTime(block.scheduledAt)}
+          </p>
+          {block.location ? (
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground sm:text-sm">
+              {block.location}
             </p>
-            {block.location ? (
-              <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
-                {block.location}
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-x-auto">
-        <div className="flex min-w-full flex-col divide-y divide-border/30 sm:flex-row sm:divide-x sm:divide-y-0 sm:border-t-0">
+      <div className="min-w-0 px-3 py-3 sm:px-4">
+        <div className="flex w-full min-w-0 flex-wrap gap-3">
           {block.sessions.map((session, index) => (
-            <SessionInterviewCell key={session.key} session={session} index={index} />
+            <SessionInterviewCell
+              key={session.key}
+              session={session}
+              index={index}
+            />
           ))}
         </div>
       </div>
@@ -851,7 +781,7 @@ function SessionStatePreviewBanner() {
 function SessionTimelineLegend() {
   return (
     <div
-      className="display-field mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2"
+      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
       aria-label="Session status legend"
     >
       <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -882,7 +812,7 @@ function SessionTimelineLegend() {
           <span className="rounded bg-muted/50 px-1 py-px font-medium tabular-nums text-muted-foreground/80">
             n/n
           </span>
-          <span className="font-medium text-foreground">Interviewer scores</span>
+          <span className="font-medium text-foreground">Interviewer Scores</span>
         </TooltipTrigger>
         <TooltipContent
           side="top"
@@ -899,28 +829,44 @@ function SessionTimelineLegend() {
 function SessionTimeline({ sessions }: { sessions: SessionGroup[] }) {
   const dayGroups = useMemo(() => groupSessionsByDay(sessions), [sessions]);
   const showDayHeaders = dayGroups.length > 1;
-  const totalBlocks = dayGroups.reduce((sum, day) => sum + day.timeBlocks.length, 0);
   let blockIndex = 0;
 
   return (
-    <div className="overflow-hidden rounded-md bg-muted/35">
+    <div className={cn('overflow-x-auto rounded-lg border', SECTION_BORDER)}>
+      <div
+        className={cn(
+          SESSION_TIMELINE_GRID,
+          'border-b bg-muted/30',
+          SECTION_BORDER,
+        )}
+      >
+        <div className="h-10 px-3 py-3 text-xs font-medium tracking-wide text-muted-foreground sm:px-4">
+          Time
+        </div>
+        <div className="h-10 px-3 py-3 text-xs font-medium tracking-wide text-muted-foreground sm:px-4">
+          Sessions
+        </div>
+      </div>
       {dayGroups.map((day) => (
         <div key={day.dayKey}>
           {showDayHeaders ? (
-            <div className="flex items-center gap-2 bg-muted/25 px-3 py-2">
+            <div className={cn('flex items-center gap-2 border-b bg-muted/20 px-4 py-3', SECTION_BORDER)}>
               <CalendarDaysIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <p className="text-sm font-medium text-foreground">{day.dayLabel}</p>
             </div>
           ) : null}
           {day.timeBlocks.map((block) => {
             blockIndex += 1;
-            const isLast = blockIndex === totalBlocks;
             return (
               <div
                 key={block.key}
-                className={cn('border-b border-border/30 last:border-b-0')}
+                className={cn(
+                  'border-b last:border-b-0',
+                  SECTION_BORDER,
+                  blockIndex % 2 === 0 && 'bg-muted/15',
+                )}
               >
-                <TimeBlockTimelineRow block={block} isLast={isLast} />
+                <TimeBlockTimelineRow block={block} />
               </div>
             );
           })}
@@ -983,6 +929,24 @@ export function AdminInterviewProgressDetail({
   if (!data) return null;
 
   const { summary, byInterviewer, bySlot } = data;
+
+  if (summary.candidateCount === 0 && !sessionStatePreview) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{phaseLabel(stage)}</CardTitle>
+          <CardDescription>No candidates in this phase yet.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Advance applicants from the previous phase, or set up the interview schedule while
+            you wait.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const sessions = groupSlotsIntoSessions(bySlot);
   const previewSessions = sessionStatePreview ? buildSessionStatePreviewGroups() : [];
   const allScored = summary.total > 0 && summary.completed === summary.total;
@@ -1014,20 +978,63 @@ export function AdminInterviewProgressDetail({
   const breakdown = (
     <div className="space-y-5">
       <div>
-        <SectionHeader icon={UserIcon}>By interviewer</SectionHeader>
+        <SectionHeader>By Interviewer</SectionHeader>
         {byInterviewer.length === 0 ? (
           <p className="text-sm text-muted-foreground">No interview assignments yet.</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {byInterviewer.map((iv) => (
-              <InterviewerProgressCard key={iv.userId} interviewer={iv} />
-            ))}
+          <div className={cn('overflow-x-auto rounded-lg border', SECTION_BORDER)}>
+            <Table className="table-fixed">
+              <colgroup>
+                <col style={{ width: '50%' }} />
+                <col style={{ width: '50%' }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow className={cn('bg-muted/30 hover:bg-muted/30', SECTION_BORDER)}>
+                  <TableHead className="h-10 px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground">
+                    Interviewer
+                  </TableHead>
+                  <TableHead className="h-10 px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground">
+                    Progress
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {byInterviewer.map((iv, index) => {
+                  const done = iv.pending === 0 && iv.total > 0;
+                  return (
+                    <TableRow
+                      key={iv.userId}
+                      className={cn(
+                        SECTION_ROW_BORDER,
+                        index % 2 === 1 && 'bg-muted/15',
+                      )}
+                    >
+                      <TableCell className="px-4 py-3">
+                        <p className="font-medium">{iv.name}</p>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'text-sm tabular-nums',
+                            done ? 'text-emerald-700' : 'text-foreground',
+                          )}
+                        >
+                          {iv.total === 0
+                            ? 'No assignments'
+                            : `${iv.completed}/${iv.total} scored · ${iv.pending} left`}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
 
       <div>
-        <SectionHeader icon={ClockIcon}>By session</SectionHeader>
+        <SectionHeader>By Session</SectionHeader>
         {sessions.length === 0 && !sessionStatePreview ? (
           <p className="text-sm text-muted-foreground">No interview slots scheduled.</p>
         ) : sessions.length > 0 ? (
@@ -1037,7 +1044,7 @@ export function AdminInterviewProgressDetail({
           </>
         ) : null}
         {sessionStatePreview ? (
-          <div className={sessions.length > 0 ? 'mt-6' : undefined}>
+          <div className={sessions.length > 0 ? 'mt-4' : undefined}>
             <SessionStatePreviewBanner />
             {sessions.length === 0 ? <SessionTimelineLegend /> : null}
             <SessionTimeline sessions={previewSessions} />
@@ -1047,38 +1054,34 @@ export function AdminInterviewProgressDetail({
     </div>
   );
 
-  const body = (
-    <div className="space-y-4">
-      <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-muted/45 px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/60">
-          <span>Detailed breakdown</span>
-          <ChevronDownIcon
-            className={cn(
-              'size-4 shrink-0 text-muted-foreground transition-transform',
-              detailOpen && 'rotate-180',
-            )}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-4">{breakdown}</CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+      <CardHeader className="border-b border-border">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
             <CardTitle>{phaseLabel(stage)} Scoring</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-pretty">
               {summary.slotCount} of {summary.candidateCount} scheduled ·{' '}
               {summary.completed} of {summary.total} scores submitted
             </CardDescription>
           </div>
-          {statusBadges}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{statusBadges}</div>
         </div>
       </CardHeader>
-      <CardContent>{body}</CardContent>
+      <CardContent>
+        <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
+          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium transition-colors hover:text-primary">
+            <span>Detailed Breakdown</span>
+            <ChevronDownIcon
+              className={cn(
+                'size-4 shrink-0 text-muted-foreground transition-transform',
+                detailOpen && 'rotate-180',
+              )}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-4">{breakdown}</CollapsibleContent>
+        </Collapsible>
+      </CardContent>
     </Card>
   );
 }
