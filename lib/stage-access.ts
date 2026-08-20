@@ -1,7 +1,9 @@
 import {
   getActiveAccessGrantsForUser,
   getDb,
+  type AccessGrant,
   type AssignmentStage,
+  type Round,
   type User,
 } from '@/lib/db';
 import { userHasTeamAccess } from '@/lib/access';
@@ -67,29 +69,55 @@ export async function lockRoundStage(roundId: number, stage: UnlockableStage): P
 }
 
 /** Stages this user may access for a team (empty if none). Admins: all unlockable. */
+export function resolveGrantedStagesForTeam(
+  user: User,
+  teamId: number,
+  grants: AccessGrant[] | null,
+): UnlockableStage[] | 'all' {
+  if (user.role === 'admin' || user.role === 'exec') return 'all';
+  if (!grants) return [];
+
+  const teamGrants = grants.filter((g) => g.team_id === teamId);
+  if (teamGrants.length === 0) return [];
+  if (teamGrants.some((g) => g.stage === null)) return 'all';
+
+  const stages = new Set<UnlockableStage>();
+  for (const grant of teamGrants) {
+    if (grant.stage && UNLOCKABLE_STAGES.includes(grant.stage as UnlockableStage)) {
+      stages.add(grant.stage as UnlockableStage);
+    }
+  }
+  return [...stages];
+}
+
 export async function getGrantedStagesForUser(
   user: User,
   teamId: number,
 ): Promise<UnlockableStage[] | 'all'> {
   if (user.role === 'admin') return 'all';
   if (!(await userHasTeamAccess(user, teamId))) return [];
-
   if (user.role === 'exec') return 'all';
 
-  const grants = (await getActiveAccessGrantsForUser(user.id)).filter((g) => g.team_id === teamId);
-  if (grants.length === 0) return [];
+  const grants = await getActiveAccessGrantsForUser(user.id);
+  return resolveGrantedStagesForTeam(user, teamId, grants);
+}
 
-  if (grants.some((g) => g.stage === null)) {
-    return 'all';
-  }
+/** Interview-only scope from pre-fetched grants (no DB). */
+export function resolveInterviewOnlyScope(
+  user: User,
+  teamId: number,
+  round: Round | null,
+  grants: AccessGrant[] | null,
+): AssignmentStage | null {
+  if (user.role !== 'ad_hoc_exec') return null;
+  if (round?.status === 'closed') return null;
+  if (!grants) return null;
 
-  const stages = new Set<UnlockableStage>();
-  for (const grant of grants) {
-    if (grant.stage && UNLOCKABLE_STAGES.includes(grant.stage as UnlockableStage)) {
-      stages.add(grant.stage as UnlockableStage);
-    }
-  }
-  return [...stages];
+  const teamGrants = grants.filter((g) => g.team_id === teamId);
+  if (teamGrants.length !== 1 || teamGrants[0].stage === null) return null;
+  const stage = teamGrants[0].stage;
+  if (stage === 'first_round' || stage === 'final_round') return stage;
+  return null;
 }
 
 /** Interview-only: ad hoc exec scoped to a single interview stage for one team. */
@@ -101,13 +129,8 @@ export async function getInterviewOnlyScope(
 
   // Archive mode: don't pin the nav to a single interview stage.
   const round = await getActiveRoundForTeam(teamId);
-  if (round?.status === 'closed') return null;
-
-  const grants = (await getActiveAccessGrantsForUser(user.id)).filter((g) => g.team_id === teamId);
-  if (grants.length !== 1 || grants[0].stage === null) return null;
-  const stage = grants[0].stage;
-  if (stage === 'first_round' || stage === 'final_round') return stage;
-  return null;
+  const grants = await getActiveAccessGrantsForUser(user.id);
+  return resolveInterviewOnlyScope(user, teamId, round, grants);
 }
 
 export async function canUserAccessTeamStage(

@@ -1,7 +1,7 @@
 import 'server-only';
 
+import { batchDeliberationsFinalSelectionComplete } from '@/lib/batch-team-stats';
 import { getTeams } from '@/lib/db';
-import { isDeliberationsFinalSelectionComplete } from '@/lib/deliberations';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 
 /**
@@ -18,18 +18,23 @@ export async function isOrgFinalSelectionComplete(): Promise<boolean> {
     return false;
   }
 
+  const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
   const withRound = globalState.teams.filter(
     (team): team is typeof team & { round: NonNullable<typeof team.round> } => team.round != null,
   );
-  const roundIdByTeam = new Map(withRound.map((team) => [team.teamId, team.round.id]));
 
-  const flags = await Promise.all(
-    teams.map((team) => {
-      const roundId = roundIdByTeam.get(team.id);
-      if (roundId == null) return Promise.resolve(false);
-      return isDeliberationsFinalSelectionComplete(team.id, roundId);
-    }),
-  );
+  const entries = teams.flatMap((team) => {
+    const pipelineEntry = withRound.find((t) => t.teamId === team.id);
+    if (!pipelineEntry) return [];
+    return [
+      {
+        teamId: team.id,
+        roundId: pipelineEntry.round.id,
+        teamName: teamNameById.get(team.id) ?? pipelineEntry.teamName,
+      },
+    ];
+  });
 
-  return flags.every(Boolean);
+  const flags = await batchDeliberationsFinalSelectionComplete(entries);
+  return teams.every((team) => flags.get(team.id) === true);
 }

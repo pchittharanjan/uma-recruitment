@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -41,6 +42,14 @@ function parsePhase(json: Record<string, unknown>): AdminPhaseSnapshot {
 export function AdminPhaseProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<AdminPhaseSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -48,12 +57,12 @@ export function AdminPhaseProvider({ children }: { children: ReactNode }) {
       const { ok, json } = await cachedJsonFetch<Record<string, unknown>>(LIGHT_PHASE_URL, {
         force: true,
       });
-      if (!ok || !json) return;
+      if (!mountedRef.current || !ok || !json) return;
       setPhase(parsePhase(json));
     } catch {
       // Shell stays usable without phase data.
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 

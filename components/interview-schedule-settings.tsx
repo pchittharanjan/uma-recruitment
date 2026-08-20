@@ -10,6 +10,7 @@ import {
   settingsDateFieldWidth,
   settingsTimeFieldWidth,
 } from '@/components/settings-panel';
+import { NumberDraftInput } from '@/components/number-draft-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { RoundStatus } from '@/lib/db';
@@ -172,23 +173,15 @@ export function InterviewScheduleSettings({
               <Label htmlFor="blockMinutes" className="text-sm" required>
                 Block minutes
               </Label>
-              <Input
+              <NumberDraftInput
                 id="blockMinutes"
-                type="number"
+                integer
                 className={settingsControlClass}
                 min={15}
                 max={120}
-                step={5}
                 value={config.blockMinutes}
-                onChange={(e) =>
-                  setConfig((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          blockMinutes: Number.parseInt(e.target.value, 10) || 30,
-                        }
-                      : prev,
-                  )
+                onCommit={(blockMinutes) =>
+                  setConfig((prev) => (prev ? { ...prev, blockMinutes } : prev))
                 }
               />
             </div>
@@ -197,19 +190,15 @@ export function InterviewScheduleSettings({
                 <Label htmlFor="groupSize" className="text-sm" required>
                   Group size
                 </Label>
-                <Input
+                <NumberDraftInput
                   id="groupSize"
-                  type="number"
+                  integer
                   className={settingsControlClass}
                   min={2}
                   max={12}
                   value={config.groupSize}
-                  onChange={(e) =>
-                    setConfig((prev) =>
-                      prev
-                        ? { ...prev, groupSize: Number.parseInt(e.target.value, 10) || 4 }
-                        : prev,
-                    )
+                  onCommit={(groupSize) =>
+                    setConfig((prev) => (prev ? { ...prev, groupSize } : prev))
                   }
                 />
               </div>

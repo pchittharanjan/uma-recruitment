@@ -70,7 +70,7 @@ export function initDb(): Promise<void> {
  * Bump to force a full re-init when schema work happens outside SCHEMA.sql and
  * the MIGRATIONS list (e.g. editing a backfill function's logic).
  */
-const INIT_REVISION = 1;
+const INIT_REVISION = 2;
 
 /** Fingerprint of everything initDbOnce runs; changes whenever schema work changes. */
 function computeSchemaFingerprint(): string {
@@ -304,6 +304,10 @@ const MIGRATIONS = [
     'ALTER TABLE coffee_chats ADD COLUMN applicant_grade_level TEXT',
     "ALTER TABLE coffee_chats ADD COLUMN teams_interested TEXT NOT NULL DEFAULT '[]'",
     'ALTER TABLE coffee_chats ADD COLUMN applicant_email TEXT',
+    'CREATE INDEX IF NOT EXISTS idx_applications_team_round_stage ON applications(team_id, round_id, stage)',
+    'CREATE INDEX IF NOT EXISTS idx_rounds_team_status ON rounds(team_id, status)',
+    'CREATE INDEX IF NOT EXISTS idx_access_grants_user ON access_grants(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_assignments_application_stage ON assignments(application_id, stage)',
 ];
 
 async function scoresNeedsScaleMigration(

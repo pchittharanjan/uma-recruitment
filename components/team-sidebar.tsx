@@ -18,10 +18,23 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { teamOverviewHref } from '@/lib/stages';
-import { teamDotClass } from '@/lib/team-colors';
+import { isTeamOverviewPath, teamOverviewHref } from '@/lib/stages';
 import { cn } from '@/lib/utils';
-import { ClipboardListIcon } from 'lucide-react';
+import { LayoutDashboardIcon } from 'lucide-react';
+
+function extractTeamId(pathname: string): number | null {
+  const match = pathname.match(/^\/team\/(\d+)/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function teamSidebarActiveClass(teamName: string): string {
+  // Match admin "team color" language: Strategy=orange, Events=blue, Design=purple/violet.
+  // Keep it subtle so it blends with the sidebar surface.
+  if (teamName === 'Strategy') return 'bg-orange-500/12 text-orange-800';
+  if (teamName === 'Events') return 'bg-blue-500/12 text-blue-800';
+  if (teamName === 'Design') return 'bg-violet-500/12 text-violet-800';
+  return 'bg-primary/10 text-foreground';
+}
 
 export function TeamSidebar({
   user,
@@ -57,25 +70,18 @@ export function TeamSidebar({
                 {teams.map((team) => {
                   const teamHref = teamOverviewHref(team.id);
                   const teamActive =
-                    mounted &&
-                    (pathname === teamHref ||
-                      (pathname.startsWith(`${teamHref}/`) &&
-                        !pathname.startsWith(`${teamHref}/advancement`)));
+                    mounted && isTeamOverviewPath(pathname) &&
+                    extractTeamId(pathname) === team.id;
 
                   return (
                     <SidebarMenuItem key={team.id}>
                       <SidebarMenuButton
                         isActive={teamActive}
+                        className={cn(teamActive && teamSidebarActiveClass(team.name))}
                         tooltip={mounted ? `${team.name} - Overview` : undefined}
                         render={<Link href={teamHref} />}
                       >
-                        <span
-                          className={cn(
-                            'size-2 shrink-0 rounded-full',
-                            teamDotClass(team.name),
-                          )}
-                          aria-hidden
-                        />
+                        <LayoutDashboardIcon className="size-4 shrink-0" />
                         <span>{team.name}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

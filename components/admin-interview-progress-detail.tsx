@@ -435,7 +435,7 @@ function SessionStatusCompact({ session }: { session: SessionGroup }) {
         aria-label={`${statusLabel}: ${session.scoredCount} of ${session.interviewerCount} scored`}
       >
         <CheckIcon className="size-3.5 shrink-0 text-emerald-600" aria-hidden />
-        <StageBadge label="Completed" color="green" />
+        <StageBadge label="Completed" color="green" size="compact" />
         <span className="text-sm font-medium tabular-nums text-muted-foreground">
           {scoreLabel}
         </span>
@@ -959,17 +959,19 @@ export function AdminInterviewProgressDetail({
   const statusBadges = (
     <div className="flex flex-wrap gap-2">
       {allScored && summary.total > 0 ? (
-        <StageBadge label="All scored" color="green" />
+        <StageBadge label="All scored" color="green" size="compact" />
       ) : pendingInterviewers.length > 0 ? (
         <StageBadge
           label={`${pendingInterviewers.length} interviewer${pendingInterviewers.length === 1 ? '' : 's'} pending`}
           color="yellow"
+          size="compact"
         />
       ) : null}
       {pendingSessions.length > 0 && (
         <StageBadge
           label={`${pendingSessions.length} session${pendingSessions.length === 1 ? '' : 's'} incomplete`}
           color="orange"
+          size="compact"
         />
       )}
     </div>

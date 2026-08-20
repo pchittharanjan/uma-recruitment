@@ -148,7 +148,7 @@ export function FinalSelectionOffers({
           {members.length > 0 ? (
             <button
               type="button"
-              onClick={() => fireRecruitmentConfetti(2500)}
+              onClick={() => void fireRecruitmentConfetti(2500)}
               style={{
                 ...chipBaseStyle,
                 backgroundColor: '#ffffff',

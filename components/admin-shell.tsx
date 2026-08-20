@@ -41,13 +41,18 @@ function AdminShellInner({
       <AdminSidebar user={user} showApplicationsNav={showApplicationsNav} variant="inset" />
       <SidebarInset className="uma-app-canvas min-h-0 min-w-0 overflow-hidden bg-transparent md:peer-data-[variant=inset]:shadow-none">
         <SidebarTrigger
+          data-interview-chrome=""
           className={cn(
             'fixed top-3.5 left-3.5 z-20 md:hidden',
-            'size-8 border border-border bg-card/90 backdrop-blur-md',
+            'h-9 rounded-full border border-border/70 bg-card/92 px-3 text-sm font-medium text-foreground shadow-lg backdrop-blur-xl',
           )}
-        />
+        >
+          Menu
+        </SidebarTrigger>
         <PipelineClosedBanner statusUrl="/api/admin/phase" />
-        <WorkspaceFrame area="admin">{children}</WorkspaceFrame>
+        <WorkspaceFrame area="admin" className="min-h-0 flex-1">
+          {children}
+        </WorkspaceFrame>
       </SidebarInset>
     </SidebarProvider>
   );

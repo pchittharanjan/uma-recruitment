@@ -12,6 +12,7 @@ import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { NumberDraftInput } from '@/components/number-draft-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -867,7 +868,8 @@ export function TeamInterviewScheduleEditor({
   }
 
   return (
-    <PageContainer size="wide" className="space-y-8">
+    <PageContainer size="wide">
+      <PageSection>
       <PageHeader
         eyebrow={data.team.name}
         title={title}
@@ -926,17 +928,14 @@ export function TeamInterviewScheduleEditor({
               <Label htmlFor="block-minutes" className="text-foreground" required>
                 Block length (minutes)
               </Label>
-              <Input
+              <NumberDraftInput
                 id="block-minutes"
-                type="number"
+                integer
                 min={15}
                 max={120}
-                step={5}
                 className={SCHEDULE_FIELD_CLASS}
                 value={blockMinutes}
-                onChange={(e) =>
-                  setBlockMinutes(Number.parseInt(e.target.value, 10) || 30)
-                }
+                onCommit={setBlockMinutes}
               />
             </div>
           </div>
@@ -963,7 +962,7 @@ export function TeamInterviewScheduleEditor({
         </CardContent>
       </Card>
 
-      <PageSection className="space-y-6">
+      <PageSection>
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border/50">
             <CardTitle className="flex items-baseline gap-2.5 text-foreground">
@@ -1207,6 +1206,7 @@ export function TeamInterviewScheduleEditor({
             </div>
           )}
         </Card>
+      </PageSection>
       </PageSection>
     </PageContainer>
   );

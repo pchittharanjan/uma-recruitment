@@ -1,9 +1,10 @@
 'use client';
 
-import { use, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
-import { PageContainer, PageContent } from '@/components/page-shell';
+import { PageContainer, PageContent, pagePaddingX } from '@/components/page-shell';
+import { cn } from '@/lib/utils';
 import LoadingButton from '@/components/loading-button';
 import StatusBanner from '@/components/status-banner';
 import { Button } from '@/components/ui/button';
@@ -36,15 +37,22 @@ export default function AdminInterviewPreviewPage({
   const router = useRouter();
   const [data, setData] = useState<PreviewPageData | null>(null);
   const [draftGuide, setDraftGuide] = useState<InterviewGuide | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState('');
 
-  useLayoutEffect(() => {
-    if (!isInterviewGuideStage(stageRaw)) return;
+  useEffect(() => {
+    if (!isInterviewGuideStage(stageRaw)) {
+      setHydrated(true);
+      return;
+    }
     const staged = readInterviewPreviewGuide(teamId, stageRaw);
-    if (staged) setDraftGuide(staged);
+    setDraftGuide(staged);
+    setHydrated(true);
   }, [teamId, stageRaw]);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!isInterviewGuideStage(stageRaw)) {
       setError('Invalid interview stage.');
       return;
@@ -54,18 +62,29 @@ export default function AdminInterviewPreviewPage({
       `/api/admin/teams/${teamId}/interview-preview/${stageRaw}`,
     )
       .then(({ ok, json }) => {
+        if (cancelled) return;
         if (!ok || json?.error) {
           setError(json?.error ?? 'Failed to load preview.');
           return;
         }
         setData(json);
       })
-      .catch(() => setError('Failed to load preview.'));
+      .catch(() => {
+        if (!cancelled) setError('Failed to load preview.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [teamId, stageRaw]);
 
   const guide = useMemo(() => draftGuide ?? data?.guide ?? null, [draftGuide, data?.guide]);
 
   const showGroupSample = stageRaw === 'first_round';
+
+  if (!data && !draftGuide && !hydrated) {
+    return <PageLoading />;
+  }
 
   if (error && !guide) {
     return (
@@ -102,9 +121,14 @@ export default function AdminInterviewPreviewPage({
     );
   }
 
+  const fillHeight = Boolean(guide.casePdfUrl);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-4 border-b border-border bg-background/95 px-5 py-3.5 backdrop-blur sm:px-6 lg:px-8">
+    <div className="flex flex-col has-[[data-interview-workspace]]:h-0 has-[[data-interview-workspace]]:min-h-0 has-[[data-interview-workspace]]:flex-1">
+      <div
+        data-interview-page-chrome=""
+        className="flex shrink-0 items-center justify-between gap-4 border-b border-border bg-background/95 px-5 py-3.5 backdrop-blur sm:px-8 lg:px-10 xl:px-12 2xl:px-14"
+      >
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
           <span
             role="status"
@@ -127,8 +151,14 @@ export default function AdminInterviewPreviewPage({
         </Button>
       </div>
 
-      <PageContainer className="!px-5 !py-6 sm:!px-6 lg:!px-8 lg:!py-8">
-        <PageContent width={guide.casePdfUrl ? 'fluid' : 'wide'}>
+      {fillHeight ? (
+        <div
+          className={cn(
+            pagePaddingX,
+            'flex flex-col pb-4 pt-3 has-[[data-interview-workspace]]:min-h-0 has-[[data-interview-workspace]]:flex-1',
+          )}
+          data-interview-fill=""
+        >
           <InterviewScoringPreview
             guide={guide}
             stage={stageRaw as InterviewGuideStage}
@@ -136,8 +166,20 @@ export default function AdminInterviewPreviewPage({
             showGroupSample={showGroupSample}
             interactive
           />
-        </PageContent>
-      </PageContainer>
+        </div>
+      ) : (
+        <PageContainer className="py-6 lg:py-8">
+          <PageContent width="wide">
+            <InterviewScoringPreview
+              guide={guide}
+              stage={stageRaw as InterviewGuideStage}
+              teamName={data?.team.name ?? 'Team'}
+              showGroupSample={showGroupSample}
+              interactive
+            />
+          </PageContent>
+        </PageContainer>
+      )}
     </div>
   );
 }

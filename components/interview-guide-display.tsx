@@ -12,7 +12,7 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
   return (
     <div className="space-y-3 text-sm text-amber-900 dark:text-amber-100">
       {partLabel && (
-        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+        <p className="uma-section-label text-amber-700 dark:text-amber-300">
           {partLabel}
         </p>
       )}
@@ -62,7 +62,7 @@ function QuestionsBlock({
   return (
     <div className="space-y-2">
       {partLabel && (
-        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+        <p className="uma-section-label text-amber-700 dark:text-amber-300">
           {partLabel}
         </p>
       )}
@@ -80,7 +80,7 @@ function QuestionsBlock({
 export function InterviewGuideDisplay({ guide }: { guide: InterviewGuide }) {
   return (
     <div className="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+      <p className="mb-2 uma-section-label text-amber-700 dark:text-amber-300">
         Interview materials
       </p>
 

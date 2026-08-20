@@ -38,7 +38,7 @@ function TeamClosedBanner() {
 
 function ClosedBannerMessage({ message }: { message: string }) {
   return (
-    <div className="px-5 py-2 sm:px-8">
+    <div data-interview-chrome="" className="px-5 py-2 sm:px-8">
       <StatusBanner type="info" message={message} />
     </div>
   );

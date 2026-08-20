@@ -56,10 +56,10 @@ export function designDefaultGuides(): InterviewGuidesRecord {
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Precision', weight: 1 },
-        { name: 'Creativity', weight: 1 },
-        { name: 'Efficiency', weight: 1 },
-        { name: 'Communication', weight: 1 },
+        { name: 'Precision', weight: 25 },
+        { name: 'Creativity', weight: 25 },
+        { name: 'Efficiency', weight: 25 },
+        { name: 'Communication', weight: 25 },
       ],
     },
   };

@@ -16,7 +16,7 @@ import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AvgScoreCell, AvgScoreHeader } from '@/components/avg-score-header';
-import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { cachedJsonFetch, invalidateClientFetchCache, peekCachedJson } from '@/lib/client-fetch-cache';
 import {
   Table,
   TableBody,
@@ -115,29 +115,39 @@ interface TeamReadinessRow {
   };
 }
 
+const ADVANCEMENTS_URL = '/api/admin/advancements?includeReadiness=1';
+
 export default function AdminAdvancementsPage() {
   const router = useRouter();
-  const [submissions, setSubmissions] = useState<Submission[] | null>(null);
-  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
-  const [teamReadiness, setTeamReadiness] = useState<TeamReadinessRow[]>([]);
-  const [readinessStage, setReadinessStage] = useState<AdvancementFromStage | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[] | null>(() => {
+    const cached = peekCachedJson<{ submissions?: Submission[] }>(ADVANCEMENTS_URL);
+    return cached?.submissions ?? null;
+  });
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(() => {
+    const cached = peekCachedJson<{ activity?: ActivityEntry[] }>(ADVANCEMENTS_URL);
+    return cached?.activity ?? null;
+  });
+  const [teamReadiness, setTeamReadiness] = useState<TeamReadinessRow[]>(() => {
+    const cached = peekCachedJson<{ teamReadiness?: TeamReadinessRow[] }>(ADVANCEMENTS_URL);
+    return cached?.teamReadiness ?? [];
+  });
+  const [readinessStage, setReadinessStage] = useState<AdvancementFromStage | null>(() => {
+    const cached = peekCachedJson<{ teamReadiness?: TeamReadinessRow[] }>(ADVANCEMENTS_URL);
+    return cached?.teamReadiness?.[0]?.fromStage ?? null;
+  });
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [approveError, setApproveError] = useState('');
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (opts?: { force?: boolean }) => {
     const { status, ok, json } = await cachedJsonFetch<{
       submissions?: Submission[];
       activity?: ActivityEntry[];
       teamReadiness?: TeamReadinessRow[];
       error?: string;
-    }>('/api/admin/advancements?includeReadiness=1', {
-      // Always refetch — a Director submit in another tab (or via Test as Exec)
-      // otherwise stays hidden behind the 5-minute client cache.
-      force: true,
-    });
+    }>(ADVANCEMENTS_URL, opts?.force ? { force: true } : undefined);
     if (status === 401) {
       router.push('/login');
       return;
@@ -184,7 +194,7 @@ export default function AdminAdvancementsPage() {
       setConfirmId(null);
       toast.success('Advancement approved');
       invalidateClientFetchCache('/api/admin/advancements');
-      await fetchData();
+      await fetchData({ force: true });
     } catch {
       setApproveError('Approval failed.');
       toast.error('Approval failed.');
@@ -204,7 +214,8 @@ export default function AdminAdvancementsPage() {
   if (!submissions || !activity) return <PageLoading />;
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow="Admin"
         title="Team Advancement Submissions"
@@ -317,7 +328,7 @@ export default function AdminAdvancementsPage() {
           <AdminAdvancementReadinessOverview
             teams={teamReadiness}
             fromStage={readinessStage}
-            onRefresh={fetchData}
+            onRefresh={() => fetchData({ force: true })}
           />
         </PageSection>
       )}
@@ -349,6 +360,7 @@ export default function AdminAdvancementsPage() {
           if (confirmId !== null) await handleApprove(confirmId, true);
         }}
       />
+      </PageSection>
     </PageContainer>
   );
 }

@@ -9,30 +9,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { RoundStatus } from '@/lib/db';
 import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
-import type { UnlockableStage } from '@/lib/stages';
+import type { TeamNavSnapshot, TeamNavTeam } from '@/lib/team-nav-types';
 
-export type TeamNavTeam = {
-  id: number;
-  name: string;
-  round: { status: RoundStatus } | null;
-  grantedStages: UnlockableStage[] | 'all';
-  unlockedStages: UnlockableStage[];
-  interviewOnlyStage?: string | null;
-  isDirector?: boolean;
-};
-
-export type TeamNavSnapshot = {
-  status: RoundStatus | null;
-  teams: TeamNavTeam[];
-  isExec: boolean;
-  finalSelectionComplete: boolean;
-  pipelineClosed: boolean;
-  recruitmentCycleShortLabel?: string;
-  recruitmentCycleLabel?: string;
-};
+export type { TeamNavSnapshot, TeamNavTeam };
 
 type TeamNavContextValue = {
   nav: TeamNavSnapshot | null;
@@ -44,8 +25,8 @@ const TeamNavContext = createContext<TeamNavContextValue | null>(null);
 
 function parseNav(json: Record<string, unknown>): TeamNavSnapshot {
   return {
-    status: (json.status as RoundStatus | null) ?? null,
-    teams: (json.teams as TeamNavTeam[]) ?? [],
+    status: (json.status as TeamNavSnapshot['status']) ?? null,
+    teams: (json.teams as TeamNavSnapshot['teams']) ?? [],
     isExec: Boolean(json.isExec),
     finalSelectionComplete: Boolean(json.finalSelectionComplete),
     pipelineClosed:
@@ -63,9 +44,15 @@ function parseNav(json: Record<string, unknown>): TeamNavSnapshot {
 
 const NAV_URL = '/api/team/nav';
 
-export function TeamNavProvider({ children }: { children: ReactNode }) {
-  const [nav, setNav] = useState<TeamNavSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+export function TeamNavProvider({
+  children,
+  initialNav,
+}: {
+  children: ReactNode;
+  initialNav?: TeamNavSnapshot | null;
+}) {
+  const [nav, setNav] = useState<TeamNavSnapshot | null>(initialNav ?? null);
+  const [loading, setLoading] = useState(!initialNav);
 
   const refresh = useCallback(async () => {
     try {
@@ -83,6 +70,7 @@ export function TeamNavProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (initialNav) return;
     let cancelled = false;
     setLoading(true);
     cachedJsonFetch<Record<string, unknown>>(NAV_URL)
@@ -97,7 +85,7 @@ export function TeamNavProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialNav]);
 
   useEffect(() => {
     const onChange = () => {

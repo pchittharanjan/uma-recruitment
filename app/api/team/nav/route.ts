@@ -3,13 +3,11 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessibleTeams } from '@/lib/access';
 import { listDirectorTeamIdsForUser } from '@/lib/directors';
-import { initDb } from '@/lib/db';
+import { getActiveAccessGrantsForUser, initDb } from '@/lib/db';
 import { getActiveRoundsByTeam } from '@/lib/pipeline-phase';
-import { getActiveRoundForTeam } from '@/lib/rounds';
 import {
-  getGrantedStagesForUser,
-  getInterviewOnlyScope,
-  getRoundStageUnlocks,
+  resolveGrantedStagesForTeam,
+  resolveInterviewOnlyScope,
 } from '@/lib/stage-access';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { runWithRequestCache } from '@/lib/request-cache';
@@ -41,6 +39,10 @@ async function handleGet(req: NextRequest) {
       ]);
     const directorTeamIdSet = new Set(directorTeamIds);
 
+    const pipelineByTeamId = new Map(activeRounds.map((entry) => [entry.teamId, entry]));
+    const grants =
+      user.role === 'ad_hoc_exec' ? await getActiveAccessGrantsForUser(user.id) : null;
+
     const teamStatuses = activeRounds
       .filter((entry) => entry.round)
       .map((entry) => entry.round!.status);
@@ -56,38 +58,35 @@ async function handleGet(req: NextRequest) {
           )
         : null;
 
-    const teamNav = await Promise.all(
-      teams.map(async (team) => {
-        const [round, granted, interviewOnlyStage] = await Promise.all([
-          getActiveRoundForTeam(team.id),
-          getGrantedStagesForUser(user, team.id),
-          getInterviewOnlyScope(user, team.id),
-        ]);
-        const teamPipelineClosed = round?.status === 'closed';
-        const unlocks = round ? await getRoundStageUnlocks(round.id) : [];
-        const hasAnyAccess = granted === 'all' || granted.length > 0;
-        // Closed archive: everyone with team access can browse all phases (view-only).
-        const archiveBrowse = teamPipelineClosed && hasAnyAccess;
+    const teamNav = teams.map((team) => {
+      const pipelineEntry = pipelineByTeamId.get(team.id);
+      const round = pipelineEntry?.round ?? null;
+      const granted = resolveGrantedStagesForTeam(user, team.id, grants);
+      const interviewOnlyStage = resolveInterviewOnlyScope(user, team.id, round, grants);
+      const teamPipelineClosed = round?.status === 'closed';
+      const unlocks = pipelineEntry?.unlockedStages ?? [];
+      const hasAnyAccess = granted === 'all' || granted.length > 0;
+      // Closed archive: everyone with team access can browse all phases (view-only).
+      const archiveBrowse = teamPipelineClosed && hasAnyAccess;
 
-        return {
-          id: team.id,
-          name: team.name,
-          round: round
-            ? {
-                id: round.id,
-                label: recruitmentCycleLabel,
-                status: round.status,
-              }
-            : null,
-          grantedStages: archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted,
-          unlockedStages: archiveBrowse
-            ? [...UNLOCKABLE_STAGES]
-            : unlocks.map((u) => u.stage),
-          interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
-          isDirector: directorTeamIdSet.has(team.id),
-        };
-      }),
-    );
+      return {
+        id: team.id,
+        name: team.name,
+        round: round
+          ? {
+              id: round.id,
+              label: recruitmentCycleLabel,
+              status: round.status,
+            }
+          : null,
+        grantedStages: archiveBrowse ? ('all' as const) : granted === 'all' ? ('all' as const) : granted,
+        unlockedStages: archiveBrowse
+          ? [...UNLOCKABLE_STAGES]
+          : unlocks,
+        interviewOnlyStage: archiveBrowse ? null : interviewOnlyStage,
+        isDirector: directorTeamIdSet.has(team.id),
+      };
+    });
 
     return NextResponse.json({
       status: orgPipelineStatus,

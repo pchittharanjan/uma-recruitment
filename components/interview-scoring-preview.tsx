@@ -1,15 +1,37 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { InterviewElapsedTimer } from '@/components/interview-elapsed-timer';
 import LoadingButton from '@/components/loading-button';
-import { CasePdfPane } from '@/components/case-pdf-pane';
+import {
+  InterviewCaseEvalSplit,
+  useInterviewCaseOpen,
+} from '@/components/interview-case-eval-split';
+import {
+  InterviewFullscreenEvalBar,
+  InterviewStickyLead,
+  InterviewWorkspaceExitFullscreenButton,
+  InterviewWorkspaceFullscreenButton,
+  useInterviewWorkspaceFullscreen,
+} from '@/components/interview-workspace-fullscreen';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import ScoreSelector from '@/components/ScoreSelector';
 import { InterviewNotesAndScoringForm } from '@/components/interview-question-eval';
+import {
+  DocumentSaveStatusLine,
+} from '@/components/document-save-status';
+import {
+  GroupInterviewCandidateWorkspace,
+  GroupInterviewLayoutToggle,
+  GroupInterviewReadOnlyNames,
+  InterviewNotesPanelHeader,
+  useGroupInterviewLayout,
+  type GroupInterviewCandidate,
+} from '@/components/group-interview-candidate-workspace';
+import { useAutosaveStatus } from '@/hooks/use-autosave-status';
+import { useElapsedTimer } from '@/hooks/use-elapsed-timer';
 import {
   interviewScaleMax,
   interviewScoreFieldGroups,
@@ -17,7 +39,6 @@ import {
   type InterviewGuide,
   type InterviewGuideStage,
 } from '@/lib/interview-guide';
-
 interface PreviewCandidateDraft {
   scores: Record<string, number>;
   notes: Record<string, string>;
@@ -27,6 +48,8 @@ interface PreviewCandidateDraft {
 const SAMPLE_APPLICANTS = [
   { id: 1, name: 'Alex Chen' },
   { id: 2, name: 'Jordan Lee' },
+  { id: 3, name: 'Maya Patel' },
+  { id: 4, name: 'Ryan Kim' },
 ] as const;
 
 const SAMPLE_APPLICANT_NAME = 'Sample Applicant';
@@ -51,19 +74,20 @@ function isDraftComplete(draft: PreviewCandidateDraft, fields: string[]): boolea
   return fields.length > 0 && fields.every((field) => draft.scores[field] !== undefined);
 }
 
-function firstName(name: string): string {
-  const part = name.trim().split(/\s+/)[0];
-  return part || name;
+function serializePreviewDraft(draft: PreviewCandidateDraft): string {
+  return JSON.stringify({
+    scores: draft.scores,
+    notes: draft.notes,
+    comment: draft.comment,
+  });
 }
 
-function NotesPanelHeader({ title, intro }: { title: string; intro?: string }) {
-  return (
-    <div className="space-y-2">
-      <h2 className="text-base font-semibold">{title}</h2>
-      {intro?.trim() ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">{intro.trim()}</p>
-      ) : null}
-    </div>
+function serializePreviewDrafts(drafts: Record<number, PreviewCandidateDraft>): string {
+  return JSON.stringify(
+    SAMPLE_APPLICANTS.map((applicant) => ({
+      id: applicant.id,
+      ...(drafts[applicant.id] ?? emptyDraft()),
+    })),
   );
 }
 
@@ -71,6 +95,7 @@ function NotesAndEvaluationForm({
   guide,
   draft,
   disabled,
+  compact,
   onNoteChange,
   onScoreChange,
   onCommentChange,
@@ -78,6 +103,7 @@ function NotesAndEvaluationForm({
   guide: InterviewGuide;
   draft: PreviewCandidateDraft;
   disabled: boolean;
+  compact?: boolean;
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
@@ -89,6 +115,7 @@ function NotesAndEvaluationForm({
       scores={draft.scores}
       comment={draft.comment}
       disabled={disabled}
+      compact={compact}
       onNoteChange={onNoteChange}
       onScoreChange={onScoreChange}
       onCommentChange={onCommentChange}
@@ -144,8 +171,30 @@ export function InterviewScoringPreview({
   const [drafts, setDrafts] = useState<Record<number, PreviewCandidateDraft>>(emptyDrafts);
   const [activeTab, setActiveTab] = useState(String(SAMPLE_APPLICANTS[0].id));
   const [submitting, setSubmitting] = useState(false);
+  const [caseOpen, setCaseOpen] = useInterviewCaseOpen();
+  const { fullscreen, exit: exitFullscreen, toggle: toggleFullscreen } =
+    useInterviewWorkspaceFullscreen();
+  const { layout, updateLayout } = useGroupInterviewLayout();
+  const elapsedTimer = useElapsedTimer();
 
   const disabled = !interactive;
+
+  const saveSnapshot = useMemo(
+    () => (showGroupSample ? serializePreviewDrafts(drafts) : serializePreviewDraft(draft)),
+    [showGroupSample, drafts, draft],
+  );
+
+  const persistPreview = useCallback(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 280));
+  }, []);
+
+  const { status: saveStatus, errorMessage: saveError } = useAutosaveStatus({
+    snapshot: saveSnapshot,
+    ready: interactive,
+    enabled: interactive,
+    warnOnLeave: false,
+    persist: persistPreview,
+  });
 
   const groupCompletion = useMemo(() => {
     if (!showGroupSample) return { completed: 0, total: 0 };
@@ -212,10 +261,10 @@ export function InterviewScoringPreview({
   );
 
   const groupSubmitFooter = interactive ? (
-    <div className="flex shrink-0 flex-col gap-4 border-t border-border bg-muted/50 px-6 py-4 sm:px-7 lg:px-8">
+    <div className="flex shrink-0 flex-col gap-4 border-t border-border/25 bg-muted/35 px-6 py-3.5 sm:px-7 lg:px-8">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
-          <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-background">
+          <div className="h-2 w-full overflow-hidden rounded-full border border-border/35 bg-background/60">
             <div
               className="h-full bg-primary transition-all"
               style={{
@@ -227,7 +276,7 @@ export function InterviewScoringPreview({
               }}
             />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground/85">
             {groupCompletion.completed} of {groupCompletion.total} applicants scored
           </p>
         </div>
@@ -241,73 +290,71 @@ export function InterviewScoringPreview({
     </div>
   ) : null;
 
-  const notesContent = showGroupSample ? (
-    <div className="space-y-8">
-      <NotesPanelHeader title="Notes & Evaluation" intro={guide.intro} />
-      {interactive ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-fit max-w-full flex-wrap justify-start">
-            {SAMPLE_APPLICANTS.map((applicant) => {
-              const complete = isDraftComplete(
-                drafts[applicant.id] ?? emptyDraft(),
-                scoreFieldList,
-              );
-              return (
-                <TabsTrigger key={applicant.id} value={String(applicant.id)}>
-                  {firstName(applicant.name)}
-                  {complete ? (
-                    <Check className="size-3.5 text-primary" aria-label="Scored" />
-                  ) : (
-                    <span className="text-muted-foreground" aria-hidden>
-                      ·
-                    </span>
-                  )}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+  const groupWorkspaceProps = showGroupSample && interactive
+    ? {
+        layout,
+        candidates: SAMPLE_APPLICANTS.map((applicant) => ({
+          id: String(applicant.id),
+          name: applicant.name,
+          complete: isDraftComplete(drafts[applicant.id] ?? emptyDraft(), scoreFieldList),
+        })),
+        activeId: activeTab,
+        onActiveIdChange: setActiveTab,
+        guide,
+        getFormBindings: (candidate: GroupInterviewCandidate) => {
+          const applicantId = Number(candidate.id);
+          const entryDraft = drafts[applicantId] ?? emptyDraft();
+          return {
+            notes: entryDraft.notes,
+            scores: entryDraft.scores,
+            comment: entryDraft.comment,
+            disabled,
+            onNoteChange: (field: string, value: string) =>
+              updateDraft(applicantId, {
+                notes: { ...entryDraft.notes, [field]: value },
+              }),
+            onScoreChange: (field: string, value: number) =>
+              updateDraft(applicantId, {
+                scores: { ...entryDraft.scores, [field]: value },
+              }),
+            onCommentChange: (value: string) => updateDraft(applicantId, { comment: value }),
+          };
+        },
+        renderForm: (candidate: GroupInterviewCandidate, { compact }: { compact: boolean }) => {
+          const applicantId = Number(candidate.id);
+          const entryDraft = drafts[applicantId] ?? emptyDraft();
+          return (
+            <NotesAndEvaluationForm
+              guide={guide}
+              draft={entryDraft}
+              disabled={disabled}
+              compact={compact}
+              onNoteChange={(field, value) =>
+                updateDraft(applicantId, {
+                  notes: { ...entryDraft.notes, [field]: value },
+                })
+              }
+              onScoreChange={(field, value) =>
+                updateDraft(applicantId, {
+                  scores: { ...entryDraft.scores, [field]: value },
+                })
+              }
+              onCommentChange={(value) => updateDraft(applicantId, { comment: value })}
+            />
+          );
+        },
+      }
+    : null;
 
-          {SAMPLE_APPLICANTS.map((applicant) => {
-            const entryDraft = drafts[applicant.id] ?? emptyDraft();
-            return (
-              <TabsContent
-                key={applicant.id}
-                value={String(applicant.id)}
-                className="space-y-4"
-              >
-                <h3 className="text-lg font-semibold">{applicant.name}</h3>
-                <NotesAndEvaluationForm
-                  guide={guide}
-                  draft={entryDraft}
-                  disabled={disabled}
-                  onNoteChange={(field, value) =>
-                    updateDraft(applicant.id, {
-                      notes: { ...entryDraft.notes, [field]: value },
-                    })
-                  }
-                  onScoreChange={(field, value) =>
-                    updateDraft(applicant.id, {
-                      scores: { ...entryDraft.scores, [field]: value },
-                    })
-                  }
-                  onCommentChange={(value) => updateDraft(applicant.id, { comment: value })}
-                />
-              </TabsContent>
-            );
-          })}
-        </Tabs>
+  const notesContent = showGroupSample ? (
+    <div className="flex flex-col gap-6">
+      {groupWorkspaceProps ? (
+        <GroupInterviewCandidateWorkspace {...groupWorkspaceProps} />
       ) : (
         <>
-          <div className="flex flex-wrap gap-2.5">
-            {SAMPLE_APPLICANTS.map((applicant) => (
-              <span
-                key={applicant.id}
-                className="inline-flex items-center rounded-md border border-border bg-muted/40 px-3 py-1.5 text-sm font-medium"
-              >
-                {firstName(applicant.name)}
-              </span>
-            ))}
-          </div>
+          <GroupInterviewReadOnlyNames
+            names={SAMPLE_APPLICANTS.map((applicant) => applicant.name)}
+          />
           <h3 className="text-lg font-semibold">{SAMPLE_APPLICANTS[0].name}</h3>
           <InterviewNotesAndScoringForm
             guide={guide}
@@ -323,8 +370,8 @@ export function InterviewScoringPreview({
       )}
     </div>
   ) : (
-    <div className="space-y-8">
-      <NotesPanelHeader title="Notes & Evaluation" intro={guide.intro} />
+    <div className="uma-stack-page">
+      <InterviewNotesPanelHeader title="Notes & Evaluation" intro={guide.intro} />
       {interactive ? (
         <NotesAndEvaluationForm
           guide={guide}
@@ -356,42 +403,125 @@ export function InterviewScoringPreview({
   );
 
   const panelFooter = showGroupSample ? groupSubmitFooter : singleSubmitFooter;
-
-  const headerLabel = showGroupSample
-    ? `Group interview · Sample slot · ${stageCopy.label}`
-    : `${SAMPLE_APPLICANT_NAME} · ${stageCopy.label}`;
+  const layoutToggle =
+    showGroupSample && interactive ? (
+      <GroupInterviewLayoutToggle
+        value={layout}
+        onValueChange={updateLayout}
+        className="shrink-0 flex-nowrap"
+      />
+    ) : null;
 
   const headerRow = (
-    <div className="mb-4 flex items-center justify-between gap-4">
-      <p className="text-sm font-medium text-muted-foreground">{headerLabel}</p>
-      {interactive && !showGroupSample ? (
-        <Button type="button" variant="ghost" size="sm" onClick={previewNextApplicant}>
-          Next →
-        </Button>
-      ) : null}
+    <div
+      data-interview-header=""
+      className="flex shrink-0 items-start justify-between gap-4"
+    >
+      <div className="min-w-0 pb-2">
+        <h1 className="font-heading text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+          {showGroupSample ? 'Group interview' : SAMPLE_APPLICANT_NAME}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {showGroupSample ? 'Sample Date & Time · Sample Room' : stageCopy.label}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3 pt-1">
+        <InterviewElapsedTimer {...elapsedTimer} />
+        {layoutToggle}
+        {interactive ? (
+          <DocumentSaveStatusLine
+            status={saveStatus}
+            errorMessage={saveError}
+            savedLabel="Auto-saved"
+          />
+        ) : null}
+        {casePdfUrl ? (
+          <>
+            <InterviewWorkspaceFullscreenButton
+              fullscreen={fullscreen}
+              onToggle={toggleFullscreen}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 normal-case border-foreground/25 bg-background font-medium"
+              onClick={() => setCaseOpen(!caseOpen)}
+            >
+              {caseOpen ? 'Close case' : 'Open case'}
+            </Button>
+          </>
+        ) : null}
+        {interactive && !showGroupSample ? (
+          <Button type="button" variant="ghost" size="sm" onClick={previewNextApplicant}>
+            Next →
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 
   if (casePdfUrl) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {headerRow}
-        <div className="grid min-h-[calc(100svh-9rem)] flex-1 grid-cols-1 overflow-hidden rounded-xl bg-surface-panel lg:grid-cols-2">
-          <CasePdfPane url={casePdfUrl} title={pdfTitle} />
-          <div className="flex min-h-0 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:p-7 lg:p-8">
-              {notesContent}
-            </div>
-            {panelFooter}
-          </div>
+      <div
+        data-interview-fill=""
+        className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <InterviewStickyLead>
+          <div className={showGroupSample ? 'mb-3' : 'mb-4'}>{headerRow}</div>
+          <InterviewFullscreenEvalBar className="px-0">
+            <InterviewElapsedTimer {...elapsedTimer} />
+            {layoutToggle}
+            <InterviewWorkspaceExitFullscreenButton onExit={exitFullscreen} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 normal-case border-foreground/25 bg-background font-medium"
+              onClick={() => setCaseOpen(!caseOpen)}
+            >
+              {caseOpen ? 'Close case' : 'Open case'}
+            </Button>
+          </InterviewFullscreenEvalBar>
+        </InterviewStickyLead>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {groupWorkspaceProps ? (
+            <GroupInterviewCandidateWorkspace
+              {...groupWorkspaceProps}
+              render={({ chrome, body }) => (
+                <InterviewCaseEvalSplit
+                  caseUrl={casePdfUrl}
+                  caseTitle={pdfTitle}
+                  candidateCount={SAMPLE_APPLICANTS.length}
+                  caseOpen={caseOpen}
+                  onCaseOpenChange={setCaseOpen}
+                  fullscreen={fullscreen}
+                  notesChrome={chrome}
+                  notes={body}
+                  footer={panelFooter}
+                />
+              )}
+            />
+          ) : (
+            <InterviewCaseEvalSplit
+              caseUrl={casePdfUrl}
+              caseTitle={pdfTitle}
+              candidateCount={1}
+              caseOpen={caseOpen}
+              onCaseOpenChange={setCaseOpen}
+              fullscreen={fullscreen}
+              notes={notesContent}
+              footer={panelFooter}
+            />
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {headerRow}
+    <div className="uma-stack-page">
+      <div className={showGroupSample ? 'mb-3' : 'mb-4'}>{headerRow}</div>
       {notesContent}
     </div>
   );

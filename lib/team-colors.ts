@@ -49,6 +49,33 @@ export function teamCheckboxAccentClass(teamName: string): string {
   return '';
 }
 
+const TEAM_UNLOCK_OPEN: Record<TeamName, string> = {
+  Strategy: 'border-orange-500/50 bg-orange-500/12',
+  Events: 'border-blue-500/50 bg-blue-500/12',
+  Design: 'border-violet-500/50 bg-violet-500/12',
+};
+
+const TEAM_UNLOCK_CLOSED: Record<TeamName, string> = {
+  Strategy: 'border-border/70 bg-background',
+  Events: 'border-border/70 bg-background',
+  Design: 'border-border/70 bg-background',
+};
+
+/** Unlock chip styling — open vs closed exec access. */
+export function teamUnlockChipClass(
+  teamName: string,
+  open: boolean,
+  options?: { disabled?: boolean },
+): string {
+  if (options?.disabled) {
+    return 'border-border/40 bg-muted/25 opacity-50';
+  }
+  if (open) {
+    return isTeamName(teamName) ? TEAM_UNLOCK_OPEN[teamName] : 'border-primary/40 bg-primary/10';
+  }
+  return isTeamName(teamName) ? TEAM_UNLOCK_CLOSED[teamName] : 'border-border/70 bg-background';
+}
+
 const TEAM_DOT: Record<TeamName, string> = {
   Strategy: 'bg-orange-500',
   Events: 'bg-blue-500',

@@ -11,11 +11,11 @@ import { RecruitmentPhaseStepper } from '@/components/recruitment-phase-stepper'
 import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
+import { greetingForName } from '@/lib/greeting';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -24,10 +24,8 @@ import type { AssignmentStage, RoundStatus } from '@/lib/db';
 import type { UnlockableStage } from '@/lib/stages';
 import {
   pastPhaseWorkSummary,
-  pendingWorkLabel,
   resolveWorkStatus,
   WORK_STATUS_DISPLAY,
-  workActionVerb,
   workCompleteState,
   workEmptyState,
   workItemNoun,
@@ -35,6 +33,7 @@ import {
   yourWorkCardLabel,
 } from '@/lib/stages';
 import { gradingCompleteGuidance } from '@/lib/next-step-guidance';
+import { cn } from '@/lib/utils';
 
 function workStageForPhase(status: RoundStatus): AssignmentStage | null {
   if (status === 'application' || status === 'first_round' || status === 'final_round') {
@@ -128,7 +127,7 @@ function personalSummary(data: TeamOverviewData): string {
       currentStage === 'application'
         ? 'applications to grade'
         : currentStage === 'first_round' || currentStage === 'final_round'
-          ? 'interviews to score'
+          ? 'interviews remaining'
           : 'work';
     return `The team is in ${phase.phaseLabel}. You don't have any ${emptyNoun} yet. Check back when work is assigned to you.`;
   }
@@ -163,8 +162,7 @@ function personalSummary(data: TeamOverviewData): string {
   if (pendingAreas.length === 1) {
     const area = pendingAreas[0];
     const noun = workItemNoun(area.stage, scopedSummary.totalPending);
-    const verb = workActionVerb(area.stage);
-    return `You have ${scopedSummary.totalPending} ${noun} still to ${verb}.`;
+    return `You have ${scopedSummary.totalPending} ${noun} remaining.`;
   }
   return `You have ${scopedSummary.totalPending} items still pending across ${pendingAreas.length} active areas.`;
 }
@@ -260,11 +258,19 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
     }
 
     if (adv && adv.incompleteCount > 0) {
-      const pendingLabel = pendingWorkLabel(adv.fromStage);
+      const count = adv.incompleteCount;
+      const noun =
+        adv.fromStage === 'application'
+          ? count === 1
+            ? 'application'
+            : 'applications'
+          : count === 1
+            ? 'interview'
+            : 'interviews';
       notices.push({
         dismissKey: `${prefix}:advancement-incomplete`,
         type: 'warning',
-        message: `${adv.incompleteCount} ${pendingLabel}${adv.incompleteCount === 1 ? '' : 's'} still pending before Directors can submit the advancement list.`,
+        message: `${count} ${noun} remaining before Directors can submit the advancement list.`,
       });
     }
   }
@@ -289,16 +295,25 @@ export function TeamPersonalDashboard({
     ? yourWorkCardLabel(currentWorkStage)
     : 'Your work';
 
+  // Keep the header stats scoped to the current phase, so they don't mix
+  // "application" completion with "first_round" pending (which looks like
+  // the user finished interviews when they're actually still pending).
+  const scopedWork = currentWorkStage
+    ? data.work.filter((w) => w.stage === currentWorkStage)
+    : data.work;
+  const totalPending = scopedWork.reduce((sum, w) => sum + w.pendingCount, 0);
+  const totalAssigned = scopedWork.reduce((sum, w) => sum + w.progress.total, 0);
+  const totalCompleted = totalAssigned - totalPending;
+
   return (
     <PageContainer>
-      <PageSection>
+      <PageSection className="space-y-5">
       <PageHeader
-        eyebrow={data.round.label}
-        title={data.team.name}
-        description={personalSummary(data)}
+        eyebrow={`${data.round.label} · ${data.team.name}`}
+        title={greetingForName(data.user.name)}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <StageBadge label={data.phase.phaseLabel} color="blue" />
+            <StageBadge label={data.phase.phaseLabel} color="blue" size="compact" />
             {hasMultipleTeams && (
               <NavLinkButton variant="secondary" href="/team">
                 ← Teams
@@ -323,38 +338,41 @@ export function TeamPersonalDashboard({
         </div>
       )}
 
-      {data.summary.totalAssigned > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>{statsCardLabel}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">
-                {data.summary.totalAssigned}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Completed</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">
-                {data.summary.totalCompleted}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Pending</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">
-                {data.summary.totalPending}
-              </CardTitle>
-            </CardHeader>
-          </Card>
+      {totalAssigned > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <p className="font-heading text-base font-medium text-foreground">
+              Your Current Progress
+            </p>
+            <p className="font-heading text-xs text-muted-foreground tabular-nums">
+              {totalCompleted} of {totalAssigned} complete
+              {totalPending > 0 ? ` · ${totalPending} pending` : ''}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: statsCardLabel, value: totalAssigned, accent: false },
+              { label: 'Completed', value: totalCompleted, accent: false },
+              { label: 'Pending', value: totalPending, accent: totalPending > 0 },
+            ].map(({ label, value, accent }) => (
+              <Card key={label} className={cn('gap-0 py-0', accent && 'border border-primary/20')}>
+                <CardContent className="flex flex-col gap-1 px-5 py-4">
+                  <p className="font-heading text-base font-medium">{label}</p>
+                  <p className={cn('font-heading text-2xl font-medium tracking-tight tabular-nums', accent && 'text-primary')}>
+                    {value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
+        <p className="font-heading text-base font-medium text-foreground">Your Work</p>
         {data.work.length > 0 ? (
-          data.work.map((area) => {
+          <div className="space-y-3">
+            {data.work.map((area) => {
             const Icon = STAGE_ICONS[area.stage] ?? ClipboardListIcon;
             const allDone = area.progress.total > 0 && area.pendingCount === 0;
             const isFirstRound = area.stage === 'first_round';
@@ -372,115 +390,141 @@ export function TeamPersonalDashboard({
                 ? workEmptyState(area.stage)
                 : allDone
                   ? workCompleteState(area.stage)
-                  : `${area.pendingCount} of ${area.progress.total} ${workItemNoun(area.stage, area.progress.total)} still to ${workActionVerb(area.stage)}`;
-            const showWorkDetails = !area.phaseComplete && userHadWork;
-            const showFooter = userHadWork;
+                  : `${area.pendingCount} of ${area.progress.total} ${workItemNoun(area.stage, area.progress.total)} remaining`;
+            const showProgress = userHadWork;
+            const showPendingDetails = !area.phaseComplete && userHadWork;
+            const showPhaseSummary = !showProgress;
+            const showBottomCta =
+              (allDone &&
+                area.stage === 'application' &&
+                Boolean(data.advancement) &&
+                !data.advancement!.readOnly &&
+                !gradingLocked &&
+                data.advancement!.submissionStatus == null) ||
+              (allDone &&
+                area.stage === 'first_round' &&
+                data.advancement?.fromStage === 'first_round' &&
+                !data.advancement.readOnly &&
+                !interviewLocked &&
+                data.advancement.submissionStatus == null) ||
+              Boolean(
+                area.gradeHref &&
+                  area.pendingCount > 0 &&
+                  !(area.stage === 'application' && gradingLocked) &&
+                  !(isFirstRound && interviewLocked),
+              );
             const workStatus = area.phaseComplete
               ? ('completed' as const)
               : resolveWorkStatus(area.pendingCount, area.progress.total);
+            const badgeStatus = workStatus ?? 'not_started';
 
             return (
-              <Card key={area.stage}>
-                <CardHeader className="gap-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80">
-                        <Icon className="size-4 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <CardTitle className="text-base">{area.stageLabel}</CardTitle>
-                        <CardDescription className="mt-1">{areaDescription}</CardDescription>
-                      </div>
+              <Card key={area.stage} className="pt-3 pb-4">
+                {/* Header row — icon + title/desc on left, badge (+ View All when no work details) on right */}
+                <CardHeader>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70">
+                      <Icon className="size-4 text-muted-foreground" />
                     </div>
-                    {workStatus && (
-                      <StageBadge
-                        label={WORK_STATUS_DISPLAY[workStatus]}
-                        color={workStatusBadgeColor(workStatus)}
-                      />
-                    )}
-                  </div>
-                </CardHeader>
-
-                {showWorkDetails && (
-                  <CardContent className="space-y-4 pt-5">
-                    <ProgressBar
-                      value={area.progress.completed}
-                      max={area.progress.total}
-                      label="Your Progress"
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-base">{area.stageLabel}</CardTitle>
+                    </div>
+                    <StageBadge
+                      label={WORK_STATUS_DISPLAY[badgeStatus]}
+                      color={workStatusBadgeColor(badgeStatus)}
+                      size="compact"
                     />
-
-                    {area.upcomingScheduledAt && (
-                      <p className="text-sm text-muted-foreground">
-                        Next interview:{' '}
-                        <span className="font-medium text-foreground">
-                          {formatSlotTime(area.upcomingScheduledAt)}
-                        </span>
-                      </p>
-                    )}
-
-                    {area.recentPending.length > 0 && (
-                      <ul className="divide-y divide-border/40 rounded-lg bg-background/50">
-                        {area.recentPending.map((item) => (
-                          <li
-                            key={item.applicationId}
-                            className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
-                          >
-                            <span className="min-w-0 truncate font-medium">{item.label}</span>
-                            {item.scheduledAt && (
-                              <span className="shrink-0 text-sm text-muted-foreground">
-                                {formatSlotTime(item.scheduledAt)}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                )}
-
-                {showFooter && (
-                  <CardFooter className="flex flex-wrap items-center justify-end gap-2 pt-4">
-                    {userHadWork && (
-                      <NavLinkButton variant="secondary" href={area.href}>
+                    {!showPendingDetails && userHadWork && (
+                      <NavLinkButton variant="secondary" size="sm" href={area.href}>
                         View all
                       </NavLinkButton>
                     )}
-                    {showWorkDetails &&
-                      allDone &&
-                      area.stage === 'application' &&
-                      data.advancement &&
-                      !data.advancement.readOnly &&
-                      !gradingLocked &&
-                      data.advancement.submissionStatus == null && (
-                        <NavLinkButton href={data.advancement.href}>
-                          {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
-                        </NavLinkButton>
-                      )}
-                    {showWorkDetails &&
-                      allDone &&
-                      area.stage === 'first_round' &&
-                      data.advancement?.fromStage === 'first_round' &&
-                      !data.advancement.readOnly &&
-                      !interviewLocked &&
-                      data.advancement.submissionStatus == null && (
-                        <NavLinkButton href={data.advancement.href}>
-                          {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
-                        </NavLinkButton>
-                      )}
-                    {showWorkDetails &&
-                      area.gradeHref &&
-                      area.pendingCount > 0 &&
-                      !(area.stage === 'application' && gradingLocked) &&
-                      !(isFirstRound && interviewLocked) && (
-                        <NavLinkButton href={area.gradeHref}>
-                          {area.progress.completed === 0 ? 'Start' : 'Continue'} →
-                        </NavLinkButton>
-                      )}
-                  </CardFooter>
+                  </div>
+                  {showPhaseSummary && (
+                    <CardDescription className="pl-11">{areaDescription}</CardDescription>
+                  )}
+                </CardHeader>
+
+                {showProgress && (
+                  <CardContent
+                    className={cn(
+                      'space-y-3 pt-0',
+                    )}
+                  >
+                    <ProgressBar value={area.progress.completed} max={area.progress.total} />
+
+                    {showPendingDetails && area.recentPending.length > 0 && (
+                      <div className="space-y-2">
+                        {area.upcomingScheduledAt && (
+                      <p className="mt-2 mb-3 text-sm text-muted-foreground">
+                            Next:{' '}
+                            <span className="font-medium text-foreground">
+                              {formatSlotTime(area.upcomingScheduledAt)}
+                            </span>
+                          </p>
+                        )}
+                        <ul className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50 bg-background/60">
+                          {area.recentPending.map((item) => (
+                            <li
+                              key={item.applicationId}
+                              className="uma-hover-on-nested flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                            >
+                              <span className="min-w-0 truncate text-sm text-foreground">{item.label}</span>
+                              {item.scheduledAt && (
+                                <span className="shrink-0 text-sm text-muted-foreground">
+                                  {formatSlotTime(item.scheduledAt)}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Action buttons inline at bottom of content — no border-top strip */}
+                    {(showPendingDetails || showBottomCta) && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                        {showPendingDetails && (
+                          <NavLinkButton variant="secondary" size="sm" href={area.href}>
+                            View all
+                          </NavLinkButton>
+                        )}
+                        {allDone &&
+                          area.stage === 'application' &&
+                          data.advancement &&
+                          !data.advancement.readOnly &&
+                          !gradingLocked &&
+                          data.advancement.submissionStatus == null && (
+                            <NavLinkButton size="sm" href={data.advancement.href}>
+                              {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
+                            </NavLinkButton>
+                          )}
+                        {allDone &&
+                          area.stage === 'first_round' &&
+                          data.advancement?.fromStage === 'first_round' &&
+                          !data.advancement.readOnly &&
+                          !interviewLocked &&
+                          data.advancement.submissionStatus == null && (
+                            <NavLinkButton size="sm" href={data.advancement.href}>
+                              {gradingCompleteGuidance(data.advancement.isDirector).ctaLabel}
+                            </NavLinkButton>
+                          )}
+                        {area.gradeHref &&
+                          area.pendingCount > 0 &&
+                          !(area.stage === 'application' && gradingLocked) &&
+                          !(isFirstRound && interviewLocked) && (
+                            <NavLinkButton className="uma-cta-primary" size="sm" href={area.gradeHref}>
+                              {area.progress.completed === 0 ? 'Start' : 'Continue'} →
+                            </NavLinkButton>
+                          )}
+                      </div>
+                    )}
+                  </CardContent>
                 )}
               </Card>
             );
-          })
+            })}
+          </div>
         ) : (
           <Card>
             <CardHeader>
@@ -494,18 +538,18 @@ export function TeamPersonalDashboard({
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recruitment Phases</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RecruitmentPhaseStepper
-            currentStatus={data.phase.status}
-            unlockedStages={data.phase.unlockedStages}
-            mode="viewer"
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        <p className="font-heading text-base font-medium text-foreground">Recruitment Phases</p>
+        <Card>
+          <CardContent>
+            <RecruitmentPhaseStepper
+              currentStatus={data.phase.status}
+              unlockedStages={data.phase.unlockedStages}
+              mode="viewer"
+            />
+          </CardContent>
+        </Card>
+      </div>
       </PageSection>
     </PageContainer>
   );

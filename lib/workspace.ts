@@ -244,7 +244,7 @@ export function workspaceDestinations(
   if (teamMatch) {
     const teamId = Number.parseInt(teamMatch[1], 10);
     const destinations: WorkspaceDestination[] = [
-      { title: 'Overview', href: teamOverviewHref(teamId) },
+      { title: 'Dashboard', href: teamOverviewHref(teamId) },
     ];
     for (const phase of PIPELINE_PHASES) {
       if (phase.status === 'closed') continue;

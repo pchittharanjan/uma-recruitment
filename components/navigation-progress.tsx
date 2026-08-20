@@ -1,10 +1,18 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { usePathname } from 'next/navigation';
 
 let pendingNavigationListeners: Set<() => void> | null = null;
+
+const MIN_VISIBLE_MS = 220;
+const SAFETY_TIMEOUT_MS = 15000;
+const LOADING_SELECTOR = [
+  '[data-page-loading]',
+  '[aria-busy="true"][aria-label="Loading"]',
+  '[role="status"][aria-label="Loading"]',
+].join(',');
 
 /** Call before programmatic navigation (router.push) for instant feedback. */
 export function markNavigationPending() {
@@ -12,11 +20,17 @@ export function markNavigationPending() {
 }
 
 function pageContentStillLoading(): boolean {
-  return Boolean(document.querySelector('[data-page-loading]'));
+  return Boolean(document.querySelector(LOADING_SELECTOR));
+}
+
+function locationHref(): string {
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 function normalizeHref(href: string): string {
-  if (href.startsWith('?')) return href;
+  if (href.startsWith('?')) {
+    return `${window.location.pathname}${href}`;
+  }
   try {
     const url = new URL(href, window.location.origin);
     return `${url.pathname}${url.search}`;
@@ -25,45 +39,71 @@ function normalizeHref(href: string): string {
   }
 }
 
-function NavigationProgressInner() {
+export function NavigationProgress() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
   const [pending, setPending] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const hrefAtStartRef = useRef<string | null>(null);
+  const startedAtRef = useRef(0);
 
-  const currentHref = `${pathname}${search ? `?${search}` : ''}`;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const startPending = useCallback(() => {
-    hrefAtStartRef.current = currentHref;
+    hrefAtStartRef.current = locationHref();
+    startedAtRef.current = Date.now();
     setPending(true);
-  }, [currentHref]);
+  }, []);
 
   const finishIfReady = useCallback(() => {
-    const startedOn = hrefAtStartRef.current;
-    if (startedOn != null && startedOn === currentHref) return;
+    if (hrefAtStartRef.current != null && hrefAtStartRef.current === locationHref()) {
+      return;
+    }
     if (pageContentStillLoading()) return;
+    if (Date.now() - startedAtRef.current < MIN_VISIBLE_MS) return;
     hrefAtStartRef.current = null;
     setPending(false);
-  }, [currentHref]);
+  }, []);
 
   useEffect(() => {
     if (!pending) return;
 
-    const observer = new MutationObserver(finishIfReady);
-    observer.observe(document.body, { childList: true, subtree: true });
-    finishIfReady();
+    let cancelled = false;
+    const tryFinish = () => {
+      if (!cancelled) finishIfReady();
+    };
 
+    // Wait two frames so the destination page can mount its loading UI
+    // before we decide the navigation is done.
+    let raf2 = 0;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(tryFinish);
+    });
+
+    const observer = new MutationObserver(tryFinish);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-page-loading', 'aria-busy', 'aria-label', 'role'],
+    });
+
+    const poll = window.setInterval(tryFinish, 80);
     const timeout = window.setTimeout(() => {
       hrefAtStartRef.current = null;
       setPending(false);
-    }, 15000);
+    }, SAFETY_TIMEOUT_MS);
 
     return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
       observer.disconnect();
+      window.clearInterval(poll);
       window.clearTimeout(timeout);
     };
-  }, [pending, currentHref, finishIfReady]);
+  }, [pending, pathname, finishIfReady]);
 
   useEffect(() => {
     pendingNavigationListeners = new Set([startPending]);
@@ -88,37 +128,23 @@ function NavigationProgressInner() {
       }
       if (/^https?:\/\//i.test(rawHref) && !rawHref.startsWith(window.location.origin)) return;
 
-      const nextHref = normalizeHref(rawHref);
-      if (nextHref !== currentHref) startPending();
+      if (normalizeHref(rawHref) !== locationHref()) startPending();
     };
 
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
-  }, [currentHref, startPending]);
+  }, [startPending]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       aria-hidden={!pending}
-      className={cn(
-        'pointer-events-none fixed inset-x-0 top-0 z-[100] h-[5px] overflow-hidden',
-        pending ? 'opacity-100' : 'opacity-0',
-        'transition-opacity duration-200',
-      )}
+      data-pending={pending ? 'true' : 'false'}
+      className="navigation-progress-bar"
     >
-      <div
-        className={cn(
-          'h-full w-1/3 bg-primary',
-          pending && 'animate-[navigation-progress_0.9s_ease-in-out_infinite]',
-        )}
-      />
-    </div>
-  );
-}
-
-export function NavigationProgress() {
-  return (
-    <Suspense fallback={null}>
-      <NavigationProgressInner />
-    </Suspense>
+      <div className="navigation-progress-bar__indeterminate" />
+    </div>,
+    document.body,
   );
 }

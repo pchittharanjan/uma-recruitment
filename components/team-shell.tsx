@@ -52,13 +52,18 @@ function TeamShellInner({
       <SidebarInset className="uma-app-canvas min-h-0 min-w-0 overflow-hidden bg-transparent md:peer-data-[variant=inset]:shadow-none">
         <ImpersonationBanner />
         <SidebarTrigger
+          data-interview-chrome=""
           className={cn(
             'fixed top-3.5 left-3.5 z-20 md:hidden',
-            'size-8 border border-border bg-card/90 backdrop-blur-md',
+            'h-9 rounded-full border border-border/70 bg-card/92 px-3 text-sm font-medium text-foreground shadow-lg backdrop-blur-xl',
           )}
-        />
+        >
+          Menu
+        </SidebarTrigger>
         <PipelineClosedBanner statusUrl="/api/team/nav" />
-        <WorkspaceFrame area="team">{children}</WorkspaceFrame>
+        <WorkspaceFrame area="team" className="min-h-0 flex-1">
+          {children}
+        </WorkspaceFrame>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -71,6 +76,7 @@ export function TeamShell(props: {
   impersonationAdmin?: { name: string; email: string };
   defaultSidebarOpen?: boolean;
   defaultSidebarWidth?: number;
+  initialNav?: import('@/lib/team-nav-types').TeamNavSnapshot | null;
   children: React.ReactNode;
 }) {
   const impersonation =
@@ -80,7 +86,7 @@ export function TeamShell(props: {
 
   return (
     <ShellUserProvider user={props.user} teams={props.teams} impersonation={impersonation}>
-      <TeamNavProvider>
+      <TeamNavProvider initialNav={props.initialNav}>
         <PhaseOpenedGate userName={props.user.name} />
         <RecruitmentCompleteGate />
         <TeamShellInner {...props} />

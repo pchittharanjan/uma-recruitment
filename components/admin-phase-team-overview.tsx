@@ -287,7 +287,7 @@ export function AdminPhaseTeamOverview({
                           {phaseLabelForTeam(team.round!.status, team.name)}
                         </span>
                       ) : (
-                        <StageBadge label="No round" color="gray" />
+                        <StageBadge label="No round" color="gray" size="compact" />
                       )}
                     </TableCell>
                   )}

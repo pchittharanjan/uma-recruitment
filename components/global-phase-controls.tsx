@@ -2,20 +2,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRightIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowRightIcon, Loader2, LockIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import StageBadge from '@/components/stage-badge';
 import { cn } from '@/lib/utils';
 import { RecruitmentPhaseStepper } from '@/components/recruitment-phase-stepper';
 import { RecruitmentPhaseChecklist } from '@/components/recruitment-phase-checklist';
+import { TypedConfirmDialog } from '@/components/typed-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { RoundStatus } from '@/lib/db';
 import type { PhaseChecklistStep } from '@/lib/phase-checklist';
 import { dispatchPipelinePhaseChanged, PIPELINE_PHASE_CHANGED_EVENT } from '@/lib/pipeline-events';
-import { PIPELINE_PHASES, phaseLabel, type UnlockableStage } from '@/lib/stages';
+import { PIPELINE_PHASES, phaseLabel, statusIndex, type UnlockableStage } from '@/lib/stages';
 import {
   phaseLabelForTeam,
   pipelinePhasesForTeam,
@@ -24,15 +25,23 @@ import {
 import {
   teamCardHoverClass,
   teamCheckboxAccentClass,
-  teamLinkClass,
   teamStageBadgeClass,
+  teamUnlockChipClass,
 } from '@/lib/team-colors';
+
+interface TeamPhaseRevertInfo {
+  canRevert: boolean;
+  revertBlockedReason: string | null;
+  previousStatus: RoundStatus | null;
+  blockingApplicantCount: number;
+}
 
 interface TeamPipelineCard {
   teamId: number;
   teamName: string;
   round: { id: number; status: RoundStatus } | null;
   unlockedStages: UnlockableStage[];
+  phaseRevert?: TeamPhaseRevertInfo;
 }
 
 interface GlobalPhaseState {
@@ -43,20 +52,56 @@ interface GlobalPhaseState {
   checklist?: PhaseChecklistStep[];
 }
 
+export type GlobalPhaseInitialState = GlobalPhaseState;
+
+function mapPhasePayload(json: Record<string, unknown>): GlobalPhaseState {
+  return {
+    status: (json.status as RoundStatus | null) ?? null,
+    nextStatus: (json.nextStatus as RoundStatus | null) ?? null,
+    unlockedStages: (json.unlockedStages as UnlockableStage[]) ?? [],
+    teams: ((json.teams ?? []) as TeamPipelineCard[]).map((t) => ({
+      teamId: t.teamId,
+      teamName: t.teamName,
+      round: t.round ? { id: t.round.id, status: t.round.status } : null,
+      unlockedStages: t.unlockedStages ?? [],
+      phaseRevert: t.phaseRevert,
+    })),
+    checklist: (json.checklist as PhaseChecklistStep[]) ?? [],
+  };
+}
+
 export function GlobalPhaseControls({
   viewingStatus,
   onViewingStatusChange,
   onPhaseChange,
+  initialPhaseState,
 }: {
   viewingStatus: RoundStatus | null;
   onViewingStatusChange: (status: RoundStatus) => void;
   onPhaseChange?: () => void;
+  initialPhaseState?: GlobalPhaseInitialState;
 }) {
-  const [state, setState] = useState<GlobalPhaseState | null>(null);
-  const [viewingChecklist, setViewingChecklist] = useState<PhaseChecklistStep[]>([]);
+  const [state, setState] = useState<GlobalPhaseState | null>(initialPhaseState ?? null);
+  const [viewingChecklist, setViewingChecklist] = useState<PhaseChecklistStep[]>(
+    () => initialPhaseState?.checklist ?? [],
+  );
   const [checklistLoading, setChecklistLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialPhaseState);
   const [busy, setBusy] = useState(false);
+  const [advancingTeamId, setAdvancingTeamId] = useState<number | null>(null);
+  const [revertingTeamId, setRevertingTeamId] = useState<number | null>(null);
+  const [advanceConfirm, setAdvanceConfirm] = useState<{
+    teamId: number;
+    teamName: string;
+    teamNext: RoundStatus;
+  } | null>(null);
+  const [revertConfirm, setRevertConfirm] = useState<{
+    teamId: number;
+    teamName: string;
+    previousStatus: RoundStatus;
+    currentStatus: RoundStatus;
+    applicantsToRevert: number;
+  } | null>(null);
   const [error, setError] = useState('');
   const [notices, setNotices] = useState<string[]>([]);
 
@@ -82,7 +127,7 @@ export function GlobalPhaseControls({
   }, [state]);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!state) setLoading(true);
     try {
       const res = await fetch('/api/admin/phase');
       const json = await res.json();
@@ -90,18 +135,7 @@ export function GlobalPhaseControls({
         setError(json.error ?? 'Failed to load phases.');
         return;
       }
-      const nextState: GlobalPhaseState = {
-        status: json.status,
-        nextStatus: json.nextStatus,
-        unlockedStages: json.unlockedStages ?? [],
-        teams: (json.teams ?? []).map((t: TeamPipelineCard) => ({
-          teamId: t.teamId,
-          teamName: t.teamName,
-          round: t.round ? { id: t.round.id, status: t.round.status } : null,
-          unlockedStages: t.unlockedStages ?? [],
-        })),
-        checklist: json.checklist ?? [],
-      };
+      const nextState = mapPhasePayload(json);
       setState(nextState);
       setError('');
     } catch {
@@ -109,11 +143,12 @@ export function GlobalPhaseControls({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [state]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (initialPhaseState) return;
+    void load();
+  }, [load, initialPhaseState]);
 
   useEffect(() => {
     const onChange = () => load();
@@ -135,8 +170,13 @@ export function GlobalPhaseControls({
   const postTeamAction = async (
     teamId: number,
     body: { action: string; stage?: UnlockableStage },
-  ) => {
+  ): Promise<boolean> => {
     setBusy(true);
+    if (body.action === 'advance') {
+      setAdvancingTeamId(teamId);
+    } else if (body.action === 'revert') {
+      setRevertingTeamId(teamId);
+    }
     setError('');
     try {
       const res = await fetch(`/api/admin/teams/${teamId}/phase`, {
@@ -149,7 +189,7 @@ export function GlobalPhaseControls({
         const message = json.error ?? 'Action failed.';
         setError(message);
         toast.error(message);
-        return;
+        return false;
       }
       if (json.warnings?.length) {
         setNotices(json.warnings);
@@ -159,6 +199,20 @@ export function GlobalPhaseControls({
       onPhaseChange?.();
       if (body.action === 'advance') {
         toast.success(`Advanced ${json.teamName} to ${phaseLabel(json.status)}`);
+        if (json.warnings?.length) {
+          for (const warning of json.warnings) {
+            toast.message(warning);
+          }
+        }
+      } else if (body.action === 'revert') {
+        toast.success(
+          `Moved ${json.teamName} back to ${phaseLabelForTeam(json.status, json.teamName)}`,
+        );
+        if (json.warnings?.length) {
+          for (const warning of json.warnings) {
+            toast.message(warning);
+          }
+        }
       } else if (body.action === 'unlock' && body.stage) {
         const stageName =
           PIPELINE_PHASES.find((p) => p.unlockKey === body.stage)?.label ?? body.stage;
@@ -168,32 +222,36 @@ export function GlobalPhaseControls({
           PIPELINE_PHASES.find((p) => p.unlockKey === body.stage)?.label ?? body.stage;
         toast.success(`${stageName} locked for ${json.teamName}`);
       }
+      return true;
     } catch {
       setError('Network error.');
       toast.error('Network error.');
+      return false;
     } finally {
       setBusy(false);
+      setAdvancingTeamId(null);
+      setRevertingTeamId(null);
     }
   };
 
   if (loading) {
     return (
-      <Card role="status" aria-label="Loading">
-        <CardHeader className="border-b border-border">
-          <div className="min-w-0 space-y-1">
-            <CardTitle>Team Phases</CardTitle>
-            <Skeleton className="h-4 w-48" />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-7 w-full" />
-          <div className="space-y-2 border-t border-border pt-4">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-3/4" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <p className="uma-section-label">Team Phases</p>
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Card role="status" aria-label="Loading">
+          <CardContent className="space-y-4">
+            <Skeleton className="h-7 w-full" />
+            <div className="space-y-2 border-t border-border pt-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -208,38 +266,37 @@ export function GlobalPhaseControls({
   const showGlobalImportAction = activeView === 'application';
 
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader className="scroll-mt-24 border-b border-border" id="pipeline-controls">
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1 space-y-1">
-            <CardTitle>Team Phases</CardTitle>
-            {state.teams.length > 0 && (
-              <CardDescription className="text-pretty">
-                {!state.status
-                  ? 'No team recruiting cycles yet. Set coffee chat dates to start, then advance each team individually below.'
-                  : 'Click to unlock each phase.'}
-              </CardDescription>
-            )}
-          </div>
-          {allTeamsClosed && (
-            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-              <p className="text-sm text-muted-foreground">
-                Team members are view-only; you can still send outcome emails and make admin
-                changes.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                render={<Link href="/admin/final-selection" />}
-              >
-                View final selection
-              </Button>
-            </div>
+    <div className="scroll-mt-24 space-y-4" id="pipeline-controls">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <p className="uma-section-label">Team Phases</p>
+          {state.teams.length > 0 && (
+            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+              {!state.status
+                ? 'No team recruiting cycles yet. Set coffee chat dates to start, then advance each team individually below.'
+                : 'Move each team forward, then check the current phase when members should start working.'}
+            </p>
           )}
         </div>
-      </CardHeader>
+        {allTeamsClosed && (
+          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+            <p className="text-sm text-muted-foreground">
+              Team members are view-only; you can still send outcome emails and make admin
+              changes.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href="/admin/final-selection" />}
+            >
+              View final selection
+            </Button>
+          </div>
+        )}
+      </div>
 
+    <Card className="min-w-0 overflow-hidden">
       <CardContent className="space-y-4">
         {state.teams.length > 0 && (
           <section>
@@ -251,10 +308,14 @@ export function GlobalPhaseControls({
                 const teamNext = teamStatus
                   ? nextPipelineStatusForTeam(teamStatus, team.teamName)
                   : null;
+                const currentIdx = teamStatus ? statusIndex(teamStatus) : -1;
+                const isAdvancing = advancingTeamId === team.teamId;
+                const isReverting = revertingTeamId === team.teamId;
+                const phaseRevert = team.phaseRevert;
                 return (
                   <div
                     key={team.teamId}
-                    className="min-w-0 space-y-3 rounded-lg border border-border/70 uma-nested-surface p-3"
+                    className="min-w-0 space-y-4 rounded-lg border border-border/70 uma-nested-surface p-4"
                   >
                     <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                       <p className="min-w-0 font-medium">{team.teamName}</p>
@@ -271,56 +332,152 @@ export function GlobalPhaseControls({
                         <StageBadge label="No round" color="gray" size="compact" />
                       )}
                     </div>
-                    {team.round && teamNext && teamStatus !== 'closed' && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        disabled={busy}
-                        className={cn(
-                          'h-auto w-full justify-start whitespace-normal px-0 text-left font-medium text-pretty disabled:text-muted-foreground disabled:no-underline disabled:opacity-60',
-                          teamLinkClass(team.teamName),
-                        )}
-                        onClick={() => postTeamAction(team.teamId, { action: 'advance' })}
-                      >
-                        {teamNext === 'closed'
-                          ? `Close ${team.teamName} cycle →`
-                          : `Advance to ${phaseLabelForTeam(teamNext, team.teamName)} →`}
-                      </Button>
-                    )}
-                    <div className="flex flex-wrap gap-1.5">
+
+                    {team.round && teamNext && teamStatus !== 'closed' ? (
+                      <div className="space-y-3 border-t border-border/60 pt-4">
+                        <div className="space-y-1">
+                          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                            Advance team&apos;s official phase
+                          </p>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            Earlier phases close for editing when you advance.
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            aria-busy={isAdvancing}
+                            className={cn(
+                              'h-9 w-full justify-between rounded-lg font-medium',
+                              teamCardHoverClass(team.teamName),
+                            )}
+                            onClick={() =>
+                              setAdvanceConfirm({
+                                teamId: team.teamId,
+                                teamName: team.teamName,
+                                teamNext,
+                              })
+                            }
+                          >
+                            <span>
+                              {teamNext === 'closed'
+                                ? `Close ${team.teamName} cycle`
+                                : `Advance to ${phaseLabelForTeam(teamNext, team.teamName)}`}
+                            </span>
+                            {isAdvancing ? (
+                              <Loader2 className="size-4 shrink-0 animate-spin opacity-70" aria-hidden />
+                            ) : (
+                              <ArrowRightIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                            )}
+                          </Button>
+                          {phaseRevert?.canRevert && phaseRevert.previousStatus ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy}
+                              aria-busy={isReverting}
+                              className="h-8 w-full justify-between px-2 text-xs text-muted-foreground"
+                              onClick={() =>
+                                setRevertConfirm({
+                                  teamId: team.teamId,
+                                  teamName: team.teamName,
+                                  previousStatus: phaseRevert.previousStatus!,
+                                  currentStatus: teamStatus!,
+                                  applicantsToRevert: phaseRevert.blockingApplicantCount,
+                                })
+                              }
+                            >
+                              <span>
+                                Move back to{' '}
+                                {phaseLabelForTeam(phaseRevert.previousStatus, team.teamName)}
+                              </span>
+                              {isReverting ? (
+                                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                              ) : (
+                                <ArrowLeftIcon className="size-3.5 shrink-0 opacity-70" aria-hidden />
+                              )}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-3 border-t border-border/60 pt-4">
+                      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        Unlock for Exec Access
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                       {phases.map((phase) => {
                         const key = phase.unlockKey!;
+                        const phaseIdx = statusIndex(phase.status);
+                        const isFuture = teamStatus ? phaseIdx > currentIdx : true;
                         const open = team.unlockedStages.includes(key);
+                        const phaseLabelText = phaseLabelForTeam(phase.status, team.teamName);
                         const toggleDisabled =
-                          busy || !team.round || teamStatus === 'closed';
+                          busy || !team.round || teamStatus === 'closed' || isFuture;
+
                         return (
                           <label
                             key={key}
-                            htmlFor={`team-${team.teamId}-unlock-${key}`}
+                            htmlFor={
+                              toggleDisabled ? undefined : `team-${team.teamId}-unlock-${key}`
+                            }
+                            title={
+                              isFuture
+                                ? 'Advance the team here first'
+                                : open
+                                  ? 'Exec access open — click to close'
+                                  : 'Exec access closed — click to open'
+                            }
                             className={cn(
-                              'flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs leading-none transition-colors',
+                              'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-2 text-xs leading-none transition-colors',
+                              teamUnlockChipClass(team.teamName, open, {
+                                disabled: toggleDisabled,
+                              }),
                               toggleDisabled
-                                ? 'cursor-not-allowed opacity-60'
+                                ? 'cursor-not-allowed'
                                 : cn('cursor-pointer uma-hover-on-nested', teamCardHoverClass(team.teamName)),
                             )}
                           >
-                            <Checkbox
-                              id={`team-${team.teamId}-unlock-${key}`}
-                              checked={open}
-                              disabled={toggleDisabled}
-                              checkedClassName={teamCheckboxAccentClass(team.teamName)}
-                              className="size-3.5"
-                              onCheckedChange={(checked) =>
-                                postTeamAction(team.teamId, {
-                                  action: checked === true ? 'unlock' : 'lock',
-                                  stage: key,
-                                })
-                              }
-                            />
-                            {phaseLabelForTeam(phase.status, team.teamName)}
+                            {isFuture ? (
+                              <LockIcon
+                                className="size-3.5 shrink-0 text-muted-foreground/70"
+                                aria-hidden
+                              />
+                            ) : (
+                              <Checkbox
+                                id={`team-${team.teamId}-unlock-${key}`}
+                                checked={open}
+                                disabled={toggleDisabled}
+                                checkedClassName={teamCheckboxAccentClass(team.teamName)}
+                                className={cn(
+                                  'size-3.5 bg-background',
+                                  open
+                                    ? 'border-transparent'
+                                    : 'border-2 border-foreground/45',
+                                )}
+                                onCheckedChange={(checked) =>
+                                  postTeamAction(team.teamId, {
+                                    action: checked === true ? 'unlock' : 'lock',
+                                    stage: key,
+                                  })
+                                }
+                              />
+                            )}
+                            <span
+                              className={cn(
+                                open && !toggleDisabled && 'font-medium',
+                                !open && !toggleDisabled && 'text-muted-foreground',
+                              )}
+                            >
+                              {phaseLabelText}
+                            </span>
                           </label>
                         );
                       })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -391,5 +548,63 @@ export function GlobalPhaseControls({
         )}
       </CardContent>
     </Card>
+
+      <TypedConfirmDialog
+        open={advanceConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setAdvanceConfirm(null);
+        }}
+        title={
+          advanceConfirm?.teamNext === 'closed'
+            ? `Close ${advanceConfirm?.teamName ?? 'team'} cycle?`
+            : `Move ${advanceConfirm?.teamName ?? 'team'} to ${
+                advanceConfirm
+                  ? phaseLabelForTeam(advanceConfirm.teamNext, advanceConfirm.teamName)
+                  : 'the next phase'
+              }?`
+        }
+        confirmationPhrase="advance"
+        inputId="phase-advance-confirm"
+        confirmLabel={
+          advanceConfirm?.teamNext === 'closed'
+            ? 'Close cycle'
+            : `Advance to ${
+                advanceConfirm
+                  ? phaseLabelForTeam(advanceConfirm.teamNext, advanceConfirm.teamName)
+                  : 'next phase'
+              }`
+        }
+        onConfirm={async () => {
+          if (!advanceConfirm) return;
+          const ok = await postTeamAction(advanceConfirm.teamId, { action: 'advance' });
+          if (!ok) throw new Error('Advance failed');
+        }}
+      />
+
+      <TypedConfirmDialog
+        open={revertConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevertConfirm(null);
+        }}
+        title={
+          revertConfirm
+            ? `Move ${revertConfirm.teamName} back to ${phaseLabelForTeam(revertConfirm.previousStatus, revertConfirm.teamName)}?`
+            : 'Move team back?'
+        }
+        confirmationPhrase="revert"
+        inputId="phase-revert-confirm"
+        confirmVariant="danger"
+        confirmLabel={
+          revertConfirm
+            ? `Move back to ${phaseLabelForTeam(revertConfirm.previousStatus, revertConfirm.teamName)}`
+            : 'Move back'
+        }
+        onConfirm={async () => {
+          if (!revertConfirm) return;
+          const ok = await postTeamAction(revertConfirm.teamId, { action: 'revert' });
+          if (!ok) throw new Error('Revert failed');
+        }}
+      />
+    </div>
   );
 }

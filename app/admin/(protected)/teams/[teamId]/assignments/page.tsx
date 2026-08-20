@@ -187,13 +187,13 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
     nameField ? fields[nameField] || `Application #${rowIndex}` : `Application #${rowIndex}`;
 
   return (
-    <PageContainer size="wide" className="space-y-8">
+    <PageContainer size="wide">
+      <PageSection>
       <PageHeader
         eyebrow={data.team.name}
         title="Edit Assignments"
       />
 
-      <PageSection>
         {successMsg && <StatusBanner message={successMsg} type="success" />}
         {error && <StatusBanner message={error} type="error" />}
 
@@ -218,7 +218,7 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
                   <p className="truncate font-semibold">{grader.name}</p>
                   <p className="truncate text-sm text-muted-foreground">{grader.email}</p>
                 </div>
-                <StageBadge label={`${grader.total} apps`} color="blue" />
+                <StageBadge label={`${grader.total} apps`} color="blue" size="compact" />
               </div>
               <div className="divide-y divide-border/50">
                 {grader.assignments.length === 0 && (
@@ -243,7 +243,7 @@ export default function TeamAssignmentsPage({ params }: { params: Promise<{ team
                         {label}
                       </span>
                       {isDone ? (
-                        <StageBadge label="Done" color="green" />
+                        <StageBadge label="Done" color="green" size="compact" />
                       ) : (
                         <button
                           type="button"

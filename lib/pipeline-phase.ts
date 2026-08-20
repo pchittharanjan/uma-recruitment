@@ -1,12 +1,16 @@
-import { getDb, getTeamById, getTeams, rowToRound, type Round, type RoundStatus } from '@/lib/db';
+import { getDb, getTeamById, getTeams, rowToRound, type ApplicationStage, type Round, type RoundStatus } from '@/lib/db';
 import { cachedPerRequest } from '@/lib/request-cache';
+import { getLatestAdvancementSubmission } from '@/lib/advancement-submissions';
+import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import {
   lockRoundStage,
   unlockRoundStage,
 } from '@/lib/stage-access';
 import {
+  isFutureUnlockStage,
   nextRoundStatus,
   phaseLabel,
+  roundStatusForUnlockStage,
   statusIndex,
   unlockKeyForStatus,
   type UnlockableStage,
@@ -17,6 +21,8 @@ import {
   getTeamPipelineProfile,
   nextPipelineStatusForTeam,
   phaseLabelForTeam,
+  pipelinePhasesForTeam,
+  previousPipelineStatusForTeam,
 } from '@/lib/team-pipeline-profile';
 
 /** Teams that share bulk-advance actions on the admin dashboard. */
@@ -27,6 +33,158 @@ export interface TeamPipelineRound {
   teamName: string;
   round: Round | null;
   unlockedStages: UnlockableStage[];
+  phaseRevert?: TeamPhaseRevertInfo;
+}
+
+export interface TeamPhaseRevertInfo {
+  canRevert: boolean;
+  revertBlockedReason: string | null;
+  previousStatus: RoundStatus | null;
+  blockingApplicantCount: number;
+}
+
+const REVERTIBLE_ROUND_STATUSES = new Set<RoundStatus>([
+  'pre_application',
+  'application',
+  'first_round',
+  'final_round',
+  'deliberations',
+]);
+
+function applicantStagesBlockingPhaseRevert(roundStatus: RoundStatus): ApplicationStage[] {
+  switch (roundStatus) {
+    case 'application':
+      return [
+        'application',
+        'first_round',
+        'final_round',
+        'deliberations',
+        'advanced',
+        'rejected',
+      ];
+    case 'first_round':
+      return ['first_round', 'final_round', 'deliberations', 'advanced', 'rejected'];
+    case 'final_round':
+      return ['final_round', 'deliberations', 'advanced', 'rejected'];
+    case 'deliberations':
+      return ['deliberations', 'advanced'];
+    default:
+      return [];
+  }
+}
+
+function advancementFromStageForPhaseRevert(roundStatus: RoundStatus): AdvancementFromStage | null {
+  switch (roundStatus) {
+    case 'first_round':
+      return 'application';
+    case 'final_round':
+    case 'deliberations':
+      return 'first_round';
+    default:
+      return null;
+  }
+}
+
+async function buildTeamPhaseRevertInfo(
+  teamName: string,
+  round: Round,
+  stageCounts: Map<ApplicationStage, number>,
+  totalApplications: number,
+): Promise<TeamPhaseRevertInfo> {
+  const current = round.status;
+  const previous = previousPipelineStatusForTeam(current, teamName);
+
+  if (!previous || !REVERTIBLE_ROUND_STATUSES.has(current)) {
+    return {
+      canRevert: false,
+      revertBlockedReason: null,
+      previousStatus: previous,
+      blockingApplicantCount: 0,
+    };
+  }
+
+  if (current === 'application' && totalApplications > 0) {
+    return {
+      canRevert: false,
+      revertBlockedReason: null,
+      previousStatus: previous,
+      blockingApplicantCount: totalApplications,
+    };
+  }
+
+  const blockingStages = applicantStagesBlockingPhaseRevert(current);
+  const blockingApplicantCount = blockingStages.reduce(
+    (sum, stage) => sum + (stageCounts.get(stage) ?? 0),
+    0,
+  );
+
+  return {
+    canRevert: true,
+    revertBlockedReason: null,
+    previousStatus: previous,
+    blockingApplicantCount,
+  };
+}
+
+function targetApplicationStageForRoundStatus(status: RoundStatus): ApplicationStage | null {
+  switch (status) {
+    case 'application':
+      return 'application';
+    case 'first_round':
+      return 'first_round';
+    case 'final_round':
+      return 'final_round';
+    case 'deliberations':
+      return 'deliberations';
+    default:
+      return null;
+  }
+}
+
+async function loadPhaseRevertByTeamId(
+  teams: Array<TeamPipelineRound & { round: Round }>,
+): Promise<Map<number, TeamPhaseRevertInfo>> {
+  const byTeam = new Map<number, TeamPhaseRevertInfo>();
+  if (teams.length === 0) return byTeam;
+
+  const db = getDb();
+  const roundIds = teams.map((t) => t.round.id);
+  const placeholders = roundIds.map(() => '?').join(',');
+  const countsResult = await db.execute({
+    sql: `SELECT round_id, stage, COUNT(*) AS count
+          FROM applications
+          WHERE round_id IN (${placeholders})
+          GROUP BY round_id, stage`,
+    args: roundIds,
+  });
+
+  const stageCountsByRound = new Map<number, Map<ApplicationStage, number>>();
+  const totalAppsByRound = new Map<number, number>();
+  for (const row of countsResult.rows) {
+    const roundId = row.round_id as number;
+    const stage = row.stage as ApplicationStage;
+    const count = Number(row.count ?? 0);
+    const stageCounts = stageCountsByRound.get(roundId) ?? new Map<ApplicationStage, number>();
+    stageCounts.set(stage, count);
+    stageCountsByRound.set(roundId, stageCounts);
+    totalAppsByRound.set(roundId, (totalAppsByRound.get(roundId) ?? 0) + count);
+  }
+
+  await Promise.all(
+    teams.map(async (entry) => {
+      const stageCounts = stageCountsByRound.get(entry.round.id) ?? new Map();
+      const totalApplications = totalAppsByRound.get(entry.round.id) ?? 0;
+      const info = await buildTeamPhaseRevertInfo(
+        entry.teamName,
+        entry.round,
+        stageCounts,
+        totalApplications,
+      );
+      byTeam.set(entry.teamId, info);
+    }),
+  );
+
+  return byTeam;
 }
 
 export interface GlobalPipelineState {
@@ -77,7 +235,7 @@ export async function getActiveRoundsByTeam(): Promise<TeamPipelineRound[]> {
   const roundIds = [...roundByTeam.values()].map((r) => r.id);
   const unlocksByRound = await loadUnlocksByRoundIds(roundIds);
 
-  return teams.map((team) => {
+  const entries = teams.map((team) => {
     const round = roundByTeam.get(team.id) ?? null;
     return {
       teamId: team.id,
@@ -86,6 +244,18 @@ export async function getActiveRoundsByTeam(): Promise<TeamPipelineRound[]> {
       unlockedStages: round ? (unlocksByRound.get(round.id) ?? []) : [],
     };
   });
+
+  const withRound = entries.flatMap((entry) =>
+    entry.round
+      ? [{ teamId: entry.teamId, teamName: entry.teamName, round: entry.round, unlockedStages: entry.unlockedStages }]
+      : [],
+  );
+  const phaseRevertByTeam = await loadPhaseRevertByTeamId(withRound);
+
+  return entries.map((entry) => ({
+    ...entry,
+    phaseRevert: entry.round ? phaseRevertByTeam.get(entry.teamId) : undefined,
+  }));
 }
 
 async function loadUnlocksByRoundIds(
@@ -488,6 +658,19 @@ export async function advanceTeamPipeline(
   });
 
   const warnings: string[] = [];
+  const closedLabels: string[] = [];
+  for (const phase of pipelinePhasesForTeam(team.name)) {
+    const key = phase.unlockKey;
+    if (!key) continue;
+    if (statusIndex(phase.status) < statusIndex(next)) {
+      await lockRoundStage(round.id, key);
+      closedLabels.push(phaseLabelForTeam(phase.status, team.name));
+    }
+  }
+  if (closedLabels.length > 0) {
+    warnings.push(`Team access closed for: ${closedLabels.join(', ')}.`);
+  }
+
   const profile = getTeamPipelineProfile(team.name);
   if (profile.autoUnlockDeliberations && next === 'deliberations') {
     await unlockRoundStage(round.id, 'deliberations', unlockedBy);
@@ -496,12 +679,108 @@ export async function advanceTeamPipeline(
     const unlockStage = unlockKeyForStatus(next);
     if (unlockStage) {
       warnings.push(
-        `${phaseLabel(next)} is ready for ${team.name}. Unlock it when graders should start.`,
+        `Check ${phaseLabelForTeam(next, team.name)} below when ${team.name} should start working.`,
       );
     }
   }
 
   const updated = { ...round, status: next };
+  return loadTeamActionResult(teamId, team.name, updated, warnings);
+}
+
+/** Move one team's official phase back one step (admin undo for mistaken advance). */
+export async function revertTeamPipeline(
+  teamId: number,
+  adminId: number,
+): Promise<TeamPipelineActionResult> {
+  const team = await getTeamById(teamId);
+  if (!team) throw new Error('Team not found.');
+
+  const entry = (await getActiveRoundsByTeam()).find((t) => t.teamId === teamId);
+  const round = entry?.round;
+  if (!round) {
+    throw new Error(`${team.name} has no active round.`);
+  }
+
+  const db = getDb();
+  const countsResult = await db.execute({
+    sql: `SELECT stage, COUNT(*) AS count
+          FROM applications
+          WHERE round_id = ?
+          GROUP BY stage`,
+    args: [round.id],
+  });
+  const stageCounts = new Map<ApplicationStage, number>();
+  let totalApplications = 0;
+  for (const row of countsResult.rows) {
+    const stage = row.stage as ApplicationStage;
+    const count = Number(row.count ?? 0);
+    stageCounts.set(stage, count);
+    totalApplications += count;
+  }
+
+  const revertInfo = await buildTeamPhaseRevertInfo(
+    team.name,
+    round,
+    stageCounts,
+    totalApplications,
+  );
+
+  if (!revertInfo.canRevert || !revertInfo.previousStatus) {
+    throw new Error('This phase cannot be moved back.');
+  }
+
+  const previous = revertInfo.previousStatus;
+  const current = round.status;
+  const warnings: string[] = [];
+
+  const targetApplicantStage = targetApplicationStageForRoundStatus(previous);
+  const sourceStages = applicantStagesBlockingPhaseRevert(current);
+  if (targetApplicantStage && sourceStages.length > 0) {
+    const placeholders = sourceStages.map(() => '?').join(', ');
+    const updateResult = await db.execute({
+      sql: `UPDATE applications
+            SET stage = ?, final_score = NULL, rank = NULL
+            WHERE team_id = ? AND round_id = ? AND stage IN (${placeholders})`,
+      args: [targetApplicantStage, teamId, round.id, ...sourceStages],
+    });
+    const revertedCount = updateResult.rowsAffected ?? 0;
+    if (revertedCount > 0) {
+      warnings.push(
+        `Moved ${revertedCount} applicant(s) back to ${phaseLabelForTeam(previous, team.name)}.`,
+      );
+    }
+  }
+
+  const fromStage = advancementFromStageForPhaseRevert(current);
+  if (fromStage) {
+    const submission = await getLatestAdvancementSubmission(teamId, round.id, fromStage);
+    if (submission && (submission.status === 'approved' || submission.status === 'submitted')) {
+      await db.execute({
+        sql: `UPDATE team_advancement_submissions
+              SET status = 'withdrawn', reviewed_by = ?, reviewed_at = unixepoch()
+              WHERE id = ?`,
+        args: [adminId, submission.id],
+      });
+    }
+  }
+
+  await db.execute({
+    sql: 'UPDATE rounds SET status = ? WHERE id = ?',
+    args: [previous, round.id],
+  });
+
+  const leavingUnlock = unlockKeyForStatus(current);
+  if (leavingUnlock) {
+    await lockRoundStage(round.id, leavingUnlock);
+    warnings.push(
+      `${phaseLabelForTeam(current, team.name)} exec access closed. Re-check unlock boxes if ${team.name} should work in ${phaseLabelForTeam(previous, team.name)}.`,
+    );
+  }
+
+  warnings.unshift(`Moved ${team.name} back to ${phaseLabelForTeam(previous, team.name)}.`);
+
+  const updated = { ...round, status: previous };
   return loadTeamActionResult(teamId, team.name, updated, warnings);
 }
 
@@ -522,6 +801,12 @@ export async function unlockTeamStage(
   const round = entry?.round;
   if (!round) {
     throw new Error(`${team.name} has no active round.`);
+  }
+
+  if (isFutureUnlockStage(round.status, stage)) {
+    throw new Error(
+      `Advance ${team.name} to ${phaseLabelForTeam(roundStatusForUnlockStage(stage), team.name)} before opening team access.`,
+    );
   }
 
   await unlockRoundStage(round.id, stage, unlockedBy);

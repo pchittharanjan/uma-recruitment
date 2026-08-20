@@ -124,6 +124,12 @@ export function WorkspaceProvider({
   const pendingOpenRef = useRef<string | null>(null);
   /** Set by focusTab before router.push so the sync effect does not clobber other tabs. */
   const pendingFocusRef = useRef<string | null>(null);
+  /** Avoid router.push until after mount — prevents HMR reload race. */
+  const routerReadyRef = useRef(false);
+
+  useEffect(() => {
+    routerReadyRef.current = true;
+  }, []);
 
   const titleContext = useMemo<WorkspaceTitleContext>(() => {
     const teamNames = { ...adminTeamNames };
@@ -267,7 +273,7 @@ export function WorkspaceProvider({
         if (findWorkspaceTabIndex(prev, normalized) >= 0) return prev;
         return [...prev, { href: normalized, title: workspaceTitle(normalized, titleContext) }];
       });
-      if (!options?.background) {
+      if (!options?.background && routerReadyRef.current) {
         markNavigationPending();
         router.push(normalized);
       }
@@ -290,7 +296,7 @@ export function WorkspaceProvider({
         current != null && workspaceTabMatches(current, targetHref) ? null : current,
       );
 
-      if (navigateTo) {
+      if (navigateTo && routerReadyRef.current) {
         pendingFocusRef.current = navigateTo;
         activeTabHrefRef.current = navigateTo;
         markNavigationPending();
@@ -307,8 +313,10 @@ export function WorkspaceProvider({
       const normalized = normalizeWorkspaceHref(targetHref);
       pendingFocusRef.current = normalized;
       activeTabHrefRef.current = normalized;
-      markNavigationPending();
-      router.push(normalized);
+      if (routerReadyRef.current) {
+        markNavigationPending();
+        router.push(normalized);
+      }
     },
     [router],
   );

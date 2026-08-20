@@ -23,14 +23,14 @@ export default function LoginPage() {
   const googleEnabled = isGoogleOAuthConfigured();
 
   return (
-    <div className="relative min-h-svh overflow-hidden bg-[#faf8f5]">
+    <div className="fixed inset-0 overflow-hidden bg-[#faf8f5]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="uma-marketing-gradient absolute -left-1/4 top-0 h-[55vh] w-[70vw] opacity-[0.14] blur-3xl" />
         <div className="absolute -right-1/4 bottom-0 h-[45vh] w-[60vw] rounded-full bg-[#5c59b6]/15 blur-3xl" />
       </div>
 
-      <div className="relative z-10 grid min-h-svh pb-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <section className="relative flex min-h-[28vh] flex-col justify-center overflow-hidden bg-[#9c5e8d] px-6 py-10 text-white sm:min-h-[34vh] sm:px-10 lg:min-h-svh lg:px-12 xl:px-16 2xl:px-20">
+      <div className="relative z-10 grid h-[calc(100svh-2rem)] grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)] overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:grid-rows-none xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <section className="relative flex min-h-0 flex-col justify-center overflow-hidden bg-[#9c5e8d] px-6 py-6 text-white sm:px-10 sm:py-8 lg:h-full lg:px-12 lg:py-10 xl:px-16 2xl:px-20">
           {/* Soft base only — animated blobs carry the color motion */}
           <div
             aria-hidden
@@ -75,7 +75,7 @@ export default function LoginPage() {
               height={838}
               className="login-hero-grid__logo h-7 w-auto shrink-0 object-contain object-left brightness-0 invert"
             />
-            <p className="login-hero-grid__org text-sm font-medium leading-snug text-white/85 sm:text-base">
+            <p className="login-hero-grid__org font-medium leading-none text-white/85">
               Undergraduate Marketing Association
             </p>
             <h1 className="login-hero-grid__title font-heading text-[clamp(1.8rem,4.8vw,4rem)] leading-[0.95] tracking-tight text-white">
@@ -84,7 +84,7 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-16 2xl:px-20">
+        <section className="flex min-h-0 items-center justify-center overflow-hidden px-5 py-4 sm:px-8 sm:py-6 lg:px-12 lg:py-10 xl:px-16 2xl:px-20">
           <div className="w-full max-w-md">
             <Suspense fallback={<LoginFormFallback />}>
               <LoginForm googleEnabled={googleEnabled} />
@@ -92,7 +92,7 @@ export default function LoginPage() {
           </div>
         </section>
       </div>
-      <AppCreditBar className="absolute inset-x-0 bottom-0 z-20" />
+      <AppCreditBar className="fixed inset-x-0 bottom-0 z-20" />
     </div>
   );
 }

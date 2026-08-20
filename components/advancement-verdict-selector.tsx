@@ -1,9 +1,9 @@
 'use client';
 
 import { PickerDropdown } from '@/components/picker-dropdown';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
-  ADVANCEMENT_VERDICT_VALUES,
   isAdvancementVerdict,
   isStrongAdvanceSignal,
   verdictLabel,
@@ -141,30 +141,40 @@ export function PanelVerdictSummary({
   myVerdict?: AdvancementVerdict | null;
   className?: string;
 }) {
-  const counts = new Map<AdvancementVerdict, number>();
-  if (myVerdict) {
-    counts.set(myVerdict, (counts.get(myVerdict) ?? 0) + 1);
-  }
-  for (const entry of panelVerdicts) {
-    if (!entry.verdict) continue;
-    counts.set(entry.verdict, (counts.get(entry.verdict) ?? 0) + 1);
-  }
+  const allSignals = [
+    ...(myVerdict ? [{ name: 'You', verdict: myVerdict }] : []),
+    ...panelVerdicts.filter(
+      (entry): entry is { name: string; verdict: AdvancementVerdict } => Boolean(entry.verdict),
+    ),
+  ];
 
-  if (counts.size === 0) {
+  if (allSignals.length === 0) {
     return <span className="text-sm text-muted-foreground">-</span>;
   }
 
   return (
-    <span className={cn('inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm', className)}>
-      {ADVANCEMENT_VERDICT_VALUES.filter((verdict) => counts.has(verdict)).map((verdict) => (
-        <span
-          key={verdict}
-          className={cn('inline-flex items-baseline gap-1 font-medium', verdictStatusClass(verdict))}
-        >
-          <span className="tabular-nums">{counts.get(verdict)}</span>
-          <span>{verdictLabel(verdict)}</span>
-        </span>
-      ))}
+    <span className={cn('inline-flex flex-wrap items-center gap-1.5 text-sm', className)}>
+      {allSignals.map((entry, index) => {
+        const option = VERDICT_OPTIONS.find((o) => o.value === entry.verdict);
+        const label = `${entry.name}: ${verdictLabel(entry.verdict)}`;
+        return (
+          <Tooltip key={`${entry.name}-${entry.verdict}-${index}`}>
+            <TooltipTrigger
+              type="button"
+              aria-label={label}
+              className="inline-flex cursor-default items-center justify-center rounded-full"
+            >
+              <span
+                className={cn(
+                  'inline-block size-3 rounded-full border',
+                  option?.activeClass ?? 'border-border bg-muted',
+                )}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top">{label}</TooltipContent>
+          </Tooltip>
+        );
+      })}
     </span>
   );
 }

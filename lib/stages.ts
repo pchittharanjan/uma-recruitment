@@ -69,10 +69,29 @@ export function unlockKeyForStatus(status: RoundStatus): UnlockableStage | null 
   return phase?.unlockKey ?? null;
 }
 
+/** Unlockable stage maps 1:1 to a pipeline round status. */
+export function roundStatusForUnlockStage(stage: UnlockableStage): RoundStatus {
+  return stage;
+}
+
+export function isPastUnlockStage(teamStatus: RoundStatus, stage: UnlockableStage): boolean {
+  return statusIndex(teamStatus) > statusIndex(roundStatusForUnlockStage(stage));
+}
+
+export function isFutureUnlockStage(teamStatus: RoundStatus, stage: UnlockableStage): boolean {
+  return statusIndex(teamStatus) < statusIndex(roundStatusForUnlockStage(stage));
+}
+
 export function nextRoundStatus(current: RoundStatus): RoundStatus | null {
   const idx = statusIndex(current);
   if (idx < 0 || idx >= STATUS_ORDER.length - 1) return null;
   return STATUS_ORDER[idx + 1];
+}
+
+export function previousRoundStatus(current: RoundStatus): RoundStatus | null {
+  const idx = statusIndex(current);
+  if (idx <= 0) return null;
+  return STATUS_ORDER[idx - 1];
 }
 
 export function phaseLabel(status: RoundStatus): string {
@@ -129,7 +148,7 @@ export function workEmptyState(stage: AssignmentStage): string {
       return 'No applications to grade in this phase';
     case 'first_round':
     case 'final_round':
-      return 'No interviews to score in this phase';
+      return 'No interviews remaining in this phase';
     default:
       return 'Nothing for you in this phase';
   }
@@ -184,7 +203,7 @@ export function pendingWorkLabel(stage: AssignmentStage): string {
       return 'application to grade';
     case 'first_round':
     case 'final_round':
-      return 'interview to score';
+      return 'interview remaining';
     default:
       return 'item pending';
   }
@@ -374,8 +393,8 @@ export function isTeamPhaseNavActive(
   phaseStatus: RoundStatus,
   options?: { teamCurrentStatus?: RoundStatus | null },
 ): boolean {
-  if (isTeamOverviewPath(pathname) && options?.teamCurrentStatus) {
-    return phaseStatus === options.teamCurrentStatus;
+  if (isTeamOverviewPath(pathname)) {
+    return false;
   }
   const pattern = TEAM_PHASE_PATH_PATTERNS[phaseStatus];
   return pattern?.test(pathname) ?? false;

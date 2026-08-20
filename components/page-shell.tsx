@@ -11,8 +11,11 @@ const containerSizes: Record<ContainerSize, string> = {
   full: 'max-w-none',
 };
 
+/** Horizontal page padding — one source of truth in `.uma-page-pad-x`. */
+export const pagePaddingX = 'uma-page-pad-x';
+
 const containerPadding =
-  'uma-page-root w-full min-w-0 px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-9 xl:px-12 2xl:px-14';
+  `uma-page-root w-full min-w-0 ${pagePaddingX} py-7 sm:py-9 lg:py-9`;
 
 export function PageShell({
   children,
@@ -82,7 +85,7 @@ export function PagePanel({
   return (
     <div
       className={cn(
-        'uma-inset-surface rounded-xl px-5 py-5 sm:px-7 sm:py-6',
+        'uma-inset-surface uma-pane-pad rounded-xl',
         className,
       )}
     >
@@ -162,7 +165,7 @@ export const PageSection = forwardRef<
   { children: React.ReactNode; className?: string }
 >(function PageSection({ children, className }, ref) {
   return (
-    <section ref={ref} className={cn('uma-page-root min-w-0 space-y-6', className)}>
+    <section ref={ref} className={cn('uma-page-root uma-stack-page min-w-0', className)}>
       {children}
     </section>
   );

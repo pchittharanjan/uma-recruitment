@@ -1,7 +1,5 @@
 'use client';
 
-import confetti from 'canvas-confetti';
-
 /** Confetti palette: 3 blues + 3 oranges. */
 const RECRUITMENT_CONFETTI_COLORS = [
   '#003665', // navy
@@ -12,9 +10,11 @@ const RECRUITMENT_CONFETTI_COLORS = [
   '#DD6A56', // coral orange
 ];
 
-/** Fireworks-style confetti burst (canvas-confetti). */
-export function fireRecruitmentConfetti(durationMs = 4000) {
+/** Fireworks-style confetti burst (canvas-confetti, lazy-loaded). */
+export async function fireRecruitmentConfetti(durationMs = 4000) {
   if (typeof window === 'undefined') return;
+
+  const { default: confetti } = await import('canvas-confetti');
 
   const animationEnd = Date.now() + durationMs;
   const defaults = {

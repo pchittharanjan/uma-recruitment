@@ -3,6 +3,25 @@ import type { InterviewGuide, InterviewGuidesRecord } from '@/lib/interview-guid
 export const STRATEGY_GROUP_CASE_PDF = '/interview-cases/strategy-group.pdf';
 export const STRATEGY_INDIV_CASE_PDF = '/interview-cases/strategy-individual.pdf';
 
+export const STRATEGY_GROUP_INTRO =
+  'Present the Liquid Death group case. Take notes on each question, then score the evaluation criteria.';
+
+/** Previous default copy — still stored on some saved guides / preview drafts. */
+export const STRATEGY_GROUP_INTRO_LEGACY =
+  'Group casing: Liquid Death. Present the case from the PDF, take notes on each question, then score the evaluation criteria.';
+
+export function rewriteLegacyInterviewIntro(intro: string | undefined): string | undefined {
+  const trimmed = intro?.trim();
+  if (!trimmed) return trimmed;
+  if (
+    trimmed === STRATEGY_GROUP_INTRO_LEGACY ||
+    /^group casing:/i.test(trimmed)
+  ) {
+    return STRATEGY_GROUP_INTRO;
+  }
+  return trimmed;
+}
+
 export const STRATEGY_GROUP_CASE_QUESTIONS = [
   'Estimate the annual market size for single-serve water, across any different packaging type, consumed by students at U.S. colleges and universities. Consider different consumption occasions, such as dining halls, studying, athletics, and social events, and how students\' purchasing behavior might differ across each.',
   'What are the common trends among Gen Z students, and how can Liquid Death utilize this for a campaign? (Please refer to the charts provided)',
@@ -29,7 +48,7 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
   const firstRound: InterviewGuide = {
     format: 'case_study',
     casePdfUrl: STRATEGY_GROUP_CASE_PDF,
-    intro: 'Group casing: Liquid Death. Present the case from the PDF, take notes on each question, then score the evaluation criteria.',
+    intro: STRATEGY_GROUP_INTRO,
     caseStudy: {
       title: 'Liquid Death',
       prompt:
@@ -39,10 +58,10 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Structure', weight: 1 },
-        { name: 'Quant / analytics', weight: 1 },
-        { name: 'Insight', weight: 1 },
-        { name: 'Communication', weight: 1 },
+        { name: 'Structure', weight: 25 },
+        { name: 'Quant / analytics', weight: 25 },
+        { name: 'Insight', weight: 25 },
+        { name: 'Communication', weight: 25 },
       ],
     },
   };
@@ -61,10 +80,10 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Structure', weight: 1 },
-        { name: 'Quant / analytics', weight: 1 },
-        { name: 'Insight', weight: 1 },
-        { name: 'Communication', weight: 1 },
+        { name: 'Structure', weight: 25 },
+        { name: 'Quant / analytics', weight: 25 },
+        { name: 'Insight', weight: 25 },
+        { name: 'Communication', weight: 25 },
       ],
     },
   };

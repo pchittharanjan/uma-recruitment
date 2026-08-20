@@ -49,6 +49,21 @@ function noteForField(notes: Record<string, string> | undefined, field: string):
   return value ? value : null;
 }
 
+function validatePartialScores(
+  scores: Record<string, number>,
+  scoreFields: string[],
+  scaleMax: number,
+): string | null {
+  const allowed = new Set(scoreFields);
+  for (const [field, val] of Object.entries(scores)) {
+    if (!allowed.has(field) || val === undefined) continue;
+    if (!Number.isInteger(val) || val < 1 || val > scaleMax) {
+      return `Score for "${field}" must be an integer between 1 and ${scaleMax}`;
+    }
+  }
+  return null;
+}
+
 async function saveInterviewScore(
   assignmentId: number,
   userId: number,
@@ -57,7 +72,9 @@ async function saveInterviewScore(
   noteFields: string[],
   notes: Record<string, string> | undefined,
   comment: string,
+  options?: { complete?: boolean },
 ): Promise<void> {
+  const complete = options?.complete !== false;
   const db = getDb();
   await db.batch(
     [
@@ -66,7 +83,7 @@ async function saveInterviewScore(
               ON CONFLICT(assignment_id, field_name) DO UPDATE SET
                 score = excluded.score,
                 note = excluded.note`,
-        args: [assignmentId, field, scores[field], noteForField(notes, field)],
+        args: [assignmentId, field, scores[field] ?? null, noteForField(notes, field)],
       })),
       ...noteFields.map((field) => ({
         sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, ?, ?)
@@ -75,11 +92,16 @@ async function saveInterviewScore(
                 note = excluded.note`,
         args: [assignmentId, field, null, noteForField(notes, field)],
       })),
-      {
-        sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
-              WHERE id = ? AND user_id = ?`,
-        args: [comment || null, assignmentId, userId],
-      },
+      complete
+        ? {
+            sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
+                  WHERE id = ? AND user_id = ?`,
+            args: [comment || null, assignmentId, userId],
+          }
+        : {
+            sql: `UPDATE assignments SET comment = ? WHERE id = ? AND user_id = ?`,
+            args: [comment || null, assignmentId, userId],
+          },
     ],
     'write',
   );
@@ -142,6 +164,84 @@ export async function POST(
     const scaleMax = interviewScaleMax(interviewGuide);
 
     const body = await req.json();
+
+    if (body.draft === true) {
+      if (Array.isArray(body.entries)) {
+        const entries = body.entries as ScoreEntry[];
+        if (entries.length === 0) {
+          return NextResponse.json({ error: 'No entries provided.' }, { status: 400 });
+        }
+
+        const groupMembers = await getInterviewGroupMembers(
+          applicationId,
+          stage as 'first_round' | 'final_round',
+        );
+        if (groupMembers.length <= 1) {
+          return NextResponse.json(
+            { error: 'Batch draft is only for group interviews.' },
+            { status: 400 },
+          );
+        }
+
+        const groupAppIds = new Set(groupMembers.map((m) => m.applicationId));
+        for (const entry of entries) {
+          if (!groupAppIds.has(entry.applicationId)) {
+            return NextResponse.json({ error: 'Invalid application in batch.' }, { status: 400 });
+          }
+          const validationError = validatePartialScores(entry.scores ?? {}, scoreFields, scaleMax);
+          if (validationError) {
+            const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
+            const label = member?.candidateName ?? `application ${entry.applicationId}`;
+            return NextResponse.json({ error: `${label}: ${validationError}` }, { status: 400 });
+          }
+        }
+
+        for (const entry of entries) {
+          const entryAssignment = await getGraderAssignmentForUser(
+            user.id,
+            entry.applicationId,
+            teamId,
+            stage,
+          );
+          if (!entryAssignment) {
+            return notFound(`Assignment not found for application ${entry.applicationId}`);
+          }
+          await saveInterviewScore(
+            entryAssignment.assignmentId,
+            user.id,
+            scoreFields,
+            entry.scores ?? {},
+            noteFields,
+            entry.notes,
+            (entry.comment as string | undefined) ?? '',
+            { complete: false },
+          );
+        }
+
+        return NextResponse.json({ success: true, draft: true });
+      }
+
+      const scores = (body.scores as Record<string, number> | undefined) ?? {};
+      const notes = (body.notes as Record<string, string> | undefined) ?? {};
+      const comment = (body.comment as string | undefined) ?? '';
+      const validationError = validatePartialScores(scores, scoreFields, scaleMax);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+
+      await saveInterviewScore(
+        assignment.assignmentId,
+        user.id,
+        scoreFields,
+        scores,
+        noteFields,
+        notes,
+        comment,
+        { complete: false },
+      );
+
+      return NextResponse.json({ success: true, draft: true });
+    }
 
     if (Array.isArray(body.entries)) {
       const entries = body.entries as ScoreEntry[];

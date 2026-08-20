@@ -205,7 +205,8 @@ export default function TeamCommunicationsPage({
       : null;
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={data.team.name}
         title="Applicant Outcome Emails"
@@ -213,7 +214,6 @@ export default function TeamCommunicationsPage({
 
       {error && <StatusBanner message={error} type="error" />}
 
-      <PageSection className="space-y-6">
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <div className="space-y-1">

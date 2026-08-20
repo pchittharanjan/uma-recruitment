@@ -111,7 +111,8 @@ export default function ApplicationPhasePage() {
   const hasAnyApplications = teams.some((team) => team.applicationCount > 0);
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
         title="Grading Progress"
@@ -154,7 +155,6 @@ export default function ApplicationPhasePage() {
         />
       )}
 
-      <PageSection>
         <div className="display-panel overflow-hidden">
           <Table>
             <TableHeader>

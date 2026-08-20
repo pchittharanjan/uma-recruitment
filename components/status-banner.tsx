@@ -8,7 +8,7 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
-import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -94,17 +94,16 @@ export default function StatusBanner({
   return (
     <Alert
       className={cn(
-        'grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-0 border py-2 pr-10 pl-3 text-sm shadow-none',
+        'grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-0 border py-2 pr-3 pl-3 text-sm shadow-none',
         styles[type].alert,
-        (dismissKey || hasAction) && 'has-data-[slot=alert-action]:pr-10',
       )}
     >
-      <Icon className={cn('mt-0.5 size-3.5 shrink-0', styles[type].icon)} aria-hidden />
-      <AlertDescription className="col-start-2 text-sm leading-snug text-foreground">
+      <Icon className={cn('!translate-y-0 size-3.5 shrink-0 self-center', styles[type].icon)} aria-hidden />
+      <AlertDescription className="col-start-2 flex items-center text-sm leading-snug text-foreground">
         {content}
       </AlertDescription>
       {(dismissKey || hasAction) && (
-        <AlertAction className="flex items-center gap-1">
+        <div className="col-start-3 flex items-center justify-end gap-1">
           {hasAction ? (
             <Button
               nativeButton={false}
@@ -128,10 +127,10 @@ export default function StatusBanner({
                 setDismissed(true);
               }}
             >
-              <XIcon />
+              <XIcon className="!translate-y-0 size-3.5" />
             </Button>
           ) : null}
-        </AlertAction>
+        </div>
       )}
     </Alert>
   );

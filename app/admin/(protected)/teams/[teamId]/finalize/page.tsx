@@ -74,7 +74,8 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
     contextFields[0];
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={data.team.name}
         title="Final Results"
@@ -86,7 +87,6 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
         }
       />
 
-      <PageSection>
         {data.dashboard.normalizationFactors && data.dashboard.normalizationFactors.length > 0 && (
           <Card className="p-5">
             <p className="mb-3 text-sm font-semibold">Grader calibration applied</p>
@@ -139,7 +139,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
                           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
                             {app.rank}
                           </span>
-                          {isTied && <StageBadge label="TIE" color="orange" />}
+                          {isTied && <StageBadge label="TIE" color="orange" size="compact" />}
                         </div>
                       </td>
                       <td className="p-4">
@@ -156,6 +156,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
                               key={i}
                               label={`${a.graderName}: ${a.total ?? '–'}`}
                               color={a.status === 'completed' ? 'green' : 'yellow'}
+                              size="compact"
                             />
                           ))}
                         </div>

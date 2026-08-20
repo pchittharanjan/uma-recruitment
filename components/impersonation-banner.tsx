@@ -27,7 +27,10 @@ export function ImpersonationBanner() {
   };
 
   return (
-    <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-950 font-heading sm:px-6 dark:text-amber-100">
+    <div
+      data-interview-chrome=""
+      className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-950 font-heading sm:px-6 dark:text-amber-100"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="min-w-0 leading-relaxed">
           <span className="font-semibold">Test mode:</span> viewing as{' '}

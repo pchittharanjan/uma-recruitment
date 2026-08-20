@@ -10,8 +10,12 @@ import { communicationsHref } from '@/lib/communications-stages';
 import { getDb, type RoundStatus } from '@/lib/db';
 import { getOrgCoffeeChatDates, type OrgCoffeeChatDates } from '@/lib/org-coffee-chat-dates';
 import { type TeamPipelineRound, getActiveRoundsByTeam } from '@/lib/pipeline-phase';
-import { getTeamInterviewRoundStats } from '@/lib/interview-slots';
-import { getRoundSettings, getTeamRoundStats } from '@/lib/rounds';
+import {
+  getTeamInterviewRoundStatsBatch,
+  getTeamRoundStatsBatch,
+  teamRoundStatsMapKey,
+} from '@/lib/batch-team-stats';
+import { getRoundSettings } from '@/lib/rounds';
 import {
   adminPhaseHref,
   isRoundAtOrPastStatus,
@@ -57,22 +61,27 @@ async function interviewProgressByTeam(
   withRound: Array<TeamPipelineRound & { round: NonNullable<TeamPipelineRound['round']> }>,
   stage: 'first_round' | 'final_round',
 ): Promise<TeamInterviewProgress[]> {
-  return Promise.all(
-    withRound.map(async (t) => {
-      const stats = await getTeamInterviewRoundStats(t.teamId, t.round.id, stage);
-      const scheduledComplete =
-        stats.candidateCount > 0 && stats.slotCount >= stats.candidateCount;
-      const scoringComplete =
-        stats.scoring.total > 0 && stats.scoring.completed === stats.scoring.total;
-      return {
-        teamId: t.teamId,
-        teamName: t.teamName,
-        ...stats,
-        scheduledComplete,
-        scoringComplete,
-      };
-    }),
-  );
+  const keys = withRound.map((t) => ({ teamId: t.teamId, roundId: t.round.id }));
+  const statsByKey = await getTeamInterviewRoundStatsBatch(keys, stage);
+
+  return withRound.map((t) => {
+    const stats = statsByKey.get(teamRoundStatsMapKey(t.teamId, t.round.id)) ?? {
+      candidateCount: 0,
+      slotCount: 0,
+      scoring: { total: 0, completed: 0 },
+    };
+    const scheduledComplete =
+      stats.candidateCount > 0 && stats.slotCount >= stats.candidateCount;
+    const scoringComplete =
+      stats.scoring.total > 0 && stats.scoring.completed === stats.scoring.total;
+    return {
+      teamId: t.teamId,
+      teamName: t.teamName,
+      ...stats,
+      scheduledComplete,
+      scoringComplete,
+    };
+  });
 }
 
 function nextRoundLabel(stage: 'first_round' | 'final_round', teamName?: string): string {
@@ -185,12 +194,18 @@ async function buildApplicationChecklist(
 ): Promise<PhaseChecklistStep[]> {
   const roundIds = withRound.map((t) => t.round.id);
   const teamCount = withRound.length;
+  const keys = withRound.map((t) => ({ teamId: t.teamId, roundId: t.round.id }));
 
-  const stats = await Promise.all(
-    withRound.map((t) => getTeamRoundStats(t.teamId, t.round.id)),
-  );
-  const rubricResults = await Promise.all(
-    withRound.map((t) => getRoundSettings(t.round.id)),
+  const [statsByKey, rubricResults] = await Promise.all([
+    getTeamRoundStatsBatch(keys),
+    Promise.all(withRound.map((t) => getRoundSettings(t.round.id))),
+  ]);
+  const stats = withRound.map((t) =>
+    statsByKey.get(teamRoundStatsMapKey(t.teamId, t.round.id)) ?? {
+      applicationCount: 0,
+      assignmentProgress: { total: 0, completed: 0 },
+      gradersPerApplication: 3,
+    },
   );
 
   const importedCount = stats.filter((s) => s.applicationCount > 0).length;
@@ -339,21 +354,6 @@ async function buildInterviewChecklist(
     },
   ];
 
-  // First Round only: confirm every team's round status has left Application.
-  if (stage === 'first_round') {
-    const teamsOnStage = eligibleTeams.filter((t) =>
-      isRoundAtOrPastStatus(t.round.status, 'first_round'),
-    ).length;
-    steps.push({
-      id: `${stage}-move-teams`,
-      title: 'Advance teams into First Round Interview',
-      completed: teamCount > 0 && teamsOnStage === teamCount,
-      actionLabel: 'Open Dashboard',
-      href: `${adminPhaseHref('first_round')}#pipeline-controls`,
-      detail: teamDetail(teamsOnStage, teamCount),
-    });
-  }
-
   for (const team of teamProgress) {
     const { total, completed } = team.scoring;
     steps.push({
@@ -433,7 +433,11 @@ async function buildDeliberationsChecklist(
 ): Promise<PhaseChecklistStep[]> {
   const teamCount = withRound.length;
   const delibsUnlocked = unlockedStages.includes('deliberations');
-  const teamKeys = withRound.map((t) => ({ teamId: t.teamId, roundId: t.round.id }));
+  const teamKeys = withRound.map((t) => ({
+    teamId: t.teamId,
+    roundId: t.round.id,
+    teamName: t.teamName,
+  }));
   const finalizedTeams = await countTeamsWithCompleteFinalSelection(teamKeys);
   // Workspace hub; optionally open the first team as a tab.
   const firstTeam = withRound[0];

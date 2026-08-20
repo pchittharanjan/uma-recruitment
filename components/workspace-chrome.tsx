@@ -208,16 +208,19 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
     <SplitToggleButton split={effectiveSplit} onToggle={toggleSplit} />
   );
   const toolbarEnd = (
-    <div className="ml-2 flex shrink-0 items-center gap-0.5">
+    <div className="ml-2 flex shrink-0 items-center gap-2">
       <NotificationBell />
       {splitToggle}
     </div>
   );
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col has-[[data-interview-workspace]]:h-0 has-[[data-interview-workspace]]:overflow-hidden">
       {effectiveSplit ? (
-        <div className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 backdrop-blur-[2px]">
+        <div
+          data-interview-chrome=""
+          className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 backdrop-blur-[2px]"
+        >
           <div
             className="flex min-w-0 items-stretch pl-2 sm:pl-3"
             style={{ width: `${splitRatio}%` }}
@@ -256,7 +259,10 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : (
-        <div className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 px-2 backdrop-blur-[2px] sm:px-3">
+        <div
+          data-interview-chrome=""
+          className="flex h-12 shrink-0 items-stretch border-b border-border bg-muted/35 px-2 backdrop-blur-[2px] sm:px-3"
+        >
           <WorkspaceTabBar
             tabs={tabs}
             activeHref={activeHref}
@@ -272,13 +278,14 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
       )}
 
       <div
+        data-workspace-panes=""
         className={cn(
-          'flex min-h-0 min-w-0 flex-1',
+          'flex min-h-0 min-w-0 flex-1 has-[[data-interview-workspace]]:h-0 has-[[data-interview-workspace]]:overflow-hidden',
           effectiveSplit ? 'flex-row' : 'flex-col',
         )}
       >
         <div
-          className="min-h-0 min-w-0 flex-1 overflow-auto"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto has-[[data-interview-workspace]]:h-0 has-[[data-interview-workspace]]:overflow-hidden"
           style={effectiveSplit ? { width: `${splitRatio}%`, flex: 'none' } : undefined}
         >
           {children}
@@ -287,6 +294,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
           <>
             <button
               type="button"
+              data-interview-chrome=""
               aria-label="Resize split"
               className={cn(
                 'group relative z-10 w-1.5 shrink-0 cursor-ew-resize bg-border/70 hover:bg-primary/60',
@@ -314,6 +322,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
               }}
             />
             <div
+              data-interview-chrome=""
               className={cn(
                 'relative min-h-0 min-w-0 flex-1 flex-col bg-background',
                 effectiveSplit ? 'flex' : 'hidden',

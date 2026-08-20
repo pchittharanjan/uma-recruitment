@@ -1,5 +1,3 @@
-import { cache } from 'react';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getUserByEmail,
@@ -26,7 +24,7 @@ function getSharedTokenForRole(role: LoginRole): string | undefined {
   return process.env.TEAM_EXEC_AUTH_TOKEN;
 }
 
-function parseUserId(raw: string | undefined): number | null {
+export function parseUserId(raw: string | undefined): number | null {
   if (!raw) return null;
   const id = Number.parseInt(raw, 10);
   return Number.isFinite(id) && id > 0 ? id : null;
@@ -37,14 +35,6 @@ export async function getSessionUserFromRequest(req: NextRequest): Promise<User 
   if (!id) return null;
   return getUserById(id);
 }
-
-/** Deduped per RSC request so nested layouts share one session lookup. */
-export const getSessionUser = cache(async function getSessionUser(): Promise<User | null> {
-  const cookieStore = await cookies();
-  const id = parseUserId(cookieStore.get(SESSION_COOKIE)?.value);
-  if (!id) return null;
-  return getUserById(id);
-});
 
 export async function requireAuth(
   req: NextRequest,

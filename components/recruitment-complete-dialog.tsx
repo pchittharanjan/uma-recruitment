@@ -36,7 +36,7 @@ export function RecruitmentCompleteDialog({
 
   useEffect(() => {
     if (!open) return;
-    fireRecruitmentConfetti();
+    void fireRecruitmentConfetti();
   }, [open]);
 
   const dismiss = () => {
@@ -79,7 +79,7 @@ export function RecruitmentCompleteDialog({
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2 px-6 pt-4 pb-6">
-          <Button type="button" onClick={() => fireRecruitmentConfetti()}>
+          <Button type="button" onClick={() => void fireRecruitmentConfetti()}>
             <PartyPopperIcon data-icon="inline-start" />
             Celebrate
           </Button>

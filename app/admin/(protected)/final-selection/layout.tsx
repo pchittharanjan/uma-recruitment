@@ -1,4 +1,6 @@
 import AppBreadcrumb from '@/components/app-breadcrumb';
+import { pagePaddingX } from '@/components/page-shell';
+import { cn } from '@/lib/utils';
 
 export default function AdminFinalSelectionLayout({
   children,
@@ -7,7 +9,7 @@ export default function AdminFinalSelectionLayout({
 }) {
   return (
     <div className="flex flex-1 flex-col">
-      <div className="px-4 pt-4 lg:px-6">
+      <div className={cn(pagePaddingX, 'pt-4')}>
         <AppBreadcrumb />
       </div>
       {children}

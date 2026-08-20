@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
-import { forbidden, getSessionUser } from '@/lib/auth';
+import { forbidden } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth-session';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
 import { getImpersonateTarget } from '@/lib/impersonation';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';

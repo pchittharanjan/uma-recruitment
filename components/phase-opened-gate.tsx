@@ -6,13 +6,19 @@ import {
   PhaseOpenedDialog,
   wasPhaseOpenedDismissed,
 } from '@/components/phase-opened-dialog';
+import {
+  PhaseSettingUpDialog,
+  wasPhaseSettingUpDismissed,
+} from '@/components/phase-setting-up-dialog';
 import { useTeamNav, type TeamNavSnapshot, type TeamNavTeam } from '@/components/team-nav-provider';
 import type { RoundStatus } from '@/lib/db';
 import {
   statusIndex,
+  teamOverviewHref,
   teamPhaseHref,
   unlockKeyForStatus,
 } from '@/lib/stages';
+import { phaseLabelForTeam, pipelinePhasesForTeam } from '@/lib/team-pipeline-profile';
 
 function cycleLabelFromNav(nav: {
   recruitmentCycleShortLabel?: string;
@@ -52,7 +58,6 @@ function phaseAccessible(
     return hasTeamPortalAccess(team);
   }
 
-  // Coffee chats are org-wide — any team-portal user with team access qualifies.
   if (phase === 'pre_application') {
     if (orgPipelineStatus && statusIndex(orgPipelineStatus) < statusIndex('pre_application')) {
       return false;
@@ -95,17 +100,79 @@ function resolvePhaseHref(
   return null;
 }
 
+/** Best link to an already-open earlier phase for this team. */
+function resolveBrowseHref(
+  team: TeamNavTeam,
+  orgPipelineStatus: RoundStatus | null,
+): string {
+  if (!team.round) return teamOverviewHref(team.id);
+
+  const currentIdx = statusIndex(team.round.status as RoundStatus);
+  const phases = pipelinePhasesForTeam(team.name);
+
+  for (let i = phases.length - 1; i >= 0; i--) {
+    const phase = phases[i]!;
+    if (statusIndex(phase.status) > currentIdx) continue;
+    if (!phaseAccessible(phase.status, team, orgPipelineStatus)) continue;
+
+    if (phase.status === 'pre_application') return '/coffee-chats';
+    const href = teamPhaseHref(team.id, phase.status);
+    if (href) return href;
+  }
+
+  return teamOverviewHref(team.id);
+}
+
+/** Team whose live phase was advanced but not unlocked yet. */
+function findSettingUpPhase(nav: TeamNavSnapshot): {
+  status: RoundStatus;
+  team: TeamNavTeam;
+  browseHref: string;
+} | null {
+  let best: {
+    status: RoundStatus;
+    team: TeamNavTeam;
+    browseHref: string;
+  } | null = null;
+
+  for (const team of nav.teams) {
+    if (!team.round || team.round.status === 'closed') continue;
+    if (!hasTeamPortalAccess(team)) continue;
+
+    const status = team.round.status as RoundStatus;
+    if (!isAnnounceablePhase(status)) continue;
+
+    const unlockKey = unlockKeyForStatus(status);
+    if (!unlockKey || team.unlockedStages.includes(unlockKey)) continue;
+
+    if (!best || statusIndex(status) > statusIndex(best.status)) {
+      best = {
+        status,
+        team,
+        browseHref: resolveBrowseHref(team, nav.status),
+      };
+    }
+  }
+
+  return best;
+}
+
+type GateMode = 'open' | 'setting-up';
+
 /**
  * Shows a one-time (per session + phase) invite when the pipeline advances
- * into a new work phase. Mounted in the team portal shell.
+ * into a new work phase, or a setup notice when the phase is advanced but locked.
  */
 export function PhaseOpenedGate({ userName }: { userName: string }) {
   const { nav, loading } = useTeamNav();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<GateMode>('open');
   const [status, setStatus] = useState<RoundStatus | null>(null);
   const [cycleLabel, setCycleLabel] = useState('');
   const [href, setHref] = useState('');
+  const [teamId, setTeamId] = useState<number | null>(null);
   const [teamName, setTeamName] = useState<string | null>(null);
+  const [phaseLabel, setPhaseLabel] = useState('');
   const [isDirector, setIsDirector] = useState(false);
 
   useEffect(() => {
@@ -116,33 +183,64 @@ export function PhaseOpenedGate({ userName }: { userName: string }) {
       return;
     }
 
-    const nextStatus = effectivePipelineStatus(nav);
-    if (!nextStatus || !isAnnounceablePhase(nextStatus)) {
-      setOpen(false);
-      return;
-    }
-
-    const destination = resolvePhaseHref(nextStatus, nav.teams, nav.status);
-    if (!destination) {
-      setOpen(false);
-      return;
-    }
-
     const label = cycleLabelFromNav(nav);
-    if (wasPhaseOpenedDismissed(label, nextStatus)) {
+    const pipelineStatus = effectivePipelineStatus(nav);
+    if (!pipelineStatus || !isAnnounceablePhase(pipelineStatus)) {
       setOpen(false);
       return;
     }
 
-    setStatus(nextStatus);
-    setCycleLabel(label);
-    setHref(destination.href);
-    setTeamName(destination.teamName);
-    setIsDirector(destination.isDirector);
-    setOpen(true);
+    const destination = resolvePhaseHref(pipelineStatus, nav.teams, nav.status);
+    if (destination && !wasPhaseOpenedDismissed(label, pipelineStatus)) {
+      setMode('open');
+      setStatus(pipelineStatus);
+      setCycleLabel(label);
+      setHref(destination.href);
+      setTeamId(null);
+      setTeamName(destination.teamName);
+      setPhaseLabel('');
+      setIsDirector(destination.isDirector);
+      setOpen(true);
+      return;
+    }
+
+    const settingUp = findSettingUpPhase(nav);
+    if (
+      settingUp &&
+      !wasPhaseSettingUpDismissed(label, settingUp.status, settingUp.team.id)
+    ) {
+      setMode('setting-up');
+      setStatus(settingUp.status);
+      setCycleLabel(label);
+      setHref(settingUp.browseHref);
+      setTeamId(settingUp.team.id);
+      setTeamName(settingUp.team.name);
+      setPhaseLabel(phaseLabelForTeam(settingUp.status, settingUp.team.name));
+      setIsDirector(settingUp.team.isDirector === true);
+      setOpen(true);
+      return;
+    }
+
+    setOpen(false);
   }, [nav, loading]);
 
   if (!status || !cycleLabel || !href) return null;
+
+  if (mode === 'setting-up' && teamId != null && teamName) {
+    return (
+      <PhaseSettingUpDialog
+        open={open}
+        status={status}
+        cycleLabel={cycleLabel}
+        teamId={teamId}
+        teamName={teamName}
+        phaseLabel={phaseLabel}
+        browseHref={href}
+        userName={userName}
+        onOpenChange={setOpen}
+      />
+    );
+  }
 
   return (
     <PhaseOpenedDialog

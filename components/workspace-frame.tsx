@@ -5,13 +5,16 @@ import { WorkspaceChrome } from '@/components/workspace-chrome';
 import { WorkspaceProvider } from '@/components/workspace-provider';
 import { useWorkspaceEmbed } from '@/hooks/use-workspace-embed';
 import type { WorkspaceArea } from '@/lib/workspace';
+import { cn } from '@/lib/utils';
 
 export function WorkspaceFrame({
   children,
   area,
+  className,
 }: {
   children: React.ReactNode;
   area: WorkspaceArea;
+  className?: string;
 }) {
   const embed = useWorkspaceEmbed();
   if (embed) {
@@ -21,7 +24,14 @@ export function WorkspaceFrame({
   return (
     <WorkspaceProvider area={area}>
       <NavigationProgress />
-      <WorkspaceChrome>{children}</WorkspaceChrome>
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col has-[[data-interview-workspace]]:h-0 has-[[data-interview-workspace]]:overflow-hidden',
+          className,
+        )}
+      >
+        <WorkspaceChrome>{children}</WorkspaceChrome>
+      </div>
     </WorkspaceProvider>
   );
 }

@@ -33,12 +33,27 @@ import {
   isTeamPhaseNavActive,
   statusIndex,
   teamPhaseHref,
+  type UnlockableStage,
 } from '@/lib/stages';
 import {
   getTeamPipelineProfile,
   phaseLabelForTeam,
   pipelinePhasesForTeam,
 } from '@/lib/team-pipeline-profile';
+
+function teamSidebarActiveBgTextClass(teamName: string): string {
+  if (teamName === 'Strategy') return 'bg-orange-500/10 text-orange-600';
+  if (teamName === 'Events') return 'bg-blue-500/10 text-blue-600';
+  if (teamName === 'Design') return 'bg-violet-500/10 text-violet-600';
+  return 'bg-primary/10 text-foreground';
+}
+
+function teamSidebarActiveTextClass(teamName: string): string {
+  if (teamName === 'Strategy') return 'text-orange-600';
+  if (teamName === 'Events') return 'text-blue-600';
+  if (teamName === 'Design') return 'text-violet-600';
+  return 'text-primary';
+}
 
 const PHASE_ICONS: Partial<Record<RoundStatus, ComponentType<{ className?: string }>>> = {
   pre_application: CoffeeIcon,
@@ -132,6 +147,8 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
   const pipelineClosed = teamStatus === 'closed';
   const visiblePhases = pipelinePhasesForTeam(activeTeam.name);
   const profile = getTeamPipelineProfile(activeTeam.name);
+  const teamActiveClass = teamSidebarActiveBgTextClass(activeTeam.name);
+  const teamActiveTextClass = teamSidebarActiveTextClass(activeTeam.name);
   const finalActive = pathname.startsWith('/team/final-selection');
 
   return (
@@ -151,6 +168,11 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             const href = teamPhaseHref(activeTeam.id, phase.status);
             const accessible = phaseAccessible(phase.status, activeTeam);
             const phaseLabelText = phaseLabelForTeam(phase.status, activeTeam.name);
+            const unlockKey = phase.unlockKey;
+            const isCurrentButLocked =
+              phase.status === teamStatus &&
+              unlockKey != null &&
+              !activeTeam.unlockedStages.includes(unlockKey as UnlockableStage);
             const applicationPast =
               phase.status === 'application' &&
               statusIndex(teamStatus) > statusIndex('application');
@@ -166,9 +188,11 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
             const firstRoundAdvancePast = firstRoundPast && !firstRoundAdvanceActive;
 
             if (!accessible || !href) {
-              const reason = isFuture
-                ? `${phaseLabelText} - Not Open Yet`
-                : `${phaseLabelText} - Not Available for Your Role`;
+              const reason = isCurrentButLocked
+                ? `${phaseLabelText} — still being set up`
+                : isFuture
+                  ? `${phaseLabelText} - Not Open Yet`
+                  : `${phaseLabelText} - Not Available for Your Role`;
               return (
                 <DisabledPhaseItem
                   key={phase.status}
@@ -186,6 +210,7 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                   tooltip={phaseLabelText}
                   className={cn(
                     isPast && !isPipelineCurrent && !isNavActive && 'text-muted-foreground',
+                    isNavActive && !advanceActive && !firstRoundAdvanceActive && teamActiveClass,
                   )}
                   render={<Link href={href} />}
                 >
@@ -195,13 +220,13 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                     <Icon
                       className={cn(
                         'size-4 shrink-0',
-                        isPipelineCurrent && 'text-primary',
+                        isPipelineCurrent && teamActiveTextClass,
                       )}
                     />
                   ) : null}
                   <span
                     className={cn(
-                      isPipelineCurrent && 'font-medium text-primary',
+                      isPipelineCurrent && `font-medium ${teamActiveTextClass}`,
                     )}
                   >
                     {phaseLabelText}

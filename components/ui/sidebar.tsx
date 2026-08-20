@@ -32,7 +32,6 @@ import {
 } from "@/lib/sidebar-prefs"
 
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
@@ -233,10 +232,15 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          showCloseButton={false}
+          className={cn(
+            "w-(--sidebar-width) border-sidebar-border/70 bg-transparent p-0 text-sidebar-foreground shadow-none",
+            "data-[side=left]:border-r-0 data-[side=right]:border-l-0",
+            "[&_[data-sidebar=mobile-shell]]:shadow-2xl",
+          )}
           style={
             {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              "--sidebar-width": "min(22rem, calc(100vw - 1rem))",
             } as React.CSSProperties
           }
           side={side}
@@ -245,7 +249,14 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div className="h-full w-full p-2 sm:p-3">
+            <div
+              data-sidebar="mobile-shell"
+              className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-sidebar-border/70 bg-sidebar/98 ring-1 ring-black/5 backdrop-blur-xl"
+            >
+              {children}
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
     )
@@ -300,6 +311,7 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  children,
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar()
@@ -309,8 +321,8 @@ function SidebarTrigger({
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon-sm"
-      className={cn(className)}
+      size={children ? "sm" : "icon-sm"}
+      className={cn("shadow-sm", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -318,6 +330,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
+      {children ? <span>{children}</span> : null}
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
@@ -416,22 +429,34 @@ function SidebarInput({
 }
 
 function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
+  const { isMobile } = useSidebar()
+
   return (
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 overflow-visible p-2", className)}
+      className={cn(
+        "flex flex-col gap-2 overflow-visible p-2",
+        isMobile && "gap-3 px-3 pt-3 pb-2",
+        className
+      )}
       {...props}
     />
   )
 }
 
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
+  const { isMobile } = useSidebar()
+
   return (
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn(
+        "flex flex-col gap-2 p-2",
+        isMobile && "mt-auto border-t border-sidebar-border/70 bg-sidebar/92 px-3 py-3",
+        className
+      )}
       {...props}
     />
   )
@@ -452,12 +477,15 @@ function SidebarSeparator({
 }
 
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
+  const { isMobile } = useSidebar()
+
   return (
     <div
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
         "no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-x-hidden",
+        isMobile && "gap-3 px-1 pb-2",
         className
       )}
       {...props}
@@ -466,11 +494,17 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
+  const { isMobile } = useSidebar()
+
   return (
     <div
       data-slot="sidebar-group"
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      className={cn(
+        "relative flex w-full min-w-0 flex-col p-2",
+        isMobile && "gap-2 px-2 py-0",
+        className
+      )}
       {...props}
     />
   )
@@ -481,12 +515,15 @@ function SidebarGroupLabel({
   render,
   ...props
 }: useRender.ComponentProps<"div"> & React.ComponentProps<"div">) {
+  const { isMobile } = useSidebar()
+
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(
       {
         className: cn(
           "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:select-none group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+          isMobile && "h-auto px-2 pt-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em]",
           className
         ),
       },
@@ -598,12 +635,21 @@ function SidebarMenuButton({
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state } = useSidebar()
+  const { isMobile, state, setOpenMobile } = useSidebar()
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
       {
-        className: cn(sidebarMenuButtonVariants({ variant, size }), className),
+        className: cn(
+          sidebarMenuButtonVariants({ variant, size }),
+          isMobile && "min-h-11 rounded-xl px-3 text-[0.95rem]",
+          className
+        ),
+        onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+          if (!event.defaultPrevented && isMobile) {
+            setOpenMobile(false)
+          }
+        },
       },
       props
     ),
@@ -763,14 +809,22 @@ function SidebarMenuSubButton({
     size?: "sm" | "md"
     isActive?: boolean
   }) {
+  const { isMobile, setOpenMobile } = useSidebar()
+
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(
       {
         className: cn(
           "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent-hover hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+          isMobile && "h-9 rounded-lg px-3",
           className
         ),
+        onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+          if (!event.defaultPrevented && isMobile) {
+            setOpenMobile(false)
+          }
+        },
       },
       props
     ),

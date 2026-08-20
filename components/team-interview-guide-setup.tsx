@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Plus, Upload, X } from 'lucide-react';
+import { FileText, Plus, TriangleAlertIcon, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import StatusBanner from '@/components/status-banner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { NumberDraftInput } from '@/components/number-draft-input';
 import { Input } from '@/components/ui/input';
 import { Label, RequiredAsterisk } from '@/components/ui/label';
 import {
@@ -30,6 +31,8 @@ import {
   INTERVIEW_SCALE_MAX_OPTIONS,
   normalizeInterviewRubric,
   validateInterviewGuide,
+  criteriaAsPercentShares,
+  criteriaShareTotal,
   type InterviewGuide,
   type InterviewGuideFormat,
   type InterviewGuideStage,
@@ -38,6 +41,7 @@ import {
 import { serializeInterviewGuidePayload } from '@/lib/interview-guide-serialize';
 import { markNavigationPending } from '@/components/navigation-progress';
 import { stashInterviewPreviewGuide } from '@/lib/interview-preview-storage';
+import { rewriteLegacyInterviewIntro } from '@/lib/strategy-interview';
 import { cachedJsonFetch, invalidateClientFetchCache, peekCachedJson } from '@/lib/client-fetch-cache';
 import {
   DocumentSaveStatusLine,
@@ -63,6 +67,40 @@ interface TeamInterviewGuideSetupProps {
 
 const STAGES: InterviewGuideStage[] = ['first_round', 'final_round'];
 const AUTOSAVE_DELAY_MS = 900;
+
+function GuideSection({
+  title,
+  description,
+  action,
+  required = false,
+  children,
+}: {
+  title: string;
+  description?: string | null;
+  action?: ReactNode;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="uma-section-label">
+            {title}
+            {required ? <RequiredAsterisk className="ml-0.5" /> : null}
+          </p>
+          {description ? (
+            <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const FORMAT_OPTIONS: { value: InterviewGuideFormat; label: string; description: string }[] = [
   {
@@ -93,7 +131,7 @@ function withFilledRubric(guide: InterviewGuide): InterviewRubric {
       scaleMax: rubric.scaleMax,
       criteria: rubric.criteria.map((c) => ({
         name: c.name,
-        weight: c.weight > 0 ? c.weight : 1,
+        weight: Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0,
       })),
     };
   }
@@ -129,28 +167,31 @@ function withFilledCase(guide: InterviewGuide): NonNullable<InterviewGuide['case
 
 function guideFromApi(guide: InterviewGuide | null, format: InterviewGuideFormat): InterviewGuide {
   if (!guide) return emptyGuide(format);
+  const intro = rewriteLegacyInterviewIntro(guide.intro) ?? '';
   if (guide.format === 'case_and_behavioral') {
+    const rubric = withFilledRubric(guide);
     return {
       format: 'case_and_behavioral',
-      intro: guide.intro ?? '',
+      intro,
       casePdfUrl: guide.casePdfUrl,
       caseStudy: withFilledCase(guide),
       questions: guide.questions && guide.questions.length > 0 ? guide.questions : [''],
-      rubric: withFilledRubric(guide),
+      rubric: { ...rubric, criteria: criteriaAsPercentShares(rubric.criteria) },
     };
   }
   if (guide.format === 'case_study') {
+    const rubric = withFilledRubric(guide);
     return {
       format: 'case_study',
-      intro: guide.intro ?? '',
+      intro,
       casePdfUrl: guide.casePdfUrl,
       caseStudy: withFilledCase(guide),
-      rubric: withFilledRubric(guide),
+      rubric: { ...rubric, criteria: criteriaAsPercentShares(rubric.criteria) },
     };
   }
   return {
     format: 'questions',
-    intro: guide.intro ?? '',
+    intro,
     casePdfUrl: guide.casePdfUrl,
     questions: guide.questions && guide.questions.length > 0 ? guide.questions : [''],
   };
@@ -194,7 +235,7 @@ function payloadFromGuide(guide: InterviewGuide): InterviewGuide {
   const rubric = normalizeInterviewRubric(guide.rubric) ?? {
     scaleMax: guide.rubric?.scaleMax ?? 5,
     criteria: (guide.rubric?.criteria ?? [])
-      .map((c) => ({ name: c.name.trim(), weight: c.weight > 0 ? c.weight : 1 }))
+      .map((c) => ({ name: c.name.trim(), weight: c.weight > 0 ? c.weight : 0 }))
       .filter((c) => c.name),
   };
 
@@ -305,15 +346,11 @@ function StringListEditor({
   const rows = items.length > 0 ? items : [''];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
-        <div className="space-y-1">
-          <CardTitle className="text-base">
-            {title}
-            <RequiredAsterisk className="ml-0.5" />
-          </CardTitle>
-          {description ? <CardDescription>{description}</CardDescription> : null}
-        </div>
+    <GuideSection
+      title={title}
+      description={description}
+      required
+      action={
         <Button
           type="button"
           variant="outline"
@@ -324,40 +361,43 @@ function StringListEditor({
           <Plus className="mr-1 size-4" />
           {addLabel}
         </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {rows.map((value, i) => (
-          <div key={`${stage}-${idPrefix}-${i}`} className="flex gap-3">
-            <span className="pt-2.5 text-sm tabular-nums text-muted-foreground">{i + 1}.</span>
-            <textarea
-              value={value}
-              onChange={(e) => {
-                const next = [...rows];
-                next[i] = e.target.value;
-                onChange(next);
-              }}
-              placeholder={placeholder(i)}
-              rows={2}
-              className="field-textarea min-h-[4.5rem] flex-1 resize-y"
-            />
-            {rows.length > 1 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  const next = rows.filter((_, j) => j !== i);
-                  onChange(next.length ? next : ['']);
+      }
+    >
+      <Card>
+        <CardContent className="space-y-4">
+          {rows.map((value, i) => (
+            <div key={`${stage}-${idPrefix}-${i}`} className="flex gap-3">
+              <span className="pt-2.5 text-sm tabular-nums text-muted-foreground">{i + 1}.</span>
+              <textarea
+                value={value}
+                onChange={(e) => {
+                  const next = [...rows];
+                  next[i] = e.target.value;
+                  onChange(next);
                 }}
-                aria-label={`Remove ${title.toLowerCase()} ${i + 1}`}
-              >
-                <X className="size-4" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+                placeholder={placeholder(i)}
+                rows={2}
+                className="field-textarea min-h-[4.5rem] flex-1 resize-y"
+              />
+              {rows.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const next = rows.filter((_, j) => j !== i);
+                    onChange(next.length ? next : ['']);
+                  }}
+                  aria-label={`Remove ${title.toLowerCase()} ${i + 1}`}
+                >
+                  <X className="size-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </GuideSection>
   );
 }
 
@@ -370,33 +410,29 @@ function RubricEditor({
   rubric: InterviewRubric;
   onChange: (rubric: InterviewRubric) => void;
 }) {
-  const rows = rubric.criteria.length > 0 ? rubric.criteria : [{ name: '', weight: 1 }];
-  const percents = interviewWeightPercents(rows);
+  const rows = rubric.criteria.length > 0 ? rubric.criteria : [{ name: '', weight: 100 }];
+  const shareTotal = criteriaShareTotal(rows);
+  const sharesInvalid = shareTotal !== 100;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
-        <div className="space-y-1">
-          <CardTitle className="text-base">
-            Evaluation Criteria
-            <RequiredAsterisk className="ml-0.5" />
-          </CardTitle>
-          <CardDescription>
-            After notes, interviewers score the candidate on these criteria. Set the scale and how
-            much each one counts.
-          </CardDescription>
-        </div>
+    <GuideSection
+      title="Evaluation Criteria"
+      description="After notes, interviewers score the candidate on these criteria. Set the scale and each criterion's share of the score. Shares must add up to 100%."
+      required
+      action={
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="shrink-0"
-          onClick={() => onChange({ ...rubric, criteria: [...rows, { name: '', weight: 1 }] })}
+          onClick={() => onChange({ ...rubric, criteria: [...rows, { name: '', weight: 0 }] })}
         >
           <Plus className="mr-1 size-4" />
           Add Criterion
         </Button>
-      </CardHeader>
+      }
+    >
+      <Card>
       <CardContent className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor={`scale-max-${stage}`}>Scale max</Label>
@@ -407,7 +443,7 @@ function RubricEditor({
               onChange({ ...rubric, scaleMax: Number(value) });
             }}
           >
-            <SelectTrigger id={`scale-max-${stage}`} className="w-40">
+            <SelectTrigger id={`scale-max-${stage}`} className="w-40 bg-background">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -421,16 +457,15 @@ function RubricEditor({
         </div>
 
         <div className="space-y-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_2rem] items-center gap-2 text-xs font-medium text-muted-foreground">
+          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2 text-xs font-medium text-muted-foreground">
             <span>Criterion</span>
-            <span>Weight</span>
-            <span className="text-right">Share</span>
+            <span>Share</span>
             <span />
           </div>
           {rows.map((row, i) => (
             <div
               key={`${stage}-criterion-${i}`}
-              className="grid grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_2rem] items-center gap-2"
+              className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2"
             >
               <Input
                 value={row.name}
@@ -440,22 +475,25 @@ function RubricEditor({
                   onChange({ ...rubric, criteria: next });
                 }}
                 placeholder={`e.g. Structure`}
+                className="bg-background"
               />
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={row.weight}
-                onChange={(e) => {
-                  const parsed = Number(e.target.value);
-                  const next = [...rows];
-                  next[i] = { ...next[i], weight: Number.isFinite(parsed) && parsed > 0 ? parsed : 1 };
-                  onChange({ ...rubric, criteria: next });
-                }}
-              />
-              <span className="text-right text-sm tabular-nums text-muted-foreground">
-                {percents[i] ?? 0}%
-              </span>
+              <div className="flex items-center gap-1">
+                <NumberDraftInput
+                  integer
+                  min={0}
+                  max={100}
+                  commitOnChange
+                  invalid={sharesInvalid}
+                  value={row.weight}
+                  onCommit={(weight) => {
+                    const next = [...rows];
+                    next[i] = { ...next[i], weight };
+                    onChange({ ...rubric, criteria: next });
+                  }}
+                  aria-label={`Share for criterion ${i + 1}`}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
               {rows.length > 1 ? (
                 <Button
                   type="button"
@@ -463,7 +501,10 @@ function RubricEditor({
                   size="icon"
                   onClick={() => {
                     const next = rows.filter((_, j) => j !== i);
-                    onChange({ ...rubric, criteria: next.length ? next : [{ name: '', weight: 1 }] });
+                    onChange({
+                      ...rubric,
+                      criteria: next.length ? next : [{ name: '', weight: 100 }],
+                    });
                   }}
                   aria-label={`Remove criterion ${i + 1}`}
                 >
@@ -474,12 +515,32 @@ function RubricEditor({
               )}
             </div>
           ))}
+          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+            <p
+              className={
+                sharesInvalid
+                  ? 'col-span-2 flex items-center justify-end gap-1.5 text-right text-sm text-destructive'
+                  : 'col-span-2 text-right text-sm text-muted-foreground'
+              }
+              role={sharesInvalid ? 'alert' : undefined}
+            >
+              {sharesInvalid ? (
+                <>
+                  <TriangleAlertIcon className="size-3.5 shrink-0" aria-hidden />
+                  Shares add up to {shareTotal}%. They must total 100%.
+                </>
+              ) : (
+                'Total 100%'
+              )}
+            </p>
+            <span />
+          </div>
         </div>
       </CardContent>
     </Card>
+    </GuideSection>
   );
 }
-
 function CasePdfSection({
   teamId,
   stage,
@@ -537,15 +598,11 @@ function CasePdfSection({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Case Copy (PDF)</CardTitle>
-        <CardDescription>
-          Upload the case deck or packet interviewers show on the left side of the scoring screen.
-          You can also paste the scenario below. The PDF is optional but recommended for case
-          interviews.
-        </CardDescription>
-      </CardHeader>
+    <GuideSection
+      title="Case Copy (PDF)"
+      description="Upload the case deck or packet interviewers show on the left side of the scoring screen. You can also paste the scenario below. The PDF is optional but recommended for case interviews."
+    >
+      <Card>
       <CardContent className="space-y-4">
         <input
           ref={fileInputRef}
@@ -637,6 +694,7 @@ function CasePdfSection({
         ) : null}
       </CardContent>
     </Card>
+    </GuideSection>
   );
 }
 
@@ -836,12 +894,9 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
 
   if (loading) {
     return (
-      <div className="space-y-6" role="status" aria-label="Loading">
-        <Skeleton className="h-9 w-72" />
+      <div className="space-y-3" role="status" aria-label="Loading" data-page-loading="">
+        <p className="uma-section-label">Interview Guide</p>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Interview Guide</CardTitle>
-          </CardHeader>
           <CardContent className="space-y-3">
             <Skeleton className="h-9 w-full" />
             <Skeleton className="h-24 w-full" />
@@ -855,7 +910,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
   const teamName = meta?.team.name ?? '';
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8">
       {error && saveStatus === 'error' && <StatusBanner message={error} type="error" />}
       {meta?.round.status === 'closed' && (
         <StatusBanner
@@ -871,13 +926,25 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
             onValueChange={handleStageChange}
             className="space-y-8"
           >
-            <TabsList className="h-auto w-full max-w-xl">
-              {STAGES.map((s) => (
-                <TabsTrigger key={s} value={s} className="flex-1 px-4 py-2">
-                  {interviewStageSetupCopy(teamName, s).label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <TabsList className="h-auto w-full max-w-xl">
+                {STAGES.map((s) => (
+                  <TabsTrigger key={s} value={s} className="flex-1 px-4 py-2">
+                    {interviewStageSetupCopy(teamName, s).label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <div className="flex flex-wrap items-center gap-3">
+                <DocumentSaveStatusLine status={saveStatus} errorMessage={saveError} />
+                <LoadingButton
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={openPreview}
+                >
+                  Preview Interviewer View
+                </LoadingButton>
+              </div>
+            </div>
 
             {STAGES.map((s) => {
               const copy = interviewStageSetupCopy(teamName, s);
@@ -886,43 +953,53 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
 
               return (
                 <TabsContent key={s} value={s} className="space-y-8">
-                  <Card>
-                    <CardHeader className="space-y-2">
-                      <CardTitle className="text-base">Interview Format</CardTitle>
-                      {copy.hint ? <CardDescription>{copy.hint}</CardDescription> : null}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <Tabs
+                  <GuideSection title="Interview Format" description={copy.hint}>
+                    <Card>
+                    <CardContent className="space-y-3">
+                      <Select
                         value={guide.format}
-                        onValueChange={(value) =>
-                          setFormatForStage(s, value as InterviewGuideFormat)
-                        }
+                        items={FORMAT_OPTIONS}
+                        onValueChange={(value) => {
+                          if (value == null) return;
+                          setFormatForStage(s, value as InterviewGuideFormat);
+                        }}
                       >
-                        <TabsList className="grid h-auto w-full grid-cols-3">
+                        <SelectTrigger
+                          id={`interview-format-${s}`}
+                          className="w-full max-w-xl bg-background normal-case"
+                          aria-label="Interview format"
+                        >
+                          <SelectValue>
+                            {(value: InterviewGuideFormat | null) =>
+                              FORMAT_OPTIONS.find((option) => option.value === value)?.label ??
+                              'Select format'
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
                           {FORMAT_OPTIONS.map((option) => (
-                            <TabsTrigger
+                            <SelectItem
                               key={option.value}
                               value={option.value}
-                              className="whitespace-normal px-2 py-2 text-center text-xs leading-tight sm:px-3 sm:text-sm"
+                              className="normal-case"
                             >
                               {option.label}
-                            </TabsTrigger>
+                            </SelectItem>
                           ))}
-                        </TabsList>
-                      </Tabs>
+                        </SelectContent>
+                      </Select>
                       {formatMeta ? (
                         <p className="text-sm text-muted-foreground">{formatMeta.description}</p>
                       ) : null}
                     </CardContent>
                   </Card>
+                  </GuideSection>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Interviewer Brief</CardTitle>
-                      <CardDescription>
-                        Optional instructions shown at the top of the scoring screen.
-                      </CardDescription>
-                    </CardHeader>
+                  <GuideSection
+                    title="Interviewer Brief"
+                    description="Optional instructions shown at the top of the scoring screen."
+                  >
+                    <Card>
                     <CardContent>
                       <Label htmlFor={`intro-${s}`} className="sr-only">
                         Optional intro for interviewers
@@ -936,7 +1013,8 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                         className="field-textarea w-full"
                       />
                     </CardContent>
-                  </Card>
+                    </Card>
+                  </GuideSection>
 
                   {(guide.format === 'case_study' || guide.format === 'case_and_behavioral') && (
                     <>
@@ -947,17 +1025,15 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                         onChange={(casePdfUrl) => patchGuide(s, { casePdfUrl })}
                       />
 
+                      <GuideSection
+                        title={
+                          guide.format === 'case_and_behavioral'
+                            ? 'Part 1: Case Scenario'
+                            : 'Case Scenario'
+                        }
+                        description="The written prompt interviewers walk through with the candidate."
+                      >
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">
-                            {guide.format === 'case_and_behavioral'
-                              ? 'Part 1: Case Scenario'
-                              : 'Case Scenario'}
-                          </CardTitle>
-                          <CardDescription>
-                            The written prompt interviewers walk through with the candidate.
-                          </CardDescription>
-                        </CardHeader>
                         <CardContent className="space-y-4">
                           <div className="space-y-2">
                             <Label htmlFor={`case-title-${s}`}>Title (Optional)</Label>
@@ -997,6 +1073,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                           </div>
                         </CardContent>
                       </Card>
+                      </GuideSection>
 
                       <StringListEditor
                         stage={s}
@@ -1049,32 +1126,20 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                     />
                   )}
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Rubric Preview</CardTitle>
-                      <CardDescription>
-                        What interviewers see on the right: notes for packet questions, then scored
-                        criteria.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <RubricPreview guide={guide} />
-                    </CardContent>
-                  </Card>
+                  <GuideSection
+                    title="Rubric Preview"
+                    description="What interviewers see on the right: notes for packet questions, then scored criteria."
+                  >
+                    <Card>
+                      <CardContent>
+                        <RubricPreview guide={guide} />
+                      </CardContent>
+                    </Card>
+                  </GuideSection>
                 </TabsContent>
               );
             })}
           </Tabs>
-
-          <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center justify-between gap-4 border-t bg-background/95 px-5 py-3 backdrop-blur sm:-mx-8 sm:px-8">
-            <DocumentSaveStatusLine status={saveStatus} errorMessage={saveError} />
-            <LoadingButton
-              variant="secondary"
-              onClick={openPreview}
-            >
-              Preview Interviewer View
-            </LoadingButton>
-          </div>
         </>
       )}
     </div>

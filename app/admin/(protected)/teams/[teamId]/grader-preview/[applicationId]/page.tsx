@@ -109,14 +109,14 @@ export default function AdminGraderPreviewPage({
       </div>
 
       <PageContainer className="py-6 sm:py-6 lg:py-6">
-        <PageContent width="comfortable" className="space-y-6">
+        <PageContent width="comfortable" className="uma-stack-page">
           <div className="text-center">
             <span className="text-sm font-medium">{applicantDisplayId(data.rowIndex)}</span>
           </div>
 
           {data.graderInstructions && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
+              <p className="mb-1 uma-section-label text-amber-700">
                 Instructions
               </p>
               <p className="whitespace-pre-wrap text-sm text-amber-900">{data.graderInstructions}</p>
@@ -125,7 +125,7 @@ export default function AdminGraderPreviewPage({
 
           {data.contextFields.length > 0 && (
             <Card className="p-4 sm:p-5">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="mb-3 uma-section-label">
                 Application context
               </p>
               <div className="space-y-3">
@@ -146,7 +146,7 @@ export default function AdminGraderPreviewPage({
 
           {data.scoreFields.map((field) => (
             <Card key={field} className="p-4 sm:p-5 opacity-90">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+              <p className="mb-2 uma-section-label text-primary">
                 {field}
                 <RequiredAsterisk className="ml-0.5" />
               </p>
@@ -169,7 +169,7 @@ export default function AdminGraderPreviewPage({
 
           {data.customScoreFields.map((field) => (
             <Card key={`custom:${field}`} className="p-4 sm:p-5 opacity-90">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
+              <p className="mb-4 uma-section-label text-primary">
                 {field}
                 <RequiredAsterisk className="ml-0.5" />
               </p>
@@ -184,7 +184,7 @@ export default function AdminGraderPreviewPage({
           ))}
 
           <Card className="p-4 sm:p-5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-2 uma-section-label">
               Comments
             </p>
             <textarea

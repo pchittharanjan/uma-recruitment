@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth-session';
 import { AdminShell } from '@/components/admin-shell';
 import { initDb } from '@/lib/db';
 import { runWithRequestCache } from '@/lib/request-cache';

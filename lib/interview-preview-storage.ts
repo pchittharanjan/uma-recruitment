@@ -1,4 +1,5 @@
 import type { InterviewGuide, InterviewGuideStage } from '@/lib/interview-guide';
+import { rewriteLegacyInterviewIntro } from '@/lib/strategy-interview';
 
 const KEY_PREFIX = 'uma-interview-preview';
 
@@ -27,7 +28,9 @@ export function readInterviewPreviewGuide(
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as { guide?: InterviewGuide };
-    return parsed.guide ?? null;
+    const guide = parsed.guide ?? null;
+    if (!guide) return null;
+    return { ...guide, intro: rewriteLegacyInterviewIntro(guide.intro) };
   } catch {
     return null;
   }

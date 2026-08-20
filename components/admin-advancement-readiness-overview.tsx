@@ -99,13 +99,13 @@ function submissionColor(
 function outcomeBadge(outcome: AdvancementOutcomeLabel) {
   switch (outcome) {
     case 'advanced':
-      return <StageBadge label="Advancing" color="green" />;
+      return <StageBadge label="Advancing" color="green" size="compact" />;
     case 'on_list':
-      return <StageBadge label="On submitted list" color="yellow" />;
+      return <StageBadge label="On submitted list" color="yellow" size="compact" />;
     case 'rejected':
-      return <StageBadge label="Rejected" color="gray" />;
+      return <StageBadge label="Rejected" color="gray" size="compact" />;
     default:
-      return <StageBadge label="Still in round" color="orange" />;
+      return <StageBadge label="Still in round" color="orange" size="compact" />;
   }
 }
 
@@ -397,6 +397,7 @@ export function AdminAdvancementReadinessOverview({
                         <StageBadge
                           label={submissionLabel(team.status.submission.status)}
                           color={submissionColor(team.status.submission.status)}
+                          size="compact"
                         />
                       </TableCell>
                     </TableRow>

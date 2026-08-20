@@ -51,6 +51,14 @@ export function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const lastCountAt = useRef(0);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const clearHoverCloseTimer = useCallback(() => {
     if (hoverCloseTimer.current) {
@@ -83,7 +91,7 @@ export function NotificationBell() {
           staleMs: 15 * 60_000,
         },
       );
-      if (!ok || !json) return;
+      if (!ok || !json || !mountedRef.current) return;
       lastCountAt.current = Date.now();
       setUnreadCount(json.unreadCount ?? 0);
     } catch {
@@ -97,7 +105,7 @@ export function NotificationBell() {
         notifications?: NotificationItem[];
         unreadCount?: number;
       }>('/api/notifications', { force: true, ttlMs: 30_000 });
-      if (!ok || !json) return;
+      if (!ok || !json || !mountedRef.current) return;
       setItems(json.notifications ?? []);
       setUnreadCount(json.unreadCount ?? 0);
       lastCountAt.current = Date.now();
@@ -162,7 +170,7 @@ export function NotificationBell() {
     } catch {
       void loadList();
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 

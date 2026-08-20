@@ -1,19 +1,38 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check } from 'lucide-react';
 import PageLoading from '@/components/page-loading';
-import { CasePdfPane } from '@/components/case-pdf-pane';
+import {
+  InterviewCaseEvalSplit,
+  useInterviewCaseOpen,
+} from '@/components/interview-case-eval-split';
+import {
+  InterviewFullscreenEvalBar,
+  InterviewStickyLead,
+  InterviewWorkspaceExitFullscreenButton,
+  InterviewWorkspaceFullscreenButton,
+  useInterviewWorkspaceFullscreen,
+} from '@/components/interview-workspace-fullscreen';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent } from '@/components/page-shell';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { Button } from '@/components/ui/button';
 import StatusBanner from '@/components/status-banner';
 import { InterviewNotesAndScoringForm } from '@/components/interview-question-eval';
+import { DocumentSaveStatusLine } from '@/components/document-save-status';
+import { InterviewElapsedTimer } from '@/components/interview-elapsed-timer';
+import {
+  GroupInterviewCandidateWorkspace,
+  GroupInterviewLayoutToggle,
+  InterviewNotesPanelHeader,
+  useGroupInterviewLayout,
+  type GroupInterviewCandidate,
+} from '@/components/group-interview-candidate-workspace';
+import { useAutosaveStatus } from '@/hooks/use-autosave-status';
+import { useElapsedTimer } from '@/hooks/use-elapsed-timer';
 import { type InterviewGuide } from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
@@ -89,11 +108,6 @@ function formatSlotHeader(iso: string): string {
   });
 }
 
-function firstName(name: string): string {
-  const part = name.trim().split(/\s+/)[0];
-  return part || name;
-}
-
 function allScoreFields(data: InterviewScoreData): string[] {
   return [...data.scoreFields, ...(data.customScoreFields ?? [])];
 }
@@ -106,27 +120,33 @@ function emptyDraft(): CandidateDraft {
   return { scores: {}, notes: {}, comment: '' };
 }
 
-function NotesPanelHeader({
-  title,
-  intro,
-}: {
-  title: string;
-  intro?: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <h2 className="text-base font-semibold">{title}</h2>
-      {intro?.trim() ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">{intro.trim()}</p>
-      ) : null}
-    </div>
-  );
+function serializeDraft(draft: CandidateDraft): string {
+  return JSON.stringify({
+    scores: draft.scores,
+    notes: draft.notes,
+    comment: draft.comment,
+  });
+}
+
+function serializeGroupDrafts(
+  entries: GroupEntry[],
+  drafts: Record<number, CandidateDraft>,
+): string {
+  return JSON.stringify({
+    entries: entries.map((entry) => ({
+      applicationId: entry.applicationId,
+      scores: drafts[entry.applicationId]?.scores ?? {},
+      notes: drafts[entry.applicationId]?.notes ?? {},
+      comment: drafts[entry.applicationId]?.comment ?? '',
+    })),
+  });
 }
 
 function NotesAndEvaluationForm({
   guide,
   draft,
   locked,
+  compact,
   onNoteChange,
   onScoreChange,
   onCommentChange,
@@ -134,6 +154,7 @@ function NotesAndEvaluationForm({
   guide: InterviewGuide | null;
   draft: CandidateDraft;
   locked: boolean;
+  compact?: boolean;
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
@@ -145,6 +166,7 @@ function NotesAndEvaluationForm({
       scores={draft.scores}
       comment={draft.comment}
       disabled={locked}
+      compact={compact}
       onNoteChange={onNoteChange}
       onScoreChange={onScoreChange}
       onCommentChange={onCommentChange}
@@ -162,12 +184,22 @@ export default function TeamInterviewScorePage({
   const [draft, setDraft] = useState<CandidateDraft>(emptyDraft());
   const [drafts, setDrafts] = useState<Record<number, CandidateDraft>>({});
   const [activeTab, setActiveTab] = useState(applicationId);
+  const [caseOpen, setCaseOpen] = useInterviewCaseOpen();
+  const { fullscreen, exit: exitFullscreen, toggle: toggleFullscreen } =
+    useInterviewWorkspaceFullscreen();
+  const { layout, updateLayout } = useGroupInterviewLayout();
+  const elapsedTimer = useElapsedTimer();
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const router = useRouter();
 
   useEffect(() => {
+    setData(null);
+    setDraft(emptyDraft());
+    setDrafts({});
+    setError('');
+    setSubmitError('');
     fetch(`/api/team/interviews/${applicationId}?teamId=${teamId}&stage=${stage}`)
       .then((r) => r.json())
       .then((d) => {
@@ -210,6 +242,57 @@ export default function TeamInterviewScorePage({
     ).length;
     return { completed, total };
   }, [data?.groupEntries, drafts, scoreFieldList]);
+
+  const scoringLocked = data?.scoringEditLock?.locked ?? false;
+
+  const saveSnapshot = useMemo(() => {
+    if (isGroupInterview && data?.groupEntries) {
+      return serializeGroupDrafts(data.groupEntries, drafts);
+    }
+    return serializeDraft(draft);
+  }, [isGroupInterview, data?.groupEntries, drafts, draft]);
+
+  const persistDraft = useCallback(
+    async (snapshot: string) => {
+      const parsed = JSON.parse(snapshot) as {
+        entries?: Array<{
+          applicationId: number;
+          scores: Record<string, number>;
+          notes: Record<string, string>;
+          comment: string;
+        }>;
+        scores?: Record<string, number>;
+        notes?: Record<string, string>;
+        comment?: string;
+      };
+      const res = await fetch(
+        `/api/team/interviews/${applicationId}/score?teamId=${teamId}&stage=${stage}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft: true, ...parsed }),
+        },
+      );
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Couldn't save");
+      }
+    },
+    [applicationId, teamId, stage],
+  );
+
+  const draftsReady =
+    Boolean(data) &&
+    (!isGroupInterview ||
+      Boolean(data?.groupEntries && data.groupEntries.every((entry) => drafts[entry.applicationId])));
+
+  const { status: saveStatus, errorMessage: saveError } = useAutosaveStatus({
+    snapshot: saveSnapshot,
+    ready: draftsReady,
+    resetKey: applicationId,
+    enabled: draftsReady && !scoringLocked,
+    persist: persistDraft,
+  });
 
   const handleSingleSubmit = async () => {
     if (!data) return;
@@ -333,15 +416,22 @@ export default function TeamInterviewScorePage({
     return <PageLoading />;
   }
 
-  const scoringLocked = data.scoringEditLock?.locked ?? false;
   const lockMessage = data.scoringEditLock?.message ?? '';
   const pdfTitle =
     data.interviewGuide?.caseStudy?.title?.trim() ||
     (stage === 'first_round' ? 'Group case' : 'Case');
 
+  const layoutToggle = isGroupInterview ? (
+    <GroupInterviewLayoutToggle
+      value={layout}
+      onValueChange={updateLayout}
+      className="shrink-0 flex-nowrap"
+    />
+  ) : null;
+
   const header = (
-    <div className="sticky top-0 z-10 shrink-0 border-b border-border bg-background/95 backdrop-blur">
-      <PageContainer className="py-3">
+    <div data-interview-header="" className="mb-3 shrink-0 pb-2">
+      <PageContainer className="py-3 sm:py-3 lg:py-3">
         <PageContent width="fluid" className="flex items-center">
           <div className="flex-1">
             <button
@@ -352,24 +442,57 @@ export default function TeamInterviewScorePage({
             </button>
           </div>
           <div className="text-center">
-            <span className="text-sm font-medium">
-              {isGroupInterview
-                ? [
-                    'Group interview',
-                    data.slot ? formatSlotHeader(data.slot.scheduledAt) : null,
-                    data.slot?.location,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
-                : data.candidateName}
-            </span>
-            {!isGroupInterview && data.interviewProgress && (
-              <p className="text-sm text-muted-foreground">
-                {formatInterviewProgressLabel(data.interviewProgress)}
-              </p>
+            {isGroupInterview ? (
+              <>
+                <p className="font-heading text-base font-medium tracking-tight sm:text-lg">
+                  Group interview
+                </p>
+                {data.slot ? (
+                  <p className="text-sm text-muted-foreground">
+                    {[formatSlotHeader(data.slot.scheduledAt), data.slot.location]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <span className="font-heading text-base font-medium tracking-tight">
+                  {data.candidateName}
+                </span>
+                {data.interviewProgress ? (
+                  <p className="text-sm text-muted-foreground">
+                    {formatInterviewProgressLabel(data.interviewProgress)}
+                  </p>
+                ) : null}
+              </>
             )}
           </div>
-          <div className="flex flex-1 justify-end">
+          <div className="flex flex-1 items-center justify-end gap-3">
+            <InterviewElapsedTimer {...elapsedTimer} />
+            {layoutToggle}
+            <DocumentSaveStatusLine
+              status={saveStatus}
+              errorMessage={saveError}
+              savedLabel="Auto-saved"
+            />
+            {casePdfUrl ? (
+              <>
+                <InterviewWorkspaceFullscreenButton
+                  fullscreen={fullscreen}
+                  onToggle={toggleFullscreen}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 normal-case border-foreground/25 bg-background font-medium"
+                  onClick={() => setCaseOpen(!caseOpen)}
+                >
+                  {caseOpen ? 'Close case' : 'Open case'}
+                </Button>
+              </>
+            ) : null}
             {data.nextApplicationId ? (
               <Button
                 variant="ghost"
@@ -387,76 +510,94 @@ export default function TeamInterviewScorePage({
     </div>
   );
 
-  const notesContent = isGroupInterview && data.groupEntries ? (
-    <>
-      {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
-      {data.slot?.logisticsNote && (
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Logistics: </span>
-          {data.slot.logisticsNote}
-        </p>
-      )}
-      <NotesPanelHeader
-        title="Notes & Evaluation"
-        intro={data.interviewGuide?.intro}
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-fit max-w-full flex-wrap justify-start">
-          {data.groupEntries.map((entry) => {
-            const complete = isDraftComplete(
-              drafts[entry.applicationId] ?? emptyDraft(),
-              scoreFieldList,
-            );
-            return (
-              <TabsTrigger key={entry.applicationId} value={String(entry.applicationId)}>
-                {firstName(entry.candidateName)}
-                {complete ? (
-                  <Check className="size-3.5 text-primary" aria-label="Scored" />
-                ) : (
-                  <span className="text-muted-foreground" aria-hidden>
-                    ·
-                  </span>
-                )}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+  const groupInterviewHeaderContent =
+    isGroupInterview && data.groupEntries && ((scoringLocked && lockMessage) || data.slot?.logisticsNote) ? (
+      <div className="shrink-0 space-y-1.5">
+        {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
+        {data.slot?.logisticsNote && (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Logistics: </span>
+            {data.slot.logisticsNote}
+          </p>
+        )}
+      </div>
+    ) : null;
 
-        {data.groupEntries.map((entry) => {
-          const entryDraft = drafts[entry.applicationId] ?? emptyDraft();
+  const groupInterviewHeader = groupInterviewHeaderContent ? (
+    <PageContainer className="pb-2 pt-0">
+      <PageContent width="fluid">{groupInterviewHeaderContent}</PageContent>
+    </PageContainer>
+  ) : null;
+
+  const groupWorkspaceProps = isGroupInterview && data.groupEntries
+    ? {
+        layout,
+        candidates: data.groupEntries.map((entry) => ({
+          id: String(entry.applicationId),
+          name: entry.candidateName,
+          complete: isDraftComplete(
+            drafts[entry.applicationId] ?? emptyDraft(),
+            scoreFieldList,
+          ),
+        })),
+        activeId: activeTab,
+        onActiveIdChange: setActiveTab,
+        guide: data.interviewGuide ?? null,
+        getFormBindings: (candidate: GroupInterviewCandidate) => {
+          const applicationIdForForm = Number(candidate.id);
+          const entryDraft = drafts[applicationIdForForm] ?? emptyDraft();
+          return {
+            notes: entryDraft.notes,
+            scores: entryDraft.scores,
+            comment: entryDraft.comment,
+            disabled: scoringLocked,
+            onNoteChange: (field: string, value: string) =>
+              updateDraft(applicationIdForForm, {
+                notes: { ...entryDraft.notes, [field]: value },
+              }),
+            onScoreChange: (field: string, value: number) =>
+              updateDraft(applicationIdForForm, {
+                scores: { ...entryDraft.scores, [field]: value },
+              }),
+            onCommentChange: (value: string) =>
+              updateDraft(applicationIdForForm, { comment: value }),
+          };
+        },
+        renderForm: (candidate: GroupInterviewCandidate, { compact }: { compact: boolean }) => {
+          const applicationIdForForm = Number(candidate.id);
+          const entryDraft = drafts[applicationIdForForm] ?? emptyDraft();
           return (
-            <TabsContent
-              key={entry.applicationId}
-              value={String(entry.applicationId)}
-              className="space-y-4"
-            >
-              <h3 className="text-lg font-semibold">{entry.candidateName}</h3>
-              <NotesAndEvaluationForm
-                guide={data.interviewGuide ?? null}
-                draft={entryDraft}
-                locked={scoringLocked}
-                onNoteChange={(field, value) =>
-                  updateDraft(entry.applicationId, {
-                    notes: { ...entryDraft.notes, [field]: value },
-                  })
-                }
-                onScoreChange={(field, value) =>
-                  updateDraft(entry.applicationId, {
-                    scores: { ...entryDraft.scores, [field]: value },
-                  })
-                }
-                onCommentChange={(value) =>
-                  updateDraft(entry.applicationId, { comment: value })
-                }
-              />
-            </TabsContent>
+            <NotesAndEvaluationForm
+              guide={data.interviewGuide ?? null}
+              draft={entryDraft}
+              locked={scoringLocked}
+              compact={compact}
+              onNoteChange={(field, value) =>
+                updateDraft(applicationIdForForm, {
+                  notes: { ...entryDraft.notes, [field]: value },
+                })
+              }
+              onScoreChange={(field, value) =>
+                updateDraft(applicationIdForForm, {
+                  scores: { ...entryDraft.scores, [field]: value },
+                })
+              }
+              onCommentChange={(value) =>
+                updateDraft(applicationIdForForm, { comment: value })
+              }
+            />
           );
-        })}
-      </Tabs>
+        },
+      }
+    : null;
+
+  const notesContent = groupWorkspaceProps ? (
+    <div className="flex flex-col gap-6">
+      <GroupInterviewCandidateWorkspace {...groupWorkspaceProps} />
       {submitError && <StatusBanner message={submitError} type="error" />}
-    </>
+    </div>
   ) : (
-    <>
+    <div className="uma-stack-page">
       {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
       {data.slot && (
         <p className="text-sm text-muted-foreground">
@@ -465,7 +606,7 @@ export default function TeamInterviewScorePage({
           {data.slot.logisticsNote ? ` · ${data.slot.logisticsNote}` : ''}
         </p>
       )}
-      <NotesPanelHeader
+      <InterviewNotesPanelHeader
         title="Notes & Evaluation"
         intro={data.interviewGuide?.intro}
       />
@@ -482,7 +623,7 @@ export default function TeamInterviewScorePage({
         onCommentChange={(value) => setDraft((prev) => ({ ...prev, comment: value }))}
       />
       {submitError && <StatusBanner message={submitError} type="error" />}
-    </>
+    </div>
   );
 
   const groupFooter = (
@@ -490,12 +631,12 @@ export default function TeamInterviewScorePage({
       className={cn(
         'flex items-center justify-between gap-4',
         casePdfUrl
-          ? 'shrink-0 border-t border-border bg-muted/50 px-6 py-4 sm:px-7 lg:px-8'
+          ? 'shrink-0 border-t border-border/25 bg-muted/35 px-6 py-3.5 sm:px-7 lg:px-8'
           : 'pt-2',
       )}
     >
       <div className="flex-1">
-        <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-background">
+        <div className="h-2 w-full overflow-hidden rounded-full border border-border/35 bg-background/60">
           <div
             className="h-full bg-primary transition-all"
             style={{
@@ -507,7 +648,7 @@ export default function TeamInterviewScorePage({
             }}
           />
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-xs text-muted-foreground/85">
           {groupCompletion.completed} of {groupCompletion.total} applicants scored
         </p>
       </div>
@@ -536,16 +677,63 @@ export default function TeamInterviewScorePage({
 
   if (casePdfUrl) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {header}
-        <div className="grid min-h-[calc(100svh-8rem)] flex-1 grid-cols-1 overflow-hidden rounded-xl bg-surface-panel lg:grid-cols-2">
-          <CasePdfPane url={casePdfUrl} title={pdfTitle} />
-          <div className="flex min-h-0 flex-col">
-            <div className={cn('min-h-0 flex-1 overflow-y-auto p-6 sm:p-7 lg:p-8', 'space-y-8')}>
-              {notesContent}
-            </div>
-            {footer}
-          </div>
+      <div
+        data-interview-fill=""
+        className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <InterviewStickyLead>
+          {header}
+          <InterviewFullscreenEvalBar>
+            <InterviewElapsedTimer {...elapsedTimer} />
+            {layoutToggle}
+            <InterviewWorkspaceExitFullscreenButton onExit={exitFullscreen} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 normal-case border-foreground/25 bg-background font-medium"
+              onClick={() => setCaseOpen(!caseOpen)}
+            >
+              {caseOpen ? 'Close case' : 'Open case'}
+            </Button>
+          </InterviewFullscreenEvalBar>
+        </InterviewStickyLead>
+        {groupInterviewHeader}
+        <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+          {groupWorkspaceProps ? (
+            <GroupInterviewCandidateWorkspace
+              {...groupWorkspaceProps}
+              render={({ chrome, body }) => (
+                <InterviewCaseEvalSplit
+                  caseUrl={casePdfUrl}
+                  caseTitle={pdfTitle}
+                  candidateCount={data.groupEntries?.length ?? 1}
+                  caseOpen={caseOpen}
+                  onCaseOpenChange={setCaseOpen}
+                  fullscreen={fullscreen}
+                  notesChrome={chrome}
+                  notes={
+                    <div className="flex flex-col gap-6">
+                      {body}
+                      {submitError && <StatusBanner message={submitError} type="error" />}
+                    </div>
+                  }
+                  footer={footer}
+                />
+              )}
+            />
+          ) : (
+            <InterviewCaseEvalSplit
+              caseUrl={casePdfUrl}
+              caseTitle={pdfTitle}
+              candidateCount={1}
+              caseOpen={caseOpen}
+              onCaseOpenChange={setCaseOpen}
+              fullscreen={fullscreen}
+              notes={notesContent}
+              footer={footer}
+            />
+          )}
         </div>
       </div>
     );
@@ -555,7 +743,8 @@ export default function TeamInterviewScorePage({
     <>
       {header}
       <PageContainer>
-        <PageContent width="wide" className="space-y-8">
+        <PageContent width="wide" className="uma-stack-page">
+          {groupInterviewHeaderContent}
           {notesContent}
           {footer}
         </PageContent>

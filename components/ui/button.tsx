@@ -4,7 +4,9 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding font-heading text-sm font-medium whitespace-nowrap capitalize transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  // `cursor-pointer` is intentionally on the base class so *any* clickable button-style control
+  // (including ghost variants used for NavLinkButton) clearly signals interactivity on hover.
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding cursor-pointer font-heading text-sm font-medium whitespace-nowrap capitalize transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -15,7 +17,9 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_12%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
-          "hover:bg-muted/50 hover:text-foreground aria-expanded:bg-muted/50 aria-expanded:text-foreground dark:hover:bg-muted/50",
+          // Ghost buttons are often used for "secondary" nav actions (e.g. "View all").
+          // Make hover clearly look clickable without changing layout/semantics.
+          "hover:border-foreground/25 hover:bg-muted/90 hover:text-foreground aria-expanded:border-foreground/25 aria-expanded:bg-muted/90 aria-expanded:text-foreground dark:hover:bg-muted/75 dark:aria-expanded:bg-muted/75",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/25 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/35 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:text-primary-hover hover:underline",

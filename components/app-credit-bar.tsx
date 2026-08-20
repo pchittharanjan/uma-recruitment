@@ -1,49 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { formatLastUpdated } from '@/lib/last-updated';
 import { cn } from '@/lib/utils';
 
 export function AppCreditBar({ className }: { className?: string }) {
-  const [lastUpdated, setLastUpdated] = useState(() => formatLastUpdated());
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = () => {
-      fetch('/api/last-updated', { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json: { lastUpdated?: string } | null) => {
-          if (cancelled || !json?.lastUpdated) return;
-          setLastUpdated(formatLastUpdated(json.lastUpdated));
-        })
-        .catch(() => {});
-    };
-
-    load();
-    window.addEventListener('focus', load);
-    const interval = window.setInterval(load, 30_000);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('focus', load);
-      window.clearInterval(interval);
-    };
-  }, []);
+  const lastUpdated = formatLastUpdated();
 
   return (
     <footer
+      data-interview-chrome=""
       className={cn(
-        'flex h-8 shrink-0 items-center justify-between gap-4 border-t border-border bg-muted/40 px-5 sm:px-8',
+        'flex h-8 shrink-0 items-center justify-between gap-4 border-t border-border bg-muted/40 px-5 pb-px sm:px-8',
         'font-heading text-[11px] leading-none text-muted-foreground sm:text-xs',
         className,
       )}
     >
-      <p className="flex min-w-0 items-center truncate leading-none">
+      <span className="flex h-full min-w-0 items-center truncate leading-none -translate-y-px">
         Built By Pranav Chittharanjan
-      </p>
-      <p className="flex shrink-0 items-center leading-none">
+      </span>
+      <span className="flex h-full shrink-0 items-center leading-none -translate-y-px">
         Last Updated: {lastUpdated}
-      </p>
+      </span>
     </footer>
   );
 }

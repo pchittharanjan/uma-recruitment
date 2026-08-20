@@ -82,7 +82,8 @@ export default function TeamInterviewResultsPage({
 
   if (results.candidates.length === 0) {
     return (
-      <PageContainer className="space-y-6">
+      <PageContainer>
+        <PageSection>
         <PageHeader eyebrow={data.team.name} title={resultsTitle(stage)} />
         <CenteredMessage
           icon={MicIcon}
@@ -95,6 +96,7 @@ export default function TeamInterviewResultsPage({
               : `/admin/teams/${teamId}/schedule/first-round`
           }
         />
+        </PageSection>
       </PageContainer>
     );
   }
@@ -107,7 +109,8 @@ export default function TeamInterviewResultsPage({
   }
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={data.team.name}
         title={resultsTitle(stage)}
@@ -119,7 +122,6 @@ export default function TeamInterviewResultsPage({
         }
       />
 
-      <PageSection className="space-y-6">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] table-fixed text-sm">
@@ -164,7 +166,7 @@ export default function TeamInterviewResultsPage({
                           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
                             {candidate.rank}
                           </span>
-                          {isTied && <StageBadge label="TIE" color="orange" />}
+                          {isTied && <StageBadge label="TIE" color="orange" size="compact" />}
                         </div>
                       </td>
                       <td className="p-4">
@@ -177,6 +179,7 @@ export default function TeamInterviewResultsPage({
                               key={assignment.assignmentId}
                               label={`${assignment.interviewerName}: ${assignment.total ?? '–'}`}
                               color={assignment.status === 'completed' ? 'green' : 'yellow'}
+                              size="compact"
                             />
                           ))}
                         </div>
@@ -217,6 +220,7 @@ export default function TeamInterviewResultsPage({
                                 key={assignment.assignmentId}
                                 label={`${assignment.interviewerName}: ${assignment.total ?? '–'}`}
                                 color={assignment.status === 'completed' ? 'green' : 'yellow'}
+                                size="compact"
                               />
                             ))
                           ) : (

@@ -1,6 +1,6 @@
 import type { ApplicationStage, TeamName } from '@/lib/db';
 import type { RoundStatus } from '@/lib/db';
-import { PIPELINE_PHASES, nextRoundStatus, phaseLabel, statusIndex } from '@/lib/stages';
+import { PIPELINE_PHASES, nextRoundStatus, phaseLabel, previousRoundStatus, statusIndex } from '@/lib/stages';
 
 export type TeamInterviewStage = 'first_round' | 'final_round';
 export type PostFirstRoundStage = 'final_round' | 'deliberations';
@@ -91,6 +91,22 @@ export function nextPipelineStatusForTeam(
     return 'deliberations';
   }
   return nextRoundStatus(current);
+}
+
+/** Previous round status for a team (Design skips final_round). */
+export function previousPipelineStatusForTeam(
+  current: RoundStatus,
+  teamName: string,
+): RoundStatus | null {
+  const profile = getTeamPipelineProfile(teamName);
+  if (profile.skipFinalRoundPhase && current === 'deliberations') {
+    return 'first_round';
+  }
+  const previous = previousRoundStatus(current);
+  if (profile.skipFinalRoundPhase && previous === 'final_round') {
+    return 'first_round';
+  }
+  return previous;
 }
 
 /** Target application stage after advancing from a given stage. */

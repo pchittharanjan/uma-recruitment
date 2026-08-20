@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { batchDeliberationsFinalSelectionComplete } from '@/lib/batch-team-stats';
 import { resolveApplicantEmail } from '@/lib/candidates';
 import { getDb, getTeamById } from '@/lib/db';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
@@ -291,13 +292,16 @@ export async function isDeliberationsFinalSelectionComplete(
 }
 
 export async function countTeamsWithCompleteFinalSelection(
-  teams: Array<{ teamId: number; roundId: number }>,
+  teams: Array<{ teamId: number; roundId: number; teamName?: string }>,
 ): Promise<number> {
   if (teams.length === 0) return 0;
-  const flags = await Promise.all(
-    teams.map((t) => isDeliberationsFinalSelectionComplete(t.teamId, t.roundId)),
-  );
-  return flags.filter(Boolean).length;
+  const entries = teams.map((t) => ({
+    teamId: t.teamId,
+    roundId: t.roundId,
+    teamName: t.teamName ?? 'Strategy',
+  }));
+  const flags = await batchDeliberationsFinalSelectionComplete(entries);
+  return [...flags.values()].filter(Boolean).length;
 }
 
 /**

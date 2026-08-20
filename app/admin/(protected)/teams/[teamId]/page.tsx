@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Fragment, use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,11 +10,7 @@ import { NavLinkButton } from '@/components/nav-link-button';
 import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
-import { AdminAdvancementReadinessPanel } from '@/components/admin-advancement-readiness-panel';
-import { AdminInterviewProgressDetail } from '@/components/admin-interview-progress-detail';
-import { TeamGradingSetup } from '@/components/team-grading-setup';
-import { TeamStageControls } from '@/components/team-stage-controls';
-import { TeamTestAsExecPanel } from '@/components/team-test-as-exec-panel';
+import { Skeleton } from '@/components/ui/skeleton';
 import { phaseLabel, parseAdminPhaseSlug } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
@@ -21,7 +18,7 @@ import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communi
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { isAdminPhasePreview } from '@/lib/admin-phase-preview';
 import StatusBanner from '@/components/status-banner';
-import { PageContainer, PageHeader, TitleCount } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { CenteredMessage } from '@/components/centered-message';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
@@ -29,6 +26,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { cachedJsonFetch, peekCachedJson, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { UploadIcon } from 'lucide-react';
+
+const panelFallback = (
+  <div className="space-y-3 py-4" role="status" aria-label="Loading">
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-24 w-full" />
+  </div>
+);
+
+const AdminAdvancementReadinessPanel = dynamic(
+  () =>
+    import('@/components/admin-advancement-readiness-panel').then(
+      (mod) => mod.AdminAdvancementReadinessPanel,
+    ),
+  { loading: () => panelFallback },
+);
+const AdminInterviewProgressDetail = dynamic(
+  () =>
+    import('@/components/admin-interview-progress-detail').then(
+      (mod) => mod.AdminInterviewProgressDetail,
+    ),
+  { loading: () => panelFallback },
+);
+const TeamGradingSetup = dynamic(
+  () => import('@/components/team-grading-setup').then((mod) => mod.TeamGradingSetup),
+  { loading: () => panelFallback },
+);
+const TeamStageControls = dynamic(
+  () => import('@/components/team-stage-controls').then((mod) => mod.TeamStageControls),
+  { loading: () => panelFallback },
+);
+const TeamTestAsExecPanel = dynamic(
+  () => import('@/components/team-test-as-exec-panel').then((mod) => mod.TeamTestAsExecPanel),
+  { loading: () => panelFallback },
+);
 
 interface GraderProgress {
   id: number;
@@ -291,7 +322,8 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       : `${phaseLabel(adminView)}${phasePreview ? ' · Preview' : ''}`;
 
   return (
-    <PageContainer size="wide" className="space-y-8">
+    <PageContainer size="wide">
+      <PageSection>
       {phasePreview && (
         <StatusBanner
           type="info"
@@ -353,7 +385,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         }
       />
 
-      <div className="space-y-6">
         <TeamStageControls teamId={Number(teamId)} />
 
       {isInterviewView ? (
@@ -575,7 +606,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="min-w-0 truncate font-medium">{label}</p>
                               {app.rank !== null && (
-                                <StageBadge label={`Rank ${app.rank}`} color="green" />
+                                <StageBadge label={`Rank ${app.rank}`} color="green" size="compact" />
                               )}
                             </div>
                           </td>
@@ -586,6 +617,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                                   key={a.assignmentId}
                                   label={`${a.graderName}: ${a.total ?? '–'}`}
                                   color={a.status === 'completed' ? 'green' : 'yellow'}
+                                  size="compact"
                                 />
                               ))}
                             </div>
@@ -662,7 +694,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         </TabsContent>
       </Tabs>
       ) : null}
-      </div>
+      </PageSection>
     </PageContainer>
   );
 }

@@ -15,7 +15,7 @@ const copy: Record<
     icon: CheckIcon,
   },
   saving: {
-    label: 'Saving…',
+    label: 'Saving changes…',
     className: 'text-muted-foreground',
     icon: Loader2Icon,
   },
@@ -40,14 +40,21 @@ export function DocumentSaveStatusLine({
   status,
   errorMessage,
   className,
+  savedLabel,
 }: {
   status: DocumentSaveStatus;
   errorMessage?: string;
   className?: string;
+  savedLabel?: string;
 }) {
   const meta = copy[status];
   const Icon = meta.icon;
-  const label = status === 'error' && errorMessage ? errorMessage : meta.label;
+  const label =
+    status === 'error' && errorMessage
+      ? errorMessage
+      : status === 'saved'
+        ? (savedLabel ?? meta.label)
+        : meta.label;
 
   return (
     <p

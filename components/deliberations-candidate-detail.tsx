@@ -220,6 +220,7 @@ export function DeliberationsCandidateDetailPanel({
           <StageBadge
             label={applicationStageLabel(detail.stage as ApplicationStage)}
             color={stageBadgeColor(detail.stage)}
+            size="compact"
           />
           {rejected ? (
             <Badge className="border-0 bg-red-600 font-medium text-white">Rejected</Badge>

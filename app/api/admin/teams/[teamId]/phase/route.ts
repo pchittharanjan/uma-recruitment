@@ -8,6 +8,7 @@ import { getRoundStageUnlocks } from '@/lib/stage-access';
 import {
   advanceTeamPipeline,
   lockTeamStage,
+  revertTeamPipeline,
   unlockTeamStage,
 } from '@/lib/pipeline-phase';
 import {
@@ -74,13 +75,15 @@ export async function POST(
     if (!team) return notFound('Team not found');
 
     const body = (await req.json()) as {
-      action: 'advance' | 'unlock' | 'lock';
+      action: 'advance' | 'revert' | 'unlock' | 'lock';
       stage?: UnlockableStage;
     };
 
     let result;
     if (body.action === 'advance') {
       result = await advanceTeamPipeline(teamId, admin.id);
+    } else if (body.action === 'revert') {
+      result = await revertTeamPipeline(teamId, admin.id);
     } else if (body.action === 'unlock') {
       if (!body.stage || !UNLOCKABLE_STAGES.includes(body.stage)) {
         return NextResponse.json({ error: 'Invalid stage.' }, { status: 400 });

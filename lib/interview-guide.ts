@@ -1,4 +1,4 @@
-import { strategyDefaultGuides } from '@/lib/strategy-interview';
+import { rewriteLegacyInterviewIntro, strategyDefaultGuides } from '@/lib/strategy-interview';
 import { designDefaultGuides } from '@/lib/design-interview';
 
 export type InterviewGuideFormat = 'questions' | 'case_study' | 'case_and_behavioral';
@@ -27,7 +27,7 @@ export interface InterviewGuide {
     /** Case-packet questions. Interviewers take notes only — they do not score these. */
     discussionPoints?: string[];
   };
-  /** Scored evaluation for case interviews. Scale, criteria, and relative weights. */
+  /** Scored evaluation for case interviews. Scale, criteria, and share of the score. */
   rubric?: InterviewRubric;
 }
 
@@ -78,14 +78,14 @@ export function normalizeCasePdfUrl(value: unknown): string | undefined {
 export function emptyInterviewRubric(): InterviewRubric {
   return {
     scaleMax: DEFAULT_INTERVIEW_SCALE_MAX,
-    criteria: [{ name: '', weight: 1 }],
+    criteria: [{ name: '', weight: 100 }],
   };
 }
 
 function defaultInterviewRubric(): InterviewRubric {
   return {
     scaleMax: DEFAULT_INTERVIEW_SCALE_MAX,
-    criteria: [{ name: 'Overall assessment', weight: 1 }],
+    criteria: [{ name: 'Overall assessment', weight: 100 }],
   };
 }
 
@@ -99,7 +99,7 @@ function clampScaleMax(value: unknown): number {
 
 function normalizeWeight(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n <= 0) return 1;
+  if (!Number.isFinite(n) || n < 0) return 0;
   return Math.round(n * 100) / 100;
 }
 
@@ -148,7 +148,7 @@ function normalizeGuide(raw: unknown): InterviewGuide | null {
   const obj = raw as Partial<InterviewGuide>;
   if (!isGuideFormat(obj.format)) return null;
 
-  const intro = trimOptional(obj.intro);
+  const intro = rewriteLegacyInterviewIntro(trimOptional(obj.intro));
   const casePdfUrl = normalizeCasePdfUrl(obj.casePdfUrl);
   const rubric = normalizeInterviewRubric(obj.rubric);
 
@@ -226,6 +226,9 @@ export function validateInterviewGuide(guide: InterviewGuide): string | null {
     if (!rubric || rubric.criteria.length === 0) {
       return 'Add at least one evaluation criterion.';
     }
+    if (criteriaShareTotal(rubric.criteria) !== 100) {
+      return 'Evaluation shares must add up to 100%.';
+    }
   }
 
   return null;
@@ -298,7 +301,12 @@ export function interviewGuideForApi(
   guide: InterviewGuide | null,
 ): InterviewGuide | null {
   if (!guide) return null;
-  return normalizeGuide(guide);
+  const normalized = normalizeGuide(guide);
+  if (!normalized) return null;
+  return {
+    ...normalized,
+    intro: rewriteLegacyInterviewIntro(normalized.intro),
+  };
 }
 
 /** Case-packet questions shown as notes-only prompts on the scoring screen. */
@@ -321,6 +329,29 @@ export function interviewWeightPercents(criteria: InterviewRubricCriterion[]): n
   const drift = 100 - rounded.reduce((sum, n) => sum + n, 0);
   if (rounded.length > 0) rounded[rounded.length - 1] += drift;
   return rounded;
+}
+
+export function criteriaShareTotal(criteria: InterviewRubricCriterion[]): number {
+  return criteria.reduce((sum, c) => {
+    const n = c.weight;
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
+/** Convert legacy relative weights (e.g. 1,1,1,1) into percent shares that sum to 100. */
+export function criteriaAsPercentShares(
+  criteria: InterviewRubricCriterion[],
+): InterviewRubricCriterion[] {
+  if (criteria.length === 0) return criteria;
+  const normalized = criteria.map((c) => ({
+    name: c.name,
+    weight: Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0,
+  }));
+  if (criteriaShareTotal(normalized) === 100) return normalized;
+  const percents = interviewWeightPercents(
+    normalized.map((c) => ({ ...c, weight: c.weight > 0 ? c.weight : 1 })),
+  );
+  return normalized.map((c, i) => ({ ...c, weight: percents[i] ?? 0 }));
 }
 
 function rubricScoreFields(guide: InterviewGuide): { fields: string[]; weights: Record<string, number> } {
@@ -483,7 +514,9 @@ function mergeGuideWithDefault(
   if (missingCaseQuestions || missingBehavioral) {
     return {
       ...fallback,
-      intro: saved.intro ?? fallback.intro,
+      intro: !saved.intro?.trim()
+        ? fallback.intro
+        : rewriteLegacyInterviewIntro(saved.intro),
       casePdfUrl: saved.casePdfUrl ?? fallback.casePdfUrl,
       rubric: normalizeInterviewRubric(saved.rubric) ?? fallback.rubric,
     };
@@ -495,6 +528,14 @@ function mergeGuideWithDefault(
   }
   if (missingRubric && fallback.rubric) {
     next = { ...next, rubric: fallback.rubric };
+  }
+  if (fallback.intro && !saved.intro?.trim()) {
+    next = { ...next, intro: fallback.intro };
+  } else if (saved.intro?.trim()) {
+    const rewritten = rewriteLegacyInterviewIntro(saved.intro);
+    if (rewritten !== saved.intro.trim()) {
+      next = { ...next, intro: rewritten };
+    }
   }
   return next;
 }

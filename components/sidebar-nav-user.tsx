@@ -2,7 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar';
+import { SidebarMenu, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 function firstNameInitial(name: string): string {
@@ -22,12 +22,19 @@ export function SidebarNavUser({
   onAction: () => void;
 }) {
   const initial = firstNameInitial(user.name);
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div className="flex h-12 items-center gap-2 overflow-hidden rounded-md px-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
-          <Avatar className="size-8 rounded-lg group-data-[collapsible=icon]:hidden">
+        <div
+          data-mobile={isMobile ? 'true' : undefined}
+          className="flex h-12 items-center gap-2 overflow-hidden rounded-md px-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 data-[mobile=true]:h-auto data-[mobile=true]:rounded-xl data-[mobile=true]:border data-[mobile=true]:border-sidebar-border/70 data-[mobile=true]:bg-background/70 data-[mobile=true]:px-3 data-[mobile=true]:py-2.5"
+        >
+          <Avatar
+            data-mobile={isMobile ? 'true' : undefined}
+            className="size-8 rounded-lg group-data-[collapsible=icon]:hidden data-[mobile=true]:size-9"
+          >
             <AvatarFallback className="rounded-lg bg-primary/10 text-xs font-semibold text-primary">
               {initial}
             </AvatarFallback>
@@ -38,10 +45,14 @@ export function SidebarNavUser({
           </div>
           <Tooltip>
             <TooltipTrigger
+              data-mobile={isMobile ? 'true' : undefined}
               type="button"
-              onClick={onAction}
+              onClick={() => {
+                if (isMobile) setOpenMobile(false);
+                onAction();
+              }}
               aria-label={actionLabel}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-sidebar-accent-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-sidebar-accent-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[mobile=true]:size-9 data-[mobile=true]:rounded-xl"
             >
               <ActionIcon className="size-4" />
             </TooltipTrigger>

@@ -47,13 +47,13 @@ interface AdvancementStatusData {
 function submissionBadge(status: AdvancementStatusData['submission']['status']) {
   switch (status) {
     case 'submitted':
-      return <StageBadge label="Pending admin review" color="yellow" />;
+      return <StageBadge label="Pending admin review" color="yellow" size="compact" />;
     case 'approved':
-      return <StageBadge label="Approved" color="green" />;
+      return <StageBadge label="Approved" color="green" size="compact" />;
     case 'withdrawn':
-      return <StageBadge label="Withdrawn" color="gray" />;
+      return <StageBadge label="Withdrawn" color="gray" size="compact" />;
     default:
-      return <StageBadge label="Not submitted" color="gray" />;
+      return <StageBadge label="Not submitted" color="gray" size="compact" />;
   }
 }
 
@@ -142,10 +142,11 @@ export function AdminAdvancementReadinessPanel({
               <StageBadge
                 label={`${pendingGraders.length} grader${pendingGraders.length === 1 ? '' : 's'} pending`}
                 color="orange"
+                size="compact"
               />
             )}
             {data.allVerdictsComplete && data.graders.length > 0 && (
-              <StageBadge label="All verdicts in" color="green" />
+              <StageBadge label="All verdicts in" color="green" size="compact" />
             )}
           </div>
         </div>

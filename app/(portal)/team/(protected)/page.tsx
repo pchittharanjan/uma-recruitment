@@ -1,18 +1,17 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { ClipboardListIcon } from 'lucide-react';
 import StageBadge from '@/components/stage-badge';
-import PageLoading from '@/components/page-loading';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { useShellUser } from '@/components/shell-user-provider';
-import { useTeamNav } from '@/components/team-nav-provider';
 import type { RoundStatus } from '@/lib/db';
+import { buildTeamNavSnapshot } from '@/lib/team-nav';
+import { runWithRequestCache } from '@/lib/request-cache';
+import { getTeamPortalContext, getTeamPortalUser } from '@/lib/team-portal-context';
 import { phaseLabel, teamLandingHref, teamOverviewHref } from '@/lib/stages';
+
+export const dynamic = 'force-dynamic';
 
 function phaseOneLiner(status: RoundStatus): string | undefined {
   switch (status) {
@@ -44,61 +43,61 @@ function TeamCard({
   );
 }
 
-export default function TeamHomePage() {
-  const router = useRouter();
-  const { teams } = useShellUser();
-  const { nav, loading: navLoading } = useTeamNav();
-  const [redirecting, setRedirecting] = useState(false);
+export default async function TeamHomePage() {
+  return runWithRequestCache(async () => {
+    const ctx = await getTeamPortalContext();
+    if (!ctx) redirect('/login');
 
-  useEffect(() => {
-    if (navLoading || !nav || teams.length !== 1) return;
-    setRedirecting(true);
-    const team = teams[0];
-    const navTeam = nav.teams.find((t) => t.id === team.id);
-    const href = navTeam?.round?.status
-      ? teamLandingHref(team.id, navTeam.round.status)
-      : teamOverviewHref(team.id);
-    router.replace(href);
-  }, [nav, navLoading, router, teams]);
+    const user = await getTeamPortalUser({ roles: ['exec', 'ad_hoc_exec'] });
+    if (!user) redirect('/login');
 
-  if (navLoading || redirecting || (teams.length === 1 && !nav)) {
-    return <PageLoading />;
-  }
+    const nav = await buildTeamNavSnapshot(user);
+    const { teams } = ctx;
 
-  const status = nav?.status ?? 'application';
-  const label = phaseLabel(status);
-
-  if (teams.length === 0) {
-    return (
-      <CenteredMessage
-        title="No team access yet"
-        description="Ask an Admin to grant you access to a team, then refresh this page."
-        ctaLabel="Coffee Chats"
-        ctaHref="/coffee-chats"
-      />
-    );
-  }
-
-  return (
-    <PageContainer>
-      <PageSection>
-        <PageHeader
-          eyebrow="Team portal"
-          title="Your Teams"
-          description={phaseOneLiner(status)}
-          actions={<StageBadge label={label} color="blue" />}
+    if (teams.length === 0) {
+      return (
+        <CenteredMessage
+          title="No team access yet"
+          description="Ask an Admin to grant you access to a team, then refresh this page."
+          ctaLabel="Coffee Chats"
+          ctaHref="/coffee-chats"
         />
+      );
+    }
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {teams.map((team) => {
-            const navTeam = nav?.teams.find((t) => t.id === team.id);
-            const href = navTeam?.round?.status
-              ? teamLandingHref(team.id, navTeam.round.status)
-              : teamOverviewHref(team.id);
-            return <TeamCard key={team.id} team={team} href={href} />;
-          })}
-        </div>
-      </PageSection>
-    </PageContainer>
-  );
+    if (teams.length === 1) {
+      const team = teams[0];
+      const navTeam = nav.teams.find((t) => t.id === team.id);
+      const href = navTeam?.round?.status
+        ? teamLandingHref(team.id, navTeam.round.status)
+        : teamOverviewHref(team.id);
+      redirect(href);
+    }
+
+    const status = nav.status ?? 'application';
+    const label = phaseLabel(status);
+
+    return (
+      <PageContainer>
+        <PageSection>
+          <PageHeader
+            eyebrow="Team portal"
+            title="Your Teams"
+            description={phaseOneLiner(status)}
+            actions={<StageBadge label={label} color="blue" size="compact" />}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {teams.map((team) => {
+              const navTeam = nav.teams.find((t) => t.id === team.id);
+              const href = navTeam?.round?.status
+                ? teamLandingHref(team.id, navTeam.round.status)
+                : teamOverviewHref(team.id);
+              return <TeamCard key={team.id} team={team} href={href} />;
+            })}
+          </div>
+        </PageSection>
+      </PageContainer>
+    );
+  });
 }

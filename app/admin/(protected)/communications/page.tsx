@@ -100,7 +100,8 @@ export default function AdminCommunicationsPage() {
   const targetLabel = outcomeEmailTargetLabel(resolvedStage);
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer>
+      <PageSection>
       <PageHeader
         eyebrow={outcomeEmailPhaseEyebrow(resolvedStage)}
         title="Applicant Outcome Emails"
@@ -108,7 +109,6 @@ export default function AdminCommunicationsPage() {
 
       {error && <StatusBanner type="error" message={error} />}
 
-      <PageSection>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {teams.length === 0

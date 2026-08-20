@@ -1,8 +1,10 @@
+import 'server-only';
+
 import { cache } from 'react';
 import { connection } from 'next/server';
 import { getAccessibleTeams } from '@/lib/access';
-import { getSessionUser } from '@/lib/auth';
-import { initDb, type User } from '@/lib/db';
+import { getSessionUser } from '@/lib/auth-session';
+import { initDb, type User, type UserRole } from '@/lib/db';
 import { getImpersonateTarget } from '@/lib/impersonation';
 import { isExecRole } from '@/lib/roles';
 
@@ -42,4 +44,26 @@ export const getTeamPortalContext = cache(async function getTeamPortalContext(
     isExec: portalUser.role === 'exec',
     isImpersonating: Boolean(impersonateTarget),
   };
+});
+
+/** Effective exec/ad hoc user for team portal pages (respects admin test-as-exec). */
+export const getTeamPortalUser = cache(async function getTeamPortalUser(
+  options?: { roles?: UserRole[] },
+): Promise<User | null> {
+  await connection();
+  await initDb();
+
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return null;
+
+  const impersonateTarget = await getImpersonateTarget();
+  if (impersonateTarget) {
+    if (sessionUser.role !== 'admin') return null;
+    if (options?.roles && !options.roles.includes(impersonateTarget.role)) return null;
+    return impersonateTarget;
+  }
+
+  if (sessionUser.role !== 'exec' && sessionUser.role !== 'ad_hoc_exec') return null;
+  if (options?.roles && !options.roles.includes(sessionUser.role)) return null;
+  return sessionUser;
 });

@@ -293,7 +293,7 @@ function TimelineEventRow({
           isLast ? 'h-7' : '-bottom-5',
         )}
       >
-        <span aria-hidden className="w-px bg-border" />
+        <span aria-hidden className="w-px bg-foreground/20 dark:bg-foreground/30" />
       </div>
       <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -301,8 +301,8 @@ function TimelineEventRow({
             <div className="relative flex size-6 flex-none items-center justify-center">
               <div
                 className={cn(
-                  'size-2 rounded-full',
-                  event.complete ? 'bg-border' : 'bg-primary/40',
+                  'size-2.5 rounded-full',
+                  event.complete ? 'bg-foreground/20 dark:bg-foreground/30' : 'bg-primary/55',
                 )}
               />
             </div>

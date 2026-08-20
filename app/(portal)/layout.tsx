@@ -1,15 +1,16 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getAccessibleTeams } from '@/lib/access';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth-session';
 import { AdminShell } from '@/components/admin-shell';
 import { TeamShell } from '@/components/team-shell';
-import { getTeamPortalContext } from '@/lib/team-portal-context';
+import { getTeamPortalContext, getTeamPortalUser } from '@/lib/team-portal-context';
 import { getImpersonateTarget } from '@/lib/impersonation';
 import { initDb } from '@/lib/db';
 import { anyTeamHasActivePipeline } from '@/lib/rounds';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { readSidebarPrefs } from '@/lib/sidebar-prefs';
+import { buildTeamNavSnapshot } from '@/lib/team-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export default async function PortalLayout({ children }: { children: React.React
     const impersonateTarget = await getImpersonateTarget();
     if (impersonateTarget && sessionUser.role === 'admin') {
       const teams = await getAccessibleTeams(impersonateTarget);
+      const initialNav = await buildTeamNavSnapshot(impersonateTarget);
       return (
         <TeamShell
           user={{
@@ -41,6 +43,7 @@ export default async function PortalLayout({ children }: { children: React.React
           }}
           defaultSidebarOpen={sidebarPrefs.defaultOpen}
           defaultSidebarWidth={sidebarPrefs.defaultWidth}
+          initialNav={initialNav}
         >
           {children}
         </TeamShell>
@@ -49,6 +52,8 @@ export default async function PortalLayout({ children }: { children: React.React
 
     const portalCtx = await getTeamPortalContext(sessionUser);
     if (portalCtx) {
+      const portalUser = await getTeamPortalUser({ roles: ['exec', 'ad_hoc_exec'] });
+      const initialNav = portalUser ? await buildTeamNavSnapshot(portalUser) : null;
       return (
         <TeamShell
           user={portalCtx.portalUser}
@@ -56,6 +61,7 @@ export default async function PortalLayout({ children }: { children: React.React
           isImpersonating={portalCtx.isImpersonating}
           defaultSidebarOpen={sidebarPrefs.defaultOpen}
           defaultSidebarWidth={sidebarPrefs.defaultWidth}
+          initialNav={initialNav}
         >
           {children}
         </TeamShell>

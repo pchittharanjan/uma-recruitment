@@ -10,7 +10,7 @@ import StatusBanner from '@/components/status-banner';
 import { AdvancementActivityLog } from '@/components/advancement-activity-log';
 import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { AdvancementRankColGroup } from '@/components/advancement-rank-table-columns';
 import { AvgScoreCell, AvgScoreHeader } from '@/components/avg-score-header';
 import {
@@ -766,7 +766,8 @@ export function TeamAdvancementPanel({
   if (!data) return <PageLoading />;
 
   return (
-    <PageContainer size="full" className="space-y-8">
+    <PageContainer size="full">
+      <PageSection>
       <PageHeader
         eyebrow={teamName || `Team ${teamId}`}
         title={config.title}
@@ -808,7 +809,15 @@ export function TeamAdvancementPanel({
       {data.preview.incompleteCount > 0 && canMarkVerdicts && (
         <StatusBanner
           type="warning"
-          message={`${data.preview.incompleteCount} ${config.pendingLabel}${data.preview.incompleteCount === 1 ? '' : 's'} still pending. Finish ${workActionVerb(data.fromStage)}ing before Directors can submit the advancement list.`}
+          message={`${data.preview.incompleteCount} ${
+            data.preview.incompleteCount === 1
+              ? data.fromStage === 'application'
+                ? 'application'
+                : 'interview'
+              : data.fromStage === 'application'
+                ? 'applications'
+                : 'interviews'
+          } remaining. Finish ${workActionVerb(data.fromStage)}ing before Directors can submit the advancement list.`}
         />
       )}
 
@@ -864,100 +873,101 @@ export function TeamAdvancementPanel({
         />
       )}
 
-      <PageSection className="space-y-6">
-        {(canSubmitAdvancement || (data.submission && (isPending || isApproved))) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {usesFinalSelection ? 'Final list to admin' : 'Selection'}
-              </CardTitle>
-              {canSubmitAdvancement && usesFinalSelection && canMarkVerdicts && (
-                <CardAction>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label="How final selection works"
-                      >
-                        <InfoIcon className="size-4" />
-                      </TooltipTrigger>
-                      <TooltipContent side="left">
-                        Panel color signals are advisory. Your Advance selections are what Admin
-                        receives.
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardAction>
-              )}
-              {canSubmitAdvancement ? (
-                usesFinalSelection ? (
-                  <CardDescription>
-                    {minAdvanceCount === maxAdvanceCount
-                      ? `Select exactly ${minAdvanceCount} to advance`
-                      : allowOverCap
-                        ? `Select at least ${minAdvanceCount} to advance (up to ${maxAdvanceCount})`
-                        : `Select at least ${minAdvanceCount} to advance (you may keep up to ${maxAdvanceCount} from your pending list)`}
-                    {allowOverCap && advancementCap !== null
-                      ? `, over the usual limit of ${advancementCap}`
-                      : ''}
-                    . Panel color signals are advisory.
-                  </CardDescription>
+      <PageSection>
+        {canSubmitAdvancement && (
+          <div className="space-y-3">
+            <p className="uma-section-label">
+              {usesFinalSelection ? 'Final List To Admin' : 'Selection'}
+            </p>
+            <Card>
+              <CardHeader className="gap-2">
+                {canSubmitAdvancement && usesFinalSelection && canMarkVerdicts && (
+                  <CardAction>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="How final selection works"
+                        >
+                          <InfoIcon className="size-4" />
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          Panel color signals are advisory. Your Advance selections are what Admin
+                          receives.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardAction>
+                )}
+                {canSubmitAdvancement ? (
+                  usesFinalSelection ? (
+                    <CardDescription>
+                      {minAdvanceCount === maxAdvanceCount
+                        ? `Select exactly ${minAdvanceCount} to advance`
+                        : allowOverCap
+                          ? `Select at least ${minAdvanceCount} to advance (up to ${maxAdvanceCount})`
+                          : `Select at least ${minAdvanceCount} to advance (you may keep up to ${maxAdvanceCount} from your pending list)`}
+                      {allowOverCap && advancementCap !== null
+                        ? `, over the usual limit of ${advancementCap}`
+                        : ''}
+                      . Panel color signals are advisory.
+                    </CardDescription>
+                  ) : (
+                    <CardDescription>
+                      {isPending
+                        ? `${selectedCount} Green · update while Admin review is pending.`
+                        : `Submit sends all Green signals (${selectedCount} marked).`}
+                    </CardDescription>
+                  )
                 ) : (
                   <CardDescription>
-                    {isPending
-                      ? `${selectedCount} Green · update while Admin review is pending.`
-                      : `Submit sends all Green signals (${selectedCount} marked).`}
+                    {data.submission!.topN} applicants in your submitted list.
                   </CardDescription>
-                )
-              ) : (
-                <CardDescription>
-                  {data.submission!.topN} applicants in your submitted list.
-                </CardDescription>
-              )}
-              {canSubmitAdvancement &&
-                usesFinalSelection &&
-                canMarkVerdicts &&
-                groupPanelSummaries.length > 0 && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-sm text-muted-foreground">
-                      {groupPanelSummaries.length} interview slot
-                      {groupPanelSummaries.length === 1 ? '' : 's'} · {panelGreenCountTotal}{' '}
-                      Green
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto px-0 py-0 text-sm text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowSlotBreakdown((prev) => !prev)}
-                    >
-                      {showSlotBreakdown ? 'Hide by slot' : 'View by slot'}
-                      {showSlotBreakdown ? (
-                        <ChevronDownIcon className="ml-1 size-3" />
-                      ) : (
-                        <ChevronRightIcon className="ml-1 size-3" />
-                      )}
-                    </Button>
-                    {showSlotBreakdown && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {groupPanelSummaries.map((group) => (
-                          <span
-                            key={group.key}
-                            className="display-field px-2 py-0.5 text-sm text-muted-foreground"
-                          >
-                            {group.label}: {group.yesCount} Green
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 )}
-            </CardHeader>
+                {canSubmitAdvancement &&
+                  usesFinalSelection &&
+                  canMarkVerdicts &&
+                  groupPanelSummaries.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-sm text-muted-foreground">
+                        {groupPanelSummaries.length} interview slot
+                        {groupPanelSummaries.length === 1 ? '' : 's'} · {panelGreenCountTotal}{' '}
+                        Green
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-0 py-0 text-sm text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowSlotBreakdown((prev) => !prev)}
+                      >
+                        {showSlotBreakdown ? 'Hide by slot' : 'View by slot'}
+                        {showSlotBreakdown ? (
+                          <ChevronDownIcon className="ml-1 size-3" />
+                        ) : (
+                          <ChevronRightIcon className="ml-1 size-3" />
+                        )}
+                      </Button>
+                      {showSlotBreakdown && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {groupPanelSummaries.map((group) => (
+                            <span
+                              key={group.key}
+                              className="display-field px-2 py-0.5 text-sm text-muted-foreground"
+                            >
+                              {group.label}: {group.yesCount} Green
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+              </CardHeader>
             {canSubmitAdvancement && canMarkVerdicts && (
-              <CardContent className="space-y-4 pt-4">
+              <CardContent className="space-y-3 pt-3">
                 {usesFinalSelection ? (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <LoadingButton
                       variant="secondary"
                       size="sm"
@@ -976,7 +986,7 @@ export function TeamAdvancementPanel({
                     </LoadingButton>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <LoadingButton
                       variant="secondary"
                       size="sm"
@@ -1003,7 +1013,7 @@ export function TeamAdvancementPanel({
                     </LoadingButton>
                   </div>
                 )}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                     <p>
                       <span className="font-medium tabular-nums text-green-700 dark:text-green-400">
@@ -1048,7 +1058,7 @@ export function TeamAdvancementPanel({
                     loading={submitting}
                     disabled={data.preview.incompleteCount > 0 || !submitSelectionReady}
                     onClick={handleSubmit}
-                    className="w-full shrink-0 sm:w-auto sm:min-w-44"
+                    className="w-full shrink-0 self-start sm:w-auto sm:min-w-44"
                   >
                     {isPending ? 'Update list to admin' : 'Submit list to admin'}
                   </LoadingButton>
@@ -1056,36 +1066,41 @@ export function TeamAdvancementPanel({
                 {submitError && <p className="text-sm text-destructive">{submitError}</p>}
               </CardContent>
             )}
-          </Card>
+            </Card>
+          </div>
         )}
 
-        <Card className="overflow-visible">
-          <CardHeader className="gap-2">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1">
-                <CardTitle>
-                  {isPending || isApproved ? 'Submitted applicants' : 'Ranked applicants'}
-                </CardTitle>
-                {canMarkVerdicts && config.blindDescription && !canSubmitList && (
-                  <CardDescription>{config.blindDescription}</CardDescription>
-                )}
-              </div>
-              {isFirstRound && myIntervieweeCount > 0 && (
-                <div className="flex items-center gap-2 rounded-lg bg-muted/35 px-3 py-2">
-                  <Checkbox
-                    id="filter-my-interviewees"
-                    checked={Boolean(filterMyInterviewees)}
-                    onCheckedChange={(checked) => setFilterMyInterviewees(checked === true)}
-                  />
-                  <Label htmlFor="filter-my-interviewees" className="flex cursor-pointer items-baseline gap-2.5 text-sm">
-                    My interviewees only
-                    <TitleCount>{myIntervieweeCount}</TitleCount>
-                  </Label>
+        <div className="space-y-2">
+          <p className="uma-section-label">
+            {isPending || isApproved ? 'Submitted Applicants' : 'Ranked Applicants'}
+          </p>
+          <Card className="overflow-visible">
+            {(canMarkVerdicts && config.blindDescription && !canSubmitList) ||
+            (isFirstRound && myIntervieweeCount > 0) ? (
+              <CardHeader className="gap-2 pb-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    {canMarkVerdicts && config.blindDescription && !canSubmitList && (
+                      <CardDescription>{config.blindDescription}</CardDescription>
+                    )}
+                  </div>
+                  {isFirstRound && myIntervieweeCount > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg bg-muted/35 px-3 py-2">
+                      <Checkbox
+                        id="filter-my-interviewees"
+                        checked={Boolean(filterMyInterviewees)}
+                        onCheckedChange={(checked) => setFilterMyInterviewees(checked === true)}
+                      />
+                      <Label htmlFor="filter-my-interviewees" className="flex cursor-pointer items-baseline gap-2.5 text-sm">
+                        My interviewees only
+                        <TitleCount>{myIntervieweeCount}</TitleCount>
+                      </Label>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="overflow-visible pt-5">
+              </CardHeader>
+            ) : null}
+            <CardContent className="overflow-visible pt-0 pb-5">
             {isFirstRound && filterMyInterviewees && visibleRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No completed interviews found for you. Turn off the filter to see the full ranked
@@ -1120,7 +1135,7 @@ export function TeamAdvancementPanel({
                           </span>
                         )}
                       </div>
-                      <Table className="w-full table-fixed border-separate border-spacing-0 [&_td]:py-2.5">
+                      <Table className="w-full table-fixed border-separate border-spacing-0 [&_td]:py-2.5 [&_th]:pb-4">
                         <AdvancementRankColGroup
                           expand
                           decision={showDecisionColumn}
@@ -1229,7 +1244,9 @@ export function TeamAdvancementPanel({
                                   <TableCell className="px-3 whitespace-normal">
                                     <PanelVerdictSummary
                                       panelVerdicts={rowCtx.panelVerdicts}
-                                      myVerdict={verdict}
+                                      myVerdict={
+                                        verdicts[app.applicationId] ?? rowCtx.myVerdict ?? null
+                                      }
                                     />
                                   </TableCell>
                                   {showFinalAdvanceColumn && (
@@ -1275,7 +1292,7 @@ export function TeamAdvancementPanel({
                 })}
               </div>
             ) : (
-              <Table className="w-full table-fixed border-separate border-spacing-0 [&_td]:py-2.5">
+              <Table className="w-full table-fixed border-separate border-spacing-0 [&_td]:py-2.5 [&_th]:pb-4">
                 <AdvancementRankColGroup
                   decision={showDecisionColumn}
                   advance={showFinalAdvanceColumn}
@@ -1369,7 +1386,9 @@ export function TeamAdvancementPanel({
                           <TableCell className="px-3 whitespace-normal">
                             <PanelVerdictSummary
                               panelVerdicts={rowCtx.panelVerdicts}
-                              myVerdict={verdict}
+                              myVerdict={
+                                verdicts[app.applicationId] ?? rowCtx.myVerdict ?? null
+                              }
                             />
                           </TableCell>
                           {showFinalAdvanceColumn && (
@@ -1408,22 +1427,24 @@ export function TeamAdvancementPanel({
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </PageSection>
 
       {data.history.length > 0 && (
-        <PageSection>
-          <Card>
-            <CardHeader className="gap-2">
-              <CardTitle className="text-base">Submission Log</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <AdvancementActivityLog entries={data.history} hideHeader />
-            </CardContent>
-          </Card>
+        <PageSection className="pt-2">
+          <div className="space-y-2">
+            <p className="uma-section-label">Submission Log</p>
+            <Card>
+              <CardContent className="pt-0">
+                <AdvancementActivityLog entries={data.history} hideHeader />
+              </CardContent>
+            </Card>
+          </div>
         </PageSection>
       )}
+      </PageSection>
     </PageContainer>
   );
 }

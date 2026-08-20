@@ -703,7 +703,8 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <PageContainer size="wide" className="space-y-8">
+    <PageContainer size="wide">
+      <PageSection>
       <PageHeader
         eyebrow="Admin"
         title="Users"
@@ -717,7 +718,6 @@ export default function AdminUsersPage() {
 
       {error && <StatusBanner message={error} type="error" />}
 
-      <PageSection>
         <Card className="pb-0">
           <CardHeader>
             <CardTitle className="flex items-baseline gap-2.5">
@@ -785,6 +785,7 @@ export default function AdminUsersPage() {
                                   ? 'orange'
                                   : 'green'
                             }
+                            size="compact"
                           />
                         </div>
                       </TableCell>

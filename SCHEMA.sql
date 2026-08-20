@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS rounds (
     CHECK (status IN ('setup', 'pre_application', 'application', 'first_round', 'final_round', 'deliberations', 'closed')),
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+CREATE INDEX IF NOT EXISTS idx_rounds_team_status ON rounds(team_id, status);
 
 -- ── Users (every human with any access) ─────────────────────
 CREATE TABLE IF NOT EXISTS users (
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS access_grants (
   granted_at INTEGER NOT NULL DEFAULT (unixepoch()),
   revoked_at INTEGER
 );
+CREATE INDEX IF NOT EXISTS idx_access_grants_user ON access_grants(user_id);
 
 -- ── Candidates (a person; can apply to multiple teams) ──────
 CREATE TABLE IF NOT EXISTS candidates (
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS applications (
   UNIQUE (candidate_id, round_id, team_id)
 );
 CREATE INDEX IF NOT EXISTS idx_applications_round_team ON applications(round_id, team_id);
+CREATE INDEX IF NOT EXISTS idx_applications_team_round_stage ON applications(team_id, round_id, stage);
 
 -- Per-round CSV/scoring config (replaces v1 config table, scoped per team round)
 CREATE TABLE IF NOT EXISTS round_settings (
@@ -185,6 +188,7 @@ CREATE TABLE IF NOT EXISTS assignments (
 );
 CREATE INDEX IF NOT EXISTS idx_assignments_user ON assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_application ON assignments(application_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_application_stage ON assignments(application_id, stage);
 
 -- ── Scores ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS scores (

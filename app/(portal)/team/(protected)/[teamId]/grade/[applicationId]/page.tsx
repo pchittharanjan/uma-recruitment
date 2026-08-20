@@ -240,7 +240,7 @@ export default function TeamGradingScorePage({
       </div>
 
       <PageContainer className="py-6 sm:py-6 lg:py-6">
-        <PageContent width="comfortable" className="space-y-6 pb-8">
+        <PageContent width="comfortable" className="uma-stack-page pb-8">
           {gradingLocked && <StatusBanner type="info" message={lockMessage} />}
 
           {isLastPending && (
@@ -256,7 +256,7 @@ export default function TeamGradingScorePage({
 
           {appData.graderInstructions && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              <p className="mb-1 uma-section-label text-amber-700 dark:text-amber-300">
                 Instructions
               </p>
               <p className="whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
@@ -266,12 +266,12 @@ export default function TeamGradingScorePage({
           )}
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <section className="space-y-4">
+            <section className="uma-stack-section">
               <h2 className="uma-section-label">Written responses</h2>
 
               {contextFields.length > 0 && (
                 <Card className="p-4 sm:p-5">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="mb-3 uma-section-label">
                     Application context
                   </p>
                   <div className="space-y-3">
@@ -311,7 +311,7 @@ export default function TeamGradingScorePage({
                     !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
                   )}
                 >
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                  <p className="mb-2 uma-section-label text-primary">
                     {field}
                     <RequiredAsterisk className="ml-0.5" />
                   </p>
@@ -345,7 +345,7 @@ export default function TeamGradingScorePage({
                     !gradingLocked && field === activeField && 'ring-2 ring-primary/40',
                   )}
                 >
-                  <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-primary">
+                  <p className="mb-4 uma-section-label text-primary">
                     {field}
                     <RequiredAsterisk className="ml-0.5" />
                   </p>
@@ -364,7 +364,7 @@ export default function TeamGradingScorePage({
               ))}
             </section>
 
-            <section className="space-y-4">
+            <section className="uma-stack-section">
               <h2 className="uma-section-label">Portfolio &amp; supplementary</h2>
               <Card className="p-4 sm:p-5">
                 {Object.keys(appData.portfolioFields ?? {}).length === 0 ? (
@@ -396,7 +396,7 @@ export default function TeamGradingScorePage({
           </div>
 
           <Card className="p-4 sm:p-5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-2 uma-section-label">
               Comments
             </p>
             <textarea
