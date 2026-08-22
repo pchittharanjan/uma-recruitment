@@ -285,7 +285,7 @@ export function planSetLoad(
     );
   }
 
-  const movable = current.filter(isMovable);
+  const movable = current.filter((assignment) => isMovable(assignment));
   if (target < current.length - movable.length) {
     throw new Error(
       'Not enough ungraded applications to move. Finished or in-progress ones stay put.',
