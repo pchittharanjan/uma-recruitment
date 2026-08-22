@@ -51,6 +51,15 @@ export interface AssignmentReviewData {
   load: LoadSummary | null;
 }
 
+interface ReassignDraft {
+  assignmentId: number;
+  applicationId: number;
+  fromGraderId: number;
+  fromGraderName: string;
+  appLabel: string;
+  hasScores: boolean;
+}
+
 interface MoveDraft {
   fromGraderId: number;
   fromGraderName: string;
