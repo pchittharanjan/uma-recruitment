@@ -15,6 +15,7 @@ import type { EligibleGraderUser } from '@/lib/import-graders';
 import { roleLabel } from '@/lib/roles';
 import { teamDotClass } from '@/lib/team-colors';
 import { TitleCount } from '@/components/page-shell';
+import { evenSplitRange } from '@/lib/assignments';
 import { cn } from '@/lib/utils';
 
 interface GraderTeamColumnProps {
@@ -165,6 +166,10 @@ export default function GraderTeamColumn({
   };
 
   const showPickerDropdown = pickerOpen && (pickerQuery.trim().length > 0 || availableUsers.length > 0);
+  const split =
+    graders.length >= minGraders
+      ? evenSplitRange(applicationCount, graders.length, minGraders)
+      : null;
 
   return (
     <div
@@ -192,6 +197,8 @@ export default function GraderTeamColumn({
           >
             {graders.length} user{graders.length === 1 ? '' : 's'}
             {graders.length < minGraders && ` · need ${minGraders}`}
+            {split &&
+              ` · ~${split.low === split.high ? split.low : `${split.low}–${split.high}`} each`}
           </span>
         )}
       </div>

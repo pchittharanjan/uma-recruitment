@@ -340,7 +340,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                 variant="secondary"
                 href={`/admin/teams/${teamId}/assignments`}
               >
-                Edit assignments
+                Review assignments
               </NavLinkButton>
             )}
             <NavLinkButton

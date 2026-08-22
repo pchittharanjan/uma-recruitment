@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowDown, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,7 +64,7 @@ type Step = WizardStepId | 'done';
 
 interface ImportResult {
   roundLabel: string;
-  teams: Array<{ team: { name: string }; applicationCount: number }>;
+  teams: Array<{ team: { id: number; name: string }; applicationCount: number }>;
   unmatchedCount: number;
 }
 
@@ -937,6 +938,10 @@ export default function UnifiedImportPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Users per Team</h2>
+                <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                  Applications are randomized across these users. After import you can see who got
+                  whom, even out counts, give someone fewer apps, or reassign a conflict.
+                </p>
                 {hasSimulatedGraders && (
                   <p className="mt-1 text-sm text-muted-foreground">
                     Simulated users use @berkeley.edu test emails, and they are created automatically
@@ -1169,8 +1174,9 @@ export default function UnifiedImportPage() {
                   Import complete
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Each team has its applications, users, and scoring setup. Unlock Application
-                  grading from the dashboard when you&apos;re ready.
+                  Review each team&apos;s random assignments next: counts, who each grader got, then
+                  even out or reassign conflicts. Unlock grading from the dashboard when you&apos;re
+                  ready.
                 </p>
               </div>
 
@@ -1184,7 +1190,7 @@ export default function UnifiedImportPage() {
                   <li
                     key={t.team.name}
                     className={cn(
-                      'flex items-center justify-between gap-4 px-4 py-3 text-sm',
+                      'flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm',
                       index > 0 && 'border-t border-border/50',
                     )}
                   >
@@ -1194,10 +1200,20 @@ export default function UnifiedImportPage() {
                         aria-hidden
                       />
                       {t.team.name}
+                      <span className="font-normal tabular-nums text-muted-foreground">
+                        {t.applicationCount.toLocaleString()} applications
+                      </span>
                     </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {t.applicationCount.toLocaleString()} applications
-                    </span>
+                    {t.team.id ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href={`/admin/teams/${t.team.id}/assignments`} />}
+                      >
+                        Review assignments
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
                 {result.unmatchedCount > 0 ? (

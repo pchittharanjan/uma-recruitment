@@ -213,6 +213,16 @@ export default function ApplicationPhasePage() {
                       <div className="flex flex-wrap justify-end gap-2">
                         {hasRound ? (
                           <>
+                            {team.assignmentProgress.total > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                nativeButton={false}
+                                render={<Link href={`/admin/teams/${team.id}/assignments`} />}
+                              >
+                                Assignments
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
