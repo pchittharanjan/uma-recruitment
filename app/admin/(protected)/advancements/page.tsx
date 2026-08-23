@@ -224,6 +224,7 @@ export default function AdminAdvancementsPage() {
       {approveError && <StatusBanner type="error" message={approveError} />}
 
       <PageSection>
+        <div data-tour="admin-advancement-approve">
         {submissions.length === 0 ? (
           <Card className="pb-0">
             <CardHeader className="gap-2">
@@ -321,15 +322,18 @@ export default function AdminAdvancementsPage() {
             ))}
           </div>
         )}
+        </div>
       </PageSection>
 
       {teamReadiness.length > 0 && readinessStage && (
         <PageSection>
-          <AdminAdvancementReadinessOverview
-            teams={teamReadiness}
-            fromStage={readinessStage}
-            onRefresh={() => fetchData({ force: true })}
-          />
+          <div data-tour="admin-advancement-teams">
+            <AdminAdvancementReadinessOverview
+              teams={teamReadiness}
+              fromStage={readinessStage}
+              onRefresh={() => fetchData({ force: true })}
+            />
+          </div>
         </PageSection>
       )}
 
@@ -339,14 +343,14 @@ export default function AdminAdvancementsPage() {
             <CardHeader className="gap-2">
               <CardTitle className="text-base">Submission Log</CardTitle>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="pt-5" data-tour="admin-advancement-activity">
               <AdvancementActivityLog entries={activity} hideHeader />
             </CardContent>
           </Card>
         </PageSection>
       )}
 
-      <PageSection>
+      <PageSection data-tour="admin-advancement-caps">
         <TeamAdvancementCapSettings />
       </PageSection>
 

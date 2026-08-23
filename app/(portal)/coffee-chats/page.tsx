@@ -335,7 +335,7 @@ export default function CoffeeChatsPage() {
           )}
 
           <PageSection ref={formSectionRef}>
-              <Card className="overflow-hidden">
+              <Card className="overflow-hidden" data-tour="coffee-signup">
                 <CardHeader>
                   <CardTitle className="text-base">{editingId ? 'Edit Submission' : 'New Coffee Chat'}</CardTitle>
                 </CardHeader>
@@ -500,6 +500,7 @@ export default function CoffeeChatsPage() {
                     <LoadingButton
                       disabled={saving || formDisabled}
                       onClick={handleSubmit}
+                      data-tour="coffee-submit"
                     >
                       {editingId ? 'Save changes' : 'Submit coffee chat'}
                     </LoadingButton>
@@ -512,7 +513,7 @@ export default function CoffeeChatsPage() {
           </PageSection>
 
           <PageSection>
-            <Card>
+            <Card data-tour="coffee-schedule">
               <CardHeader>
                 <CardTitle className="flex items-baseline gap-2.5">
                   Your Submissions

@@ -359,7 +359,11 @@ export function AdminAssignmentReview({
         description="Anytime after import — including during grading — you can even out counts, give someone fewer apps, or move leftover apps to specific people if a grader has an emergency or is going slowly. Names are visible here for admins only; graders still see applicant numbers."
         actions={
           load?.rebalanceable ? (
-            <LoadingButton onClick={handleRebalance} loading={rebalancing}>
+            <LoadingButton
+              onClick={handleRebalance}
+              loading={rebalancing}
+              data-tour="assignments-actions"
+            >
               Even out loads
             </LoadingButton>
           ) : null
@@ -416,7 +420,10 @@ export function AdminAssignmentReview({
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div
+        className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+        data-tour="assignments-table"
+      >
         {assignedGraders.map((grader) => {
           const visibleAssignments = query
             ? grader.assignments.filter((a) => matchingAssignmentIds?.has(a.assignmentId))
@@ -437,7 +444,7 @@ export function AdminAssignmentReview({
                   </div>
                   <StageBadge label={`${grader.total} apps`} color="blue" size="compact" />
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-2" data-tour="assignments-actions">
                   <div className="min-w-0 flex-1 space-y-1">
                     <Label htmlFor={`load-${grader.id}`} className="text-xs">
                       Set load (fewer if they have less time)

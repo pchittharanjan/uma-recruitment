@@ -709,7 +709,7 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="Users"
         actions={
-          <Button nativeButton={false} render={<Link href="/admin/users/new" prefetch />}>
+          <Button nativeButton={false} render={<Link href="/admin/users/new" prefetch />} data-tour="users-add">
             <PlusIcon className="size-4" />
             Add Users
           </Button>
@@ -718,7 +718,7 @@ export default function AdminUsersPage() {
 
       {error && <StatusBanner message={error} type="error" />}
 
-        <Card className="pb-0">
+        <Card className="pb-0" data-tour="users-list">
           <CardHeader>
             <CardTitle className="flex items-baseline gap-2.5">
               Everyone
@@ -834,6 +834,7 @@ export default function AdminUsersPage() {
                             size="sm"
                             className="leading-none px-2.5 hover:bg-foreground/10 hover:text-foreground"
                             onClick={() => openEdit(user)}
+                            data-tour="users-edit"
                           >
                             <PencilIcon className="size-3.5" />
                             Edit
@@ -962,7 +963,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                       <TableHead>Row</TableHead>
                       <TableHead>Full name</TableHead>
                       <TableHead>Berkeley email</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead data-tour="users-role">Role</TableHead>
                       <TableHead>Teams</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>

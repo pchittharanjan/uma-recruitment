@@ -62,7 +62,7 @@ function poolNote(cap: number | null, totalRanked: number, official: number | nu
 /**
  * Selection count rules (see resolveAdvancementSelectionMin/Max):
  * - Normal: exactly min(N, pool)
- * - Allow-over-cap: count >= min(N, pool) and count <= pool
+ * - With overCapExtra: count >= min(N, pool) and count <= min(pool, N + extra)
  * - Lowered cap with pending over picks: official <= count <= previousSubmittedCount
  */
 function validateAdvancementSelection(
@@ -70,24 +70,24 @@ function validateAdvancementSelection(
   options: {
     cap: number | null;
     totalRanked: number;
-    allowOverCap: boolean;
+    overCapExtra: number;
     previousSubmittedCount?: number | null;
   },
 ): void {
-  const { cap, totalRanked, allowOverCap, previousSubmittedCount } = options;
-  if (cap === null && !allowOverCap) {
+  const { cap, totalRanked, overCapExtra, previousSubmittedCount } = options;
+  if (cap === null) {
     throw new Error('Advancement limit is not configured for this team. Contact an admin.');
   }
 
   const minRequired = resolveAdvancementSelectionMin({
     cap,
     totalRanked,
-    allowOverCap,
+    overCapExtra,
   });
   const maxAllowed = resolveAdvancementSelectionMax({
     cap,
     totalRanked,
-    allowOverCap,
+    overCapExtra,
     previousSubmittedCount,
   });
   if (minRequired === null || maxAllowed === null) {
@@ -111,7 +111,7 @@ function validateAdvancementSelection(
   }
 
   if (count > maxAllowed) {
-    if (allowOverCap) {
+    if (overCapExtra > 0) {
       throw new Error(
         `Select at most ${maxAllowed} applicant${maxAllowed === 1 ? '' : 's'} to advance.`,
       );
@@ -122,7 +122,7 @@ function validateAdvancementSelection(
       count > previousSubmittedCount
     ) {
       throw new Error(
-        `Selection is over the current limit of ${official}. You may keep up to ${previousSubmittedCount} from your pending list, but cannot add more unless an admin raises the limit or allows over cap.`,
+        `Selection is over the current limit of ${official}. You may keep up to ${previousSubmittedCount} from your pending list, but cannot add more unless an admin raises the limit or you enter the go-over code.`,
       );
     }
     throw new Error(
@@ -441,9 +441,9 @@ export async function submitTeamAdvancement(
     throw new Error('Advancement for this round has already been approved.');
   }
 
-  const { cap, allowOverCap } = await getTeamAdvancementCapState(teamId, fromStage);
+  const { cap, overCapExtra } = await getTeamAdvancementCapState(teamId, fromStage);
 
-  if (cap === null && !allowOverCap) {
+  if (cap === null) {
     throw new Error('Advancement limit is not configured for this team. Contact an admin.');
   }
 
@@ -474,16 +474,15 @@ export async function submitTeamAdvancement(
   const minRequired = resolveAdvancementSelectionMin({
     cap,
     totalRanked,
-    allowOverCap,
+    overCapExtra,
   });
   const maxAllowed = resolveAdvancementSelectionMax({
     cap,
     totalRanked,
-    allowOverCap,
+    overCapExtra,
     previousSubmittedCount,
   });
 
-  let uniqueIds: number[];
   if (!applicationIds || applicationIds.length === 0) {
     if (minRequired === null || maxAllowed === null) {
       throw new Error('Advancement limit is not configured for this team. Contact an admin.');
@@ -494,14 +493,14 @@ export async function submitTeamAdvancement(
         : `Select at least ${minRequired} applicant${minRequired === 1 ? '' : 's'} to submit (up to ${maxAllowed}).`;
     throw new Error(`${guidance} Panel color signals are recommendations only.`);
   }
-  uniqueIds = [...new Set(applicationIds)];
+  const uniqueIds = [...new Set(applicationIds)];
   if (uniqueIds.length !== applicationIds.length) {
     throw new Error('Duplicate applicants in selection.');
   }
   validateAdvancementSelection(uniqueIds, {
     cap,
     totalRanked,
-    allowOverCap,
+    overCapExtra,
     previousSubmittedCount,
   });
 

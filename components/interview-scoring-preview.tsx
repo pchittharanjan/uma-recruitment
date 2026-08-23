@@ -16,6 +16,7 @@ import {
   InterviewWorkspaceFullscreenButton,
   useInterviewWorkspaceFullscreen,
 } from '@/components/interview-workspace-fullscreen';
+import { PageTourHelpButton } from '@/components/page-tour';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import ScoreSelector from '@/components/ScoreSelector';
 import { InterviewNotesAndScoringForm } from '@/components/interview-question-eval';
@@ -347,7 +348,7 @@ export function InterviewScoringPreview({
     : null;
 
   const notesContent = showGroupSample ? (
-    <div className="flex flex-col gap-6">
+    <div data-tour="interview-scores" className="flex flex-col gap-6">
       {groupWorkspaceProps ? (
         <GroupInterviewCandidateWorkspace {...groupWorkspaceProps} />
       ) : (
@@ -370,7 +371,7 @@ export function InterviewScoringPreview({
       )}
     </div>
   ) : (
-    <div className="uma-stack-page">
+    <div data-tour="interview-scores" className="uma-stack-page">
       <InterviewNotesPanelHeader title="Notes & Evaluation" intro={guide.intro} />
       {interactive ? (
         <NotesAndEvaluationForm
@@ -405,11 +406,13 @@ export function InterviewScoringPreview({
   const panelFooter = showGroupSample ? groupSubmitFooter : singleSubmitFooter;
   const layoutToggle =
     showGroupSample && interactive ? (
-      <GroupInterviewLayoutToggle
-        value={layout}
-        onValueChange={updateLayout}
-        className="shrink-0 flex-nowrap"
-      />
+      <span data-tour="interview-layout">
+        <GroupInterviewLayoutToggle
+          value={layout}
+          onValueChange={updateLayout}
+          className="shrink-0 flex-nowrap"
+        />
+      </span>
     ) : null;
 
   const headerRow = (
@@ -426,6 +429,7 @@ export function InterviewScoringPreview({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-3 pt-1">
+        <PageTourHelpButton />
         <InterviewElapsedTimer {...elapsedTimer} />
         {layoutToggle}
         {interactive ? (
@@ -445,6 +449,7 @@ export function InterviewScoringPreview({
               type="button"
               variant="outline"
               size="sm"
+              data-tour="interview-case"
               className="h-8 normal-case border-foreground/25 bg-background font-medium"
               onClick={() => setCaseOpen(!caseOpen)}
             >
@@ -470,6 +475,7 @@ export function InterviewScoringPreview({
         <InterviewStickyLead>
           <div className={showGroupSample ? 'mb-3' : 'mb-4'}>{headerRow}</div>
           <InterviewFullscreenEvalBar className="px-0">
+            <PageTourHelpButton />
             <InterviewElapsedTimer {...elapsedTimer} />
             {layoutToggle}
             <InterviewWorkspaceExitFullscreenButton onExit={exitFullscreen} />
@@ -477,6 +483,7 @@ export function InterviewScoringPreview({
               type="button"
               variant="outline"
               size="sm"
+              data-tour="interview-case"
               className="h-8 normal-case border-foreground/25 bg-background font-medium"
               onClick={() => setCaseOpen(!caseOpen)}
             >
@@ -497,7 +504,7 @@ export function InterviewScoringPreview({
                   onCaseOpenChange={setCaseOpen}
                   fullscreen={fullscreen}
                   notesChrome={chrome}
-                  notes={body}
+                  notes={<div data-tour="interview-scores">{body}</div>}
                   footer={panelFooter}
                 />
               )}

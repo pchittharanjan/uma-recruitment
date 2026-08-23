@@ -137,18 +137,24 @@ function AdminDashboardContent({
           }
         />
 
-        <RecruitmentCycleSettings />
+        <div data-tour="admin-cycle">
+          <RecruitmentCycleSettings />
+        </div>
 
-        <GlobalPhaseControls
-          viewingStatus={viewingStatus}
-          onViewingStatusChange={handleViewingChange}
-          onPhaseChange={() => {
-            setRefreshKey((k) => k + 1);
-          }}
-          initialPhaseState={initialPhaseState}
-        />
+        <div data-tour="admin-phase">
+          <GlobalPhaseControls
+            viewingStatus={viewingStatus}
+            onViewingStatusChange={handleViewingChange}
+            onPhaseChange={() => {
+              setRefreshKey((k) => k + 1);
+            }}
+            initialPhaseState={initialPhaseState}
+          />
+        </div>
 
-        <AdminPhaseTeamOverview viewPhase={viewingStatus} teams={data.teams} />
+        <div data-tour="admin-teams-overview">
+          <AdminPhaseTeamOverview viewPhase={viewingStatus} teams={data.teams} />
+        </div>
       </PageSection>
     </PageContainer>
   );

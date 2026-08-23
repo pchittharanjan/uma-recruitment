@@ -1,0 +1,204 @@
+/* UMA-skinned driver.js — match Dialog / Button tokens, not stock blue chrome. */
+
+/* Popover surface = Dialog / popover */
+.driver-popover.uma-page-tour-popover {
+  all: unset;
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 1000000000;
+  display: block;
+  min-width: 16rem;
+  max-width: 18.5rem;
+  padding: 0.875rem 1rem 0.75rem;
+  color: var(--popover-foreground);
+  background-color: var(--popover);
+  border-radius: 0.75rem; /* rounded-xl */
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.driver-popover.uma-page-tour-popover * {
+  font-family: inherit;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-arrow {
+  border: 5px solid var(--popover);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-arrow-side-left {
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-arrow-side-right {
+  border-right-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-arrow-side-top {
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-arrow-side-bottom {
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-title {
+  display: block;
+  margin: 0;
+  padding-right: 1.5rem;
+  font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: var(--popover-foreground);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-description {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-close-btn {
+  all: unset;
+  box-sizing: border-box;
+  /* Must beat title (later in DOM, position:relative) — all:unset drops driver z-index:1 */
+  position: absolute;
+  z-index: 2;
+  top: 0.5rem;
+  right: 0.5rem;
+  /* driver.js sets inline display:block — win permanently without onPopoverRender fight */
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  margin: 0;
+  border: 0 solid transparent;
+  border-radius: 0.5rem;
+  background-color: transparent;
+  color: var(--muted-foreground);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: none;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-close-btn:hover,
+.driver-popover.uma-page-tour-popover .driver-popover-close-btn:focus {
+  /* Color/background only — no size, padding, border, or position changes */
+  color: var(--foreground);
+  background-color: var(--muted);
+  outline: none;
+  transform: none;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-progress-text {
+  display: none; /* custom dots via onPopoverRender */
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-navigation-btns {
+  display: flex;
+  flex-grow: 1;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-footer-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  padding: 0 0.75rem;
+  cursor: pointer;
+  border-radius: 0.5rem; /* rounded-lg */
+  font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: capitalize;
+  line-height: 1;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+/* Next / Done = primary */
+.driver-popover.uma-page-tour-popover .driver-popover-next-btn {
+  color: var(--primary-foreground);
+  background-color: var(--primary);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-next-btn:hover,
+.driver-popover.uma-page-tour-popover .driver-popover-next-btn:focus {
+  background-color: var(--primary-hover, color-mix(in oklab, var(--primary) 88%, black));
+}
+
+/* Back = ghost / outline */
+.driver-popover.uma-page-tour-popover .driver-popover-prev-btn {
+  color: var(--foreground);
+  background-color: transparent;
+  outline: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-prev-btn:hover,
+.driver-popover.uma-page-tour-popover .driver-popover-prev-btn:focus {
+  background-color: var(--muted);
+}
+
+.driver-popover.uma-page-tour-popover .driver-popover-footer .driver-popover-btn-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Progress dots */
+.uma-page-tour-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: auto;
+}
+
+.uma-page-tour-dots span {
+  display: block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+.uma-page-tour-dots span[data-active="true"] {
+  background-color: var(--primary);
+}
+
+/* Soft stage highlight — thin warm ring, not neon glow */
+.driver-active-element {
+  border-radius: 0.75rem;
+}

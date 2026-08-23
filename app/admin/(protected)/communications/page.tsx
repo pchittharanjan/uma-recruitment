@@ -117,7 +117,7 @@ export default function AdminCommunicationsPage() {
           </p>
         </div>
 
-        <div className="display-panel overflow-hidden">
+        <div className="display-panel overflow-hidden" data-tour="comms-audience">
           <Table>
             <TableHeader>
               <TableRow className="border-border/60 bg-background hover:bg-background">
@@ -163,6 +163,7 @@ export default function AdminCommunicationsPage() {
                       variant="outline"
                       size="sm"
                       nativeButton={false}
+                      data-tour="comms-compose"
                       render={
                         <Link href={communicationsHref(resolvedStage, row.team.id)} />
                       }

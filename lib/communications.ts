@@ -135,19 +135,25 @@ async function loadRejectRecipients(
   const db = getDb();
 
   if (fromStage === 'application') {
-    // Cut at application: rejected and never had a first-round interview assignment/slot.
+    // Cut at application: rejected_from_stage = application, or legacy heuristic.
     const result = await db.execute({
       sql: `SELECT app.id, c.name, c.email
             FROM applications app
             JOIN candidates c ON c.id = app.candidate_id
             WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
-              AND NOT EXISTS (
-                SELECT 1 FROM assignments a
-                WHERE a.application_id = app.id AND a.stage = 'first_round'
-              )
-              AND NOT EXISTS (
-                SELECT 1 FROM interview_slots s
-                WHERE s.application_id = app.id AND s.stage = 'first_round'
+              AND (
+                app.rejected_from_stage = 'application'
+                OR (
+                  app.rejected_from_stage IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'first_round'
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'first_round'
+                  )
+                )
               )
             ORDER BY app.rank IS NULL, app.rank ASC, app.row_index ASC`,
       args: [teamId, roundId],
@@ -156,20 +162,34 @@ async function loadRejectRecipients(
   }
 
   if (fromStage === 'first_round') {
-    // Cut after first round: rejected and had first-round interview work.
+    // Cut after first round (not later deliberations cuts).
     const result = await db.execute({
       sql: `SELECT app.id, c.name, c.email
             FROM applications app
             JOIN candidates c ON c.id = app.candidate_id
             WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
               AND (
-                EXISTS (
-                  SELECT 1 FROM assignments a
-                  WHERE a.application_id = app.id AND a.stage = 'first_round'
-                )
-                OR EXISTS (
-                  SELECT 1 FROM interview_slots s
-                  WHERE s.application_id = app.id AND s.stage = 'first_round'
+                app.rejected_from_stage = 'first_round'
+                OR (
+                  app.rejected_from_stage IS NULL
+                  AND (
+                    EXISTS (
+                      SELECT 1 FROM assignments a
+                      WHERE a.application_id = app.id AND a.stage = 'first_round'
+                    )
+                    OR EXISTS (
+                      SELECT 1 FROM interview_slots s
+                      WHERE s.application_id = app.id AND s.stage = 'first_round'
+                    )
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'final_round'
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'final_round'
+                  )
                 )
               )
             ORDER BY app.rank IS NULL, app.rank ASC, app.row_index ASC`,
@@ -178,20 +198,26 @@ async function loadRejectRecipients(
     return mapRecipients(result.rows as Array<Record<string, unknown>>);
   }
 
-  // Cut after final round / deliberations: rejected and had final-round interview work.
+  // Cut after final round / deliberations.
   const result = await db.execute({
     sql: `SELECT app.id, c.name, c.email
           FROM applications app
           JOIN candidates c ON c.id = app.candidate_id
           WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
             AND (
-              EXISTS (
-                SELECT 1 FROM assignments a
-                WHERE a.application_id = app.id AND a.stage = 'final_round'
-              )
-              OR EXISTS (
-                SELECT 1 FROM interview_slots s
-                WHERE s.application_id = app.id AND s.stage = 'final_round'
+              app.rejected_from_stage IN ('final_round', 'deliberations')
+              OR (
+                app.rejected_from_stage IS NULL
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'final_round'
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'final_round'
+                  )
+                )
               )
             )
           ORDER BY app.rank IS NULL, app.rank ASC, app.row_index ASC`,
@@ -345,13 +371,19 @@ async function countRejectRecipients(
     const result = await db.execute({
       sql: `SELECT COUNT(*) AS count FROM applications app
             WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
-              AND NOT EXISTS (
-                SELECT 1 FROM assignments a
-                WHERE a.application_id = app.id AND a.stage = 'first_round'
-              )
-              AND NOT EXISTS (
-                SELECT 1 FROM interview_slots s
-                WHERE s.application_id = app.id AND s.stage = 'first_round'
+              AND (
+                app.rejected_from_stage = 'application'
+                OR (
+                  app.rejected_from_stage IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'first_round'
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'first_round'
+                  )
+                )
               )`,
       args: [teamId, roundId],
     });
@@ -363,13 +395,27 @@ async function countRejectRecipients(
       sql: `SELECT COUNT(*) AS count FROM applications app
             WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
               AND (
-                EXISTS (
-                  SELECT 1 FROM assignments a
-                  WHERE a.application_id = app.id AND a.stage = 'first_round'
-                )
-                OR EXISTS (
-                  SELECT 1 FROM interview_slots s
-                  WHERE s.application_id = app.id AND s.stage = 'first_round'
+                app.rejected_from_stage = 'first_round'
+                OR (
+                  app.rejected_from_stage IS NULL
+                  AND (
+                    EXISTS (
+                      SELECT 1 FROM assignments a
+                      WHERE a.application_id = app.id AND a.stage = 'first_round'
+                    )
+                    OR EXISTS (
+                      SELECT 1 FROM interview_slots s
+                      WHERE s.application_id = app.id AND s.stage = 'first_round'
+                    )
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'final_round'
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'final_round'
+                  )
                 )
               )`,
       args: [teamId, roundId],
@@ -381,13 +427,19 @@ async function countRejectRecipients(
     sql: `SELECT COUNT(*) AS count FROM applications app
           WHERE app.team_id = ? AND app.round_id = ? AND app.stage = 'rejected'
             AND (
-              EXISTS (
-                SELECT 1 FROM assignments a
-                WHERE a.application_id = app.id AND a.stage = 'final_round'
-              )
-              OR EXISTS (
-                SELECT 1 FROM interview_slots s
-                WHERE s.application_id = app.id AND s.stage = 'final_round'
+              app.rejected_from_stage IN ('final_round', 'deliberations')
+              OR (
+                app.rejected_from_stage IS NULL
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM assignments a
+                    WHERE a.application_id = app.id AND a.stage = 'final_round'
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM interview_slots s
+                    WHERE s.application_id = app.id AND s.stage = 'final_round'
+                  )
+                )
               )
             )`,
     args: [teamId, roundId],

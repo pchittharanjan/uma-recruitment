@@ -3,21 +3,13 @@ import { cn } from '@/lib/utils';
 
 type StageColor = 'blue' | 'green' | 'gray' | 'yellow' | 'orange';
 
+/** Soft fill + colored text — same chrome as team pills (`border-0`). */
 const colorClasses: Record<StageColor, string> = {
   blue: 'bg-primary/12 text-[#9a5a2e]',
   green: 'bg-emerald-500/10 text-emerald-800',
   gray: 'bg-muted text-muted-foreground',
   yellow: 'bg-accent/10 text-[#b86a28]',
   orange: 'bg-accent/12 text-[#9c3d2e]',
-};
-
-/** Matches phase stepper / stage-access pill scale on the admin dashboard. */
-const prominentColorClasses: Record<StageColor, string> = {
-  blue: 'border-primary/30 bg-primary/[0.07] text-primary',
-  green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800',
-  gray: 'border-border/70 bg-muted/40 text-muted-foreground',
-  yellow: 'border-accent/30 bg-accent/10 text-[#b86a28]',
-  orange: 'border-accent/30 bg-accent/12 text-[#9c3d2e]',
 };
 
 export default function StageBadge({
@@ -33,9 +25,9 @@ export default function StageBadge({
     return (
       <span
         className={cn(
-          'inline-flex items-center rounded-lg border font-medium',
+          'inline-flex items-center rounded-lg font-medium',
           size === 'compact' ? 'px-2.5 py-1 text-sm' : 'px-3 py-1.5 text-sm',
-          prominentColorClasses[color],
+          colorClasses[color],
         )}
       >
         {label}

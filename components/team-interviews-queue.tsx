@@ -151,7 +151,10 @@ export function TeamInterviewsQueue({
         <div className="space-y-3">
           <p className="uma-section-label">Interviews Completed</p>
 
-          <div className="rounded-xl border border-border/50 bg-surface-panel px-5 py-4 sm:px-6 sm:py-5">
+          <div
+            data-tour="interview-queue-progress"
+            className="rounded-xl border border-border/50 bg-surface-panel px-5 py-4 sm:px-6 sm:py-5"
+          >
             <ProgressBar
               value={data.progress.completed}
               max={data.progress.total}
@@ -162,6 +165,7 @@ export function TeamInterviewsQueue({
                 <NavLinkButton
                   size="sm"
                   href={`/team/${teamId}/interviews/${stage}/${firstPending.applicationId}`}
+                  data-tour="interview-queue-next"
                 >
                   Next Interview →
                 </NavLinkButton>
@@ -170,7 +174,7 @@ export function TeamInterviewsQueue({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div data-tour="interview-queue" className="space-y-3">
           <p className="uma-section-label">Your Interviews</p>
 
           <Card className="overflow-hidden">
@@ -232,6 +236,7 @@ export function TeamInterviewsQueue({
                         <NavLinkButton
                           size="sm"
                           href={`/team/${teamId}/interviews/${stage}/${scoreTargetId}`}
+                          data-tour="interview-queue-next"
                         >
                           Next Interview →
                         </NavLinkButton>

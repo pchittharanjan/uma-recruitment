@@ -1,5 +1,5 @@
 import { isPlaceholderCandidateEmail, resolveApplicantEmail } from '@/lib/candidates';
-import { getDb, getTeams, type ApplicationStage, type Team } from '@/lib/db';
+import { getDb, getTeams, type ApplicationStage, type RejectedFromStage, type Team } from '@/lib/db';
 import type { AdminApplicationDetail, AdminApplicationRow } from '@/lib/admin-application-types';
 
 export type { AdminApplicationDetail, AdminApplicationRow } from '@/lib/admin-application-types';
@@ -10,6 +10,8 @@ export interface ListAdminApplicationsOptions {
   q?: string;
   teamId?: number;
   stage?: ApplicationStage;
+  /** When stage is rejected (or unset), filter by cut gate. */
+  rejectedFromStage?: RejectedFromStage;
   /** Max rows to return (default 150). */
   limit?: number;
   /** Offset for pagination (default 0). */
@@ -53,7 +55,10 @@ export async function listAdminApplications(
     args.push(options.teamId);
   }
 
-  if (options.stage) {
+  if (options.rejectedFromStage) {
+    where += ' AND app.stage = ? AND app.rejected_from_stage = ?';
+    args.push('rejected', options.rejectedFromStage);
+  } else if (options.stage) {
     where += ' AND app.stage = ?';
     args.push(options.stage);
   }
@@ -96,7 +101,7 @@ export async function listAdminApplications(
 
   // List payload skips app.fields when candidate email is usable — detail fetch loads fields.
   const result = await db.execute({
-    sql: `SELECT app.id, app.row_index, app.stage, app.team_id, app.round_id,
+    sql: `SELECT app.id, app.row_index, app.stage, app.rejected_from_stage, app.team_id, app.round_id,
                  app.final_score, app.rank, app.admin_note,
                  CASE
                    WHEN c.email IS NULL OR TRIM(c.email) = '' OR LOWER(c.email) LIKE '%@unknown.local'
@@ -150,6 +155,7 @@ export async function listAdminApplications(
       id,
       rowIndex: (row.row_index as number | null) ?? 0,
       stage: row.stage as ApplicationStage,
+      rejectedFromStage: (row.rejected_from_stage as RejectedFromStage | null) ?? null,
       teamId: row.team_id as number,
       teamName: row.team_name as string,
       roundId: row.round_id as number,
@@ -180,7 +186,7 @@ export async function getAdminApplication(
 ): Promise<AdminApplicationDetail | null> {
   const db = getDb();
   const result = await db.execute({
-    sql: `SELECT app.id, app.row_index, app.stage, app.team_id, app.round_id,
+    sql: `SELECT app.id, app.row_index, app.stage, app.rejected_from_stage, app.team_id, app.round_id,
                  app.final_score, app.rank, app.admin_note, app.fields,
                  c.id AS candidate_id, c.name AS candidate_name, c.email AS candidate_email,
                  t.name AS team_name
@@ -208,6 +214,7 @@ export async function getAdminApplication(
     id,
     rowIndex: (row.row_index as number | null) ?? 0,
     stage: row.stage as ApplicationStage,
+    rejectedFromStage: (row.rejected_from_stage as RejectedFromStage | null) ?? null,
     teamId: row.team_id as number,
     teamName: row.team_name as string,
     roundId: row.round_id as number,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Columns2Icon, XIcon } from 'lucide-react';
 import { AppCreditBar } from '@/components/app-credit-bar';
 import { NotificationBell } from '@/components/notification-bell';
+import { PageTourHelpButton } from '@/components/page-tour';
 import { useWorkspace } from '@/components/workspace-provider';
 import { WorkspaceNewTabMenu } from '@/components/workspace-new-tab-menu';
 import { Button } from '@/components/ui/button';
@@ -209,6 +210,7 @@ export function WorkspaceChrome({ children }: { children: React.ReactNode }) {
   );
   const toolbarEnd = (
     <div className="ml-2 flex shrink-0 items-center gap-2">
+      <PageTourHelpButton />
       <NotificationBell />
       {splitToggle}
     </div>

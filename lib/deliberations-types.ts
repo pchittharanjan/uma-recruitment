@@ -32,7 +32,7 @@ export interface DeliberationsBoardData {
   teamId: number;
   roundId: number;
   acceptLimit: number | null;
-  allowOverCap: boolean;
+  overCapExtra: number;
   candidates: DeliberationsCandidate[];
   /** Persisted column/order/rejected state, if the board has been saved. */
   layout: DeliberationsBoardLayout | null;

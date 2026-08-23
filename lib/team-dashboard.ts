@@ -364,9 +364,12 @@ export async function applyAdvancementSelection(
 
   for (const app of ranked) {
     const stage = advancedSet.has(app.id) ? 'first_round' : 'rejected';
+    const rejectedFrom = stage === 'rejected' ? 'application' : null;
     await db.execute({
-      sql: 'UPDATE applications SET final_score = ?, rank = ?, stage = ? WHERE id = ? AND team_id = ?',
-      args: [app.average, app.rank, stage, app.id, teamId],
+      sql: `UPDATE applications
+            SET final_score = ?, rank = ?, stage = ?, rejected_from_stage = ?
+            WHERE id = ? AND team_id = ?`,
+      args: [app.average, app.rank, stage, rejectedFrom, app.id, teamId],
     });
   }
 

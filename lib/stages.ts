@@ -1,4 +1,4 @@
-import type { ApplicationStage, AssignmentStage, RoundStatus } from '@/lib/db';
+import type { ApplicationStage, AssignmentStage, RejectedFromStage, RoundStatus } from '@/lib/db';
 
 /** Phases shown in the admin phase stepper (in order). */
 export const PIPELINE_PHASES: Array<{
@@ -417,4 +417,31 @@ export function applicationStageLabel(stage: ApplicationStage): string {
     default:
       return stage;
   }
+}
+
+/** Short label for the gate a candidate was cut at. */
+export function rejectedFromStageLabel(stage: RejectedFromStage): string {
+  switch (stage) {
+    case 'application':
+      return 'Application';
+    case 'first_round':
+      return 'First Round';
+    case 'final_round':
+      return 'Final Round';
+    case 'deliberations':
+      return 'Deliberations';
+    default:
+      return stage;
+  }
+}
+
+/** Stage badge / list label — includes cut gate when rejected. */
+export function applicationPipelineStatusLabel(
+  stage: ApplicationStage,
+  rejectedFromStage: RejectedFromStage | null | undefined,
+): string {
+  if (stage === 'rejected' && rejectedFromStage) {
+    return `Rejected at ${rejectedFromStageLabel(rejectedFromStage)}`;
+  }
+  return applicationStageLabel(stage);
 }

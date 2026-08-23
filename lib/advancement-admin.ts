@@ -202,7 +202,7 @@ export async function revertTeamAdvancement(
 
   const updateResult = await db.execute({
     sql: `UPDATE applications
-          SET stage = ?, final_score = NULL, rank = NULL
+          SET stage = ?, final_score = NULL, rank = NULL, rejected_from_stage = NULL
           WHERE team_id = ? AND round_id = ? AND stage IN (${placeholders})`,
     args: [targetStage, teamId, roundId, ...sourceStages],
   });

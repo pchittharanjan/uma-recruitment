@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       board,
       canSave: false,
       selectionComplete,
+      canRequestOverCap: !selectionComplete && round.status !== 'closed',
       pipelineClosed: round.status === 'closed' || (await isPipelineClosed()),
     });
   } catch (e) {

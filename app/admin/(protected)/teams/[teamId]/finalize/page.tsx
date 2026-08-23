@@ -81,7 +81,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
         title="Final Results"
         description={`${ranked.length} applications ranked`}
         actions={
-          <a href={`/api/admin/teams/${teamId}/export`} download>
+          <a href={`/api/admin/teams/${teamId}/export`} download data-tour="finalize-actions">
             <LoadingButton variant="secondary">Export CSV</LoadingButton>
           </a>
         }
@@ -108,7 +108,7 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
           </Card>
         )}
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-tour="finalize-review">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] table-fixed text-sm">
               <colgroup>

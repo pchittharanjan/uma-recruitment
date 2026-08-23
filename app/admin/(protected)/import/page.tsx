@@ -677,7 +677,9 @@ export default function UnifiedImportPage() {
       />
 
       {step !== 'done' && (
-        <ImportWizardProgress currentStepId={step as WizardStepId} />
+        <div data-tour="import-steps">
+          <ImportWizardProgress currentStepId={step as WizardStepId} />
+        </div>
       )}
 
       {error && <StatusBanner message={error} type="error" />}
@@ -730,7 +732,7 @@ export default function UnifiedImportPage() {
 
         {step === 'teams' && teamSplitConfig && (
           <PageContent width="narrow">
-            <PagePanel className="space-y-4">
+            <PagePanel className="space-y-4" data-tour="import-teams">
               <h2 className="text-base font-semibold">Team Split</h2>
 
               {teamSplitConfig.mode === 'named_columns' ? (
@@ -795,7 +797,7 @@ export default function UnifiedImportPage() {
         )}
 
         {step === 'scoring' && teamSplitConfig && splitByTeam && (
-          <PagePanel className="space-y-6">
+          <PagePanel className="space-y-6" data-tour="import-map">
             <div>
               <h2 className="text-lg font-semibold">Review Question Tagging</h2>
               <p className="mt-1 max-w-prose text-sm text-muted-foreground">
@@ -934,7 +936,7 @@ export default function UnifiedImportPage() {
         )}
 
         {step === 'graders' && (
-          <PagePanel className="space-y-5">
+          <PagePanel className="space-y-5" data-tour="import-graders">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Users per Team</h2>
@@ -1056,7 +1058,7 @@ export default function UnifiedImportPage() {
 
         {step === 'confirm' && splitSummary && (
           <PageContent width="narrow">
-            <div className="space-y-6">
+            <div className="space-y-6" data-tour="import-confirm">
               <div className="space-y-1.5">
                 <h2 className="font-heading text-lg font-semibold tracking-tight">
                   Confirm import

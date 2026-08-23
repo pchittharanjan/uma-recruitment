@@ -122,7 +122,7 @@ export default function TeamInterviewResultsPage({
         }
       />
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-tour="results-table">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] table-fixed text-sm">
               <colgroup>

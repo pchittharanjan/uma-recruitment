@@ -214,7 +214,7 @@ export default function TeamCommunicationsPage({
 
       {error && <StatusBanner message={error} type="error" />}
 
-        <Card>
+        <Card data-tour="comms-compose">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <div className="space-y-1">
               <CardTitle className="flex items-baseline gap-2.5 text-base">
@@ -286,7 +286,10 @@ export default function TeamCommunicationsPage({
               )}
             </div>
             {data.passRecipients.length > 0 && (
-              <ul className="max-h-48 overflow-y-auto rounded-lg border p-3 text-sm">
+              <ul
+                className="max-h-48 overflow-y-auto rounded-lg border p-3 text-sm"
+                data-tour="comms-audience"
+              >
                 {data.passRecipients.map((r) => {
                   const mailto = buildMailtoUrl({
                     to: r.email,
@@ -395,7 +398,10 @@ export default function TeamCommunicationsPage({
               )}
             </div>
             {data.rejectRecipients.length > 0 && (
-              <ul className="max-h-48 overflow-y-auto rounded-lg border p-3 text-sm">
+              <ul
+                className="max-h-48 overflow-y-auto rounded-lg border p-3 text-sm"
+                data-tour="comms-audience"
+              >
                 {data.rejectRecipients.map((r) => {
                   const mailto = buildMailtoUrl({
                     to: r.email,
@@ -435,7 +441,7 @@ export default function TeamCommunicationsPage({
           </CardContent>
         </Card>
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2" data-tour="comms-send">
           {data.passRecipients.length > 0 &&
             data.rejectRecipients.length > 0 &&
             (!data.passNotifiedAt || !data.rejectNotifiedAt) && (

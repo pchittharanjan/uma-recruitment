@@ -322,7 +322,7 @@ export function GlobalPhaseControls({
                       {teamStatus ? (
                         <span
                           className={cn(
-                            'inline-flex items-center rounded-lg border px-2.5 py-1 text-sm font-medium',
+                            'inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-medium',
                             teamStageBadgeClass(team.teamName),
                           )}
                         >

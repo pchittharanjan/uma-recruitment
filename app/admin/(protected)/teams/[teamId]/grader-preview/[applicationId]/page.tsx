@@ -85,7 +85,10 @@ export default function AdminGraderPreviewPage({
 
   return (
     <div className="pb-8">
-      <div className="sticky top-0 z-10 border-b border-amber-200 bg-amber-50">
+      <div
+        className="sticky top-0 z-10 border-b border-amber-200 bg-amber-50"
+        data-tour="grade-form-nav"
+      >
         <PageContainer className="py-3 sm:py-3 lg:py-3">
           <PageContent
             width="comfortable"
@@ -144,44 +147,46 @@ export default function AdminGraderPreviewPage({
             </Card>
           )}
 
-          {data.scoreFields.map((field) => (
-            <Card key={field} className="p-4 sm:p-5 opacity-90">
-              <p className="mb-2 uma-section-label text-primary">
-                {field}
-                <RequiredAsterisk className="ml-0.5" />
-              </p>
-              <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
-                {data.fields[field] ? (
-                  renderWithLinks(data.fields[field])
-                ) : (
-                  <span className="italic text-muted-foreground">No response</span>
-                )}
-              </p>
-              <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">
-                  Score (1–5)
+          <div className="uma-stack-section" data-tour="grade-form-scores">
+            {data.scoreFields.map((field) => (
+              <Card key={field} className="p-4 sm:p-5 opacity-90">
+                <p className="mb-2 uma-section-label text-primary">
+                  {field}
                   <RequiredAsterisk className="ml-0.5" />
                 </p>
-                <ScoreSelector value={null} onChange={() => {}} disabled />
-              </div>
-            </Card>
-          ))}
+                <p className="mb-4 whitespace-pre-wrap text-sm leading-relaxed">
+                  {data.fields[field] ? (
+                    renderWithLinks(data.fields[field])
+                  ) : (
+                    <span className="italic text-muted-foreground">No response</span>
+                  )}
+                </p>
+                <div className="pt-4">
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    Score (1–5)
+                    <RequiredAsterisk className="ml-0.5" />
+                  </p>
+                  <ScoreSelector value={null} onChange={() => {}} disabled />
+                </div>
+              </Card>
+            ))}
 
-          {data.customScoreFields.map((field) => (
-            <Card key={`custom:${field}`} className="p-4 sm:p-5 opacity-90">
-              <p className="mb-4 uma-section-label text-primary">
-                {field}
-                <RequiredAsterisk className="ml-0.5" />
-              </p>
-              <div className="pt-4">
-                <p className="mb-2 text-sm text-muted-foreground">
-                  Score (1–5)
+            {data.customScoreFields.map((field) => (
+              <Card key={`custom:${field}`} className="p-4 sm:p-5 opacity-90">
+                <p className="mb-4 uma-section-label text-primary">
+                  {field}
                   <RequiredAsterisk className="ml-0.5" />
                 </p>
-                <ScoreSelector value={null} onChange={() => {}} disabled />
-              </div>
-            </Card>
-          ))}
+                <div className="pt-4">
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    Score (1–5)
+                    <RequiredAsterisk className="ml-0.5" />
+                  </p>
+                  <ScoreSelector value={null} onChange={() => {}} disabled />
+                </div>
+              </Card>
+            ))}
+          </div>
 
           <Card className="p-4 sm:p-5">
             <p className="mb-2 uma-section-label">

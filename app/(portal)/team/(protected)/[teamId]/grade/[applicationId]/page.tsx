@@ -211,7 +211,10 @@ export default function TeamGradingScorePage({
 
   return (
     <>
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+      <div
+        className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur"
+        data-tour="grade-form-nav"
+      >
         <PageContainer className="py-3 sm:py-3 lg:py-3">
           <PageContent
             width="comfortable"
@@ -232,7 +235,10 @@ export default function TeamGradingScorePage({
                 {appData.graderProgress.completed} of {appData.graderProgress.total} done
               </p>
             </div>
-            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+            <span
+              className="shrink-0 text-sm tabular-nums text-muted-foreground"
+              data-tour="grade-form-progress"
+            >
               {scoredCount}/{totalScored} scored
             </span>
           </PageContent>
@@ -266,7 +272,7 @@ export default function TeamGradingScorePage({
           )}
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <section className="uma-stack-section">
+            <section className="uma-stack-section" data-tour="grade-form-scores">
               <h2 className="uma-section-label">Written responses</h2>
 
               {contextFields.length > 0 && (
@@ -364,7 +370,7 @@ export default function TeamGradingScorePage({
               ))}
             </section>
 
-            <section className="uma-stack-section">
+            <section className="uma-stack-section" data-tour="grade-form-portfolio">
               <h2 className="uma-section-label">Portfolio &amp; supplementary</h2>
               <Card className="p-4 sm:p-5">
                 {Object.keys(appData.portfolioFields ?? {}).length === 0 ? (
@@ -395,7 +401,7 @@ export default function TeamGradingScorePage({
             </section>
           </div>
 
-          <Card className="p-4 sm:p-5">
+          <Card className="p-4 sm:p-5" data-tour="grade-form-comments">
             <p className="mb-2 uma-section-label">
               Comments
             </p>

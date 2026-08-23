@@ -18,7 +18,7 @@ import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communi
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { isAdminPhasePreview } from '@/lib/admin-phase-preview';
 import StatusBanner from '@/components/status-banner';
-import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
+import { PageContainer, PageHeader, PageSection, PageToolbar, TitleCount } from '@/components/page-shell';
 import { CenteredMessage } from '@/components/centered-message';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
@@ -333,59 +333,61 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       <PageHeader
         title={data.team.name}
         description={pageDescription}
-        toolbar={
-          <>
-            {showApplicationHub && (
-              <NavLinkButton
-                variant="secondary"
-                href={`/admin/teams/${teamId}/assignments`}
-              >
-                Review assignments
-              </NavLinkButton>
-            )}
-            <NavLinkButton
-              variant="secondary"
-              href={communicationsHref(
-                outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
-                Number(teamId),
-              )}
-            >
-              Emails
-            </NavLinkButton>
-            <NavLinkButton
-              variant="secondary"
-              href={`/admin/teams/${teamId}/interview-setup`}
-            >
-              Interview Setup
-            </NavLinkButton>
-            <NavLinkButton
-              variant="secondary"
-              href={`/admin/teams/${teamId}/schedule/first-round`}
-            >
-              First Round Schedule
-            </NavLinkButton>
-            <NavLinkButton
-              variant="secondary"
-              href={`/admin/teams/${teamId}/schedule/final-round`}
-            >
-              Final Round Schedule
-            </NavLinkButton>
-            <NavLinkButton
-              variant="secondary"
-              href={openTeamDeliberationsHref(Number(teamId))}
-            >
-              Deliberations
-            </NavLinkButton>
-            {showApplicationHub && (
-              <a href={`/api/admin/teams/${teamId}/export`} download>
-                <LoadingButton variant="secondary">Export CSV</LoadingButton>
-              </a>
-            )}
-          </>
-        }
       />
+      <div data-tour="team-admin-nav">
+        <PageToolbar>
+          {showApplicationHub && (
+            <NavLinkButton
+              variant="secondary"
+              href={`/admin/teams/${teamId}/assignments`}
+            >
+              Review assignments
+            </NavLinkButton>
+          )}
+          <NavLinkButton
+            variant="secondary"
+            href={communicationsHref(
+              outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
+              Number(teamId),
+            )}
+          >
+            Emails
+          </NavLinkButton>
+          <NavLinkButton
+            variant="secondary"
+            href={`/admin/teams/${teamId}/interview-setup`}
+          >
+            Interview Setup
+          </NavLinkButton>
+          <NavLinkButton
+            variant="secondary"
+            href={`/admin/teams/${teamId}/schedule/first-round`}
+          >
+            First Round Schedule
+          </NavLinkButton>
+          <NavLinkButton
+            variant="secondary"
+            href={`/admin/teams/${teamId}/schedule/final-round`}
+          >
+            Final Round Schedule
+          </NavLinkButton>
+          <NavLinkButton
+            variant="secondary"
+            href={openTeamDeliberationsHref(Number(teamId))}
+          >
+            Deliberations
+          </NavLinkButton>
+          {showApplicationHub && (
+            <a href={`/api/admin/teams/${teamId}/export`} download>
+              <LoadingButton variant="secondary">Export CSV</LoadingButton>
+            </a>
+          )}
+        </PageToolbar>
+      </div>
 
-        <TeamStageControls teamId={Number(teamId)} />
+        <div data-tour="team-admin-phase">
+          <TeamStageControls teamId={Number(teamId)} />
+        </div>
 
       {isInterviewView ? (
         <>

@@ -70,6 +70,7 @@ export function GradingSubmitFooter({
   if (isEmbedded) {
     return (
       <div
+        data-tour="grade-form-submit"
         className={cn(
           'flex shrink-0 flex-col gap-4 border-t border-border bg-muted/50 px-6 py-4 sm:px-7 lg:px-8',
           className,
@@ -82,6 +83,7 @@ export function GradingSubmitFooter({
 
   return (
     <div
+      data-tour="grade-form-submit"
       className={cn(
         'sticky bottom-0 z-10 -mx-1 bg-background/95 pt-3 backdrop-blur',
         className,

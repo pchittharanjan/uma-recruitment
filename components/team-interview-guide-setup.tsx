@@ -925,6 +925,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
             value={stage}
             onValueChange={handleStageChange}
             className="space-y-8"
+            data-tour="interview-setup-guide"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <TabsList className="h-auto w-full max-w-xl">
@@ -934,12 +935,13 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3" data-tour="interview-setup-save">
                 <DocumentSaveStatusLine status={saveStatus} errorMessage={saveError} />
                 <LoadingButton
                   variant="secondary"
                   className="shrink-0"
                   onClick={openPreview}
+                  data-tour="interview-setup-preview"
                 >
                   Preview Interviewer View
                 </LoadingButton>

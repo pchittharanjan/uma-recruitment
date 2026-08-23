@@ -25,21 +25,16 @@ export function resolveRequiredAdvancementCount(
  * Minimum selections required to submit.
  *
  * Rules:
- * - Normal (cap set, no override): exactly min(N, pool) — min === max from
- *   resolveAdvancementSelectionMax.
- * - Allow-over-cap: still require at least min(N, pool) (or 1 if no cap); directors
- *   may exceed N up to the pool via resolveAdvancementSelectionMax.
- * - Lowered cap below a pending over-cap list: min stays at the official target;
- *   they may keep more (up to previous count) but must not submit fewer than the target.
+ * - Cap set: at least min(N, pool) — even when overCapExtra > 0.
+ * - Cap unset: not configured (null).
  */
 export function resolveAdvancementSelectionMin(options: {
   cap: number | null;
   totalRanked: number;
-  allowOverCap: boolean;
+  overCapExtra?: number;
 }): number | null {
-  const { cap, totalRanked, allowOverCap } = options;
-  if (cap === null && !allowOverCap) return null;
-  if (cap === null && allowOverCap) return totalRanked > 0 ? 1 : null;
+  const { cap, totalRanked } = options;
+  if (cap === null) return null;
   return resolveAdvancementCapMax(cap, totalRanked);
 }
 
@@ -47,31 +42,30 @@ export function resolveAdvancementSelectionMin(options: {
  * Effective max the director may select right now.
  *
  * Rules:
- * - Allow-over-cap: up to the full pool (may exceed official target; min still applies).
- * - Otherwise: official target min(N, pool). If a pending submission already exceeds a
- *   later-lowered cap, they may keep up to that prior count (not add more).
+ * - Cap + extra: min(pool, officialCap + overCapExtra).
+ * - If a pending submission already exceeds that (e.g. after a lowered cap),
+ *   they may keep up to that prior count (not add more).
  */
 export function resolveAdvancementSelectionMax(options: {
   cap: number | null;
   totalRanked: number;
-  allowOverCap: boolean;
+  overCapExtra?: number;
   previousSubmittedCount?: number | null;
 }): number | null {
-  const { cap, totalRanked, allowOverCap, previousSubmittedCount } = options;
-  if (cap === null && !allowOverCap) return null;
-  if (allowOverCap) return totalRanked;
+  const { cap, totalRanked, overCapExtra = 0, previousSubmittedCount } = options;
+  if (cap === null) return null;
 
-  const official = resolveAdvancementCapMax(cap, totalRanked);
-  if (official === null) return null;
+  const extra = Math.max(0, Math.floor(overCapExtra));
+  const effectiveMax = Math.min(totalRanked, cap + extra);
 
   if (
     previousSubmittedCount != null &&
-    previousSubmittedCount > official &&
+    previousSubmittedCount > effectiveMax &&
     previousSubmittedCount <= totalRanked
   ) {
     return previousSubmittedCount;
   }
-  return official;
+  return effectiveMax;
 }
 
 function advancementTargetLabel(fromStage: AdvancementCapStage): string {
@@ -100,30 +94,21 @@ export function advancementPageDescription(
   fromStage: AdvancementFromStage | AdvancementCapStage,
   totalApplications: number,
   cap: number | null,
-  allowOverCap = false,
+  overCapExtra = 0,
 ): string {
   const officialMax = resolveAdvancementCapMax(cap, totalApplications);
   const target = advancementTargetLabel(fromStage);
   const workers = advancementWorkersLabel(fromStage);
-
-  if (cap === null && !allowOverCap) {
-    return `Your team's advancement limit has not been set yet. An admin must configure it before Directors can submit. ${workers} can still set panel recommendations.`;
-  }
-
-  if (allowOverCap) {
-    const limitNote =
-      cap === null
-        ? 'An admin has allowed advancement without a fixed limit'
-        : `Your team's limit is ${cap}, but an admin has allowed selecting past that limit`;
-    if (cap === null) {
-      return `${limitNote}. Directors may advance 1 or more applicants to ${target} (up to all ${totalApplications}). ${workers} set panel recommendations first.`;
-    }
-    const atLeast = officialMax ?? totalApplications;
-    return `${limitNote}. Directors must select at least ${atLeast} applicant${atLeast === 1 ? '' : 's'} to ${target} (and may select more, up to all ${totalApplications}). ${workers} set panel recommendations first.`;
-  }
+  const extra = Math.max(0, Math.floor(overCapExtra));
 
   if (cap === null) {
     return `Your team's advancement limit has not been set yet. An admin must configure it before Directors can submit. ${workers} can still set panel recommendations.`;
+  }
+
+  if (extra > 0) {
+    const atLeast = officialMax ?? totalApplications;
+    const atMost = Math.min(totalApplications, cap + extra);
+    return `Your team's limit is ${cap} (+${extra} extra). Directors must select at least ${atLeast} applicant${atLeast === 1 ? '' : 's'} to ${target} (and may select up to ${atMost}). ${workers} set panel recommendations first.`;
   }
 
   if (officialMax !== null && officialMax < cap) {

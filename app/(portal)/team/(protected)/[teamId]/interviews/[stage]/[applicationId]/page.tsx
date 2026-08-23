@@ -14,6 +14,7 @@ import {
   InterviewWorkspaceFullscreenButton,
   useInterviewWorkspaceFullscreen,
 } from '@/components/interview-workspace-fullscreen';
+import { PageTourHelpButton } from '@/components/page-tour';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent } from '@/components/page-shell';
 import { toast } from 'sonner';
@@ -422,11 +423,13 @@ export default function TeamInterviewScorePage({
     (stage === 'first_round' ? 'Group case' : 'Case');
 
   const layoutToggle = isGroupInterview ? (
-    <GroupInterviewLayoutToggle
-      value={layout}
-      onValueChange={updateLayout}
-      className="shrink-0 flex-nowrap"
-    />
+    <span data-tour="interview-layout">
+      <GroupInterviewLayoutToggle
+        value={layout}
+        onValueChange={updateLayout}
+        className="shrink-0 flex-nowrap"
+      />
+    </span>
   ) : null;
 
   const header = (
@@ -469,13 +472,16 @@ export default function TeamInterviewScorePage({
             )}
           </div>
           <div className="flex flex-1 items-center justify-end gap-3">
+            <PageTourHelpButton />
             <InterviewElapsedTimer {...elapsedTimer} />
             {layoutToggle}
-            <DocumentSaveStatusLine
-              status={saveStatus}
-              errorMessage={saveError}
-              savedLabel="Auto-saved"
-            />
+            <span data-tour="interview-autosave">
+              <DocumentSaveStatusLine
+                status={saveStatus}
+                errorMessage={saveError}
+                savedLabel="Auto-saved"
+              />
+            </span>
             {casePdfUrl ? (
               <>
                 <InterviewWorkspaceFullscreenButton
@@ -486,6 +492,7 @@ export default function TeamInterviewScorePage({
                   type="button"
                   variant="outline"
                   size="sm"
+                  data-tour="interview-case"
                   className="h-8 normal-case border-foreground/25 bg-background font-medium"
                   onClick={() => setCaseOpen(!caseOpen)}
                 >
@@ -497,6 +504,7 @@ export default function TeamInterviewScorePage({
               <Button
                 variant="ghost"
                 size="sm"
+                data-tour="interview-next"
                 onClick={() =>
                   router.push(`/team/${teamId}/interviews/${stage}/${data.nextApplicationId}`)
                 }
@@ -592,12 +600,12 @@ export default function TeamInterviewScorePage({
     : null;
 
   const notesContent = groupWorkspaceProps ? (
-    <div className="flex flex-col gap-6">
+    <div data-tour="interview-scores" className="flex flex-col gap-6">
       <GroupInterviewCandidateWorkspace {...groupWorkspaceProps} />
       {submitError && <StatusBanner message={submitError} type="error" />}
     </div>
   ) : (
-    <div className="uma-stack-page">
+    <div data-tour="interview-scores" className="uma-stack-page">
       {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
       {data.slot && (
         <p className="text-sm text-muted-foreground">
@@ -628,6 +636,7 @@ export default function TeamInterviewScorePage({
 
   const groupFooter = (
     <div
+      data-tour="interview-submit"
       className={cn(
         'flex items-center justify-between gap-4',
         casePdfUrl
@@ -663,14 +672,16 @@ export default function TeamInterviewScorePage({
   );
 
   const singleFooter = (
-    <GradingSubmitFooter
-      variant={casePdfUrl ? 'embedded' : 'sticky'}
-      scoredCount={scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}
-      totalScored={scoreFieldList.length}
-      onSubmit={handleSingleSubmit}
-      submitting={submitting}
-      locked={scoringLocked}
-    />
+    <div data-tour="interview-submit">
+      <GradingSubmitFooter
+        variant={casePdfUrl ? 'embedded' : 'sticky'}
+        scoredCount={scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}
+        totalScored={scoreFieldList.length}
+        onSubmit={handleSingleSubmit}
+        submitting={submitting}
+        locked={scoringLocked}
+      />
+    </div>
   );
 
   const footer = isGroupInterview ? groupFooter : singleFooter;
@@ -684,6 +695,7 @@ export default function TeamInterviewScorePage({
         <InterviewStickyLead>
           {header}
           <InterviewFullscreenEvalBar>
+            <PageTourHelpButton />
             <InterviewElapsedTimer {...elapsedTimer} />
             {layoutToggle}
             <InterviewWorkspaceExitFullscreenButton onExit={exitFullscreen} />
@@ -691,6 +703,7 @@ export default function TeamInterviewScorePage({
               type="button"
               variant="outline"
               size="sm"
+              data-tour="interview-case"
               className="h-8 normal-case border-foreground/25 bg-background font-medium"
               onClick={() => setCaseOpen(!caseOpen)}
             >
@@ -713,7 +726,7 @@ export default function TeamInterviewScorePage({
                   fullscreen={fullscreen}
                   notesChrome={chrome}
                   notes={
-                    <div className="flex flex-col gap-6">
+                    <div data-tour="interview-scores" className="flex flex-col gap-6">
                       {body}
                       {submitError && <StatusBanner message={submitError} type="error" />}
                     </div>

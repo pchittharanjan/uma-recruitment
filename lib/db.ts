@@ -232,6 +232,12 @@ const MIGRATIONS = [
         CHECK (first_round_allow_over_cap IN (0, 1)),
       deliberations_allow_over_cap INTEGER NOT NULL DEFAULT 0
         CHECK (deliberations_allow_over_cap IN (0, 1)),
+      application_over_cap_extra INTEGER NOT NULL DEFAULT 0
+        CHECK (application_over_cap_extra >= 0),
+      first_round_over_cap_extra INTEGER NOT NULL DEFAULT 0
+        CHECK (first_round_over_cap_extra >= 0),
+      deliberations_over_cap_extra INTEGER NOT NULL DEFAULT 0
+        CHECK (deliberations_over_cap_extra >= 0),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_by INTEGER REFERENCES users(id)
     )`,
@@ -239,6 +245,15 @@ const MIGRATIONS = [
     'ALTER TABLE team_advancement_caps ADD COLUMN application_allow_over_cap INTEGER NOT NULL DEFAULT 0 CHECK (application_allow_over_cap IN (0, 1))',
     'ALTER TABLE team_advancement_caps ADD COLUMN first_round_allow_over_cap INTEGER NOT NULL DEFAULT 0 CHECK (first_round_allow_over_cap IN (0, 1))',
     'ALTER TABLE team_advancement_caps ADD COLUMN deliberations_allow_over_cap INTEGER NOT NULL DEFAULT 0 CHECK (deliberations_allow_over_cap IN (0, 1))',
+    'ALTER TABLE team_advancement_caps ADD COLUMN application_over_cap_extra INTEGER NOT NULL DEFAULT 0 CHECK (application_over_cap_extra >= 0)',
+    'ALTER TABLE team_advancement_caps ADD COLUMN first_round_over_cap_extra INTEGER NOT NULL DEFAULT 0 CHECK (first_round_over_cap_extra >= 0)',
+    'ALTER TABLE team_advancement_caps ADD COLUMN deliberations_over_cap_extra INTEGER NOT NULL DEFAULT 0 CHECK (deliberations_over_cap_extra >= 0)',
+    `CREATE TABLE IF NOT EXISTS org_over_cap_code (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      code_hash TEXT NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_by INTEGER REFERENCES users(id)
+    )`,
     "ALTER TABLE applications ADD COLUMN stage TEXT NOT NULL DEFAULT 'application'",
     `CREATE TABLE IF NOT EXISTS coffee_chats (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -308,6 +323,14 @@ const MIGRATIONS = [
     'CREATE INDEX IF NOT EXISTS idx_rounds_team_status ON rounds(team_id, status)',
     'CREATE INDEX IF NOT EXISTS idx_access_grants_user ON access_grants(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_assignments_application_stage ON assignments(application_id, stage)',
+    `ALTER TABLE applications ADD COLUMN rejected_from_stage TEXT
+      CHECK (
+        rejected_from_stage IS NULL
+        OR rejected_from_stage IN ('application', 'first_round', 'final_round', 'deliberations')
+      )`,
+    `CREATE INDEX IF NOT EXISTS idx_applications_rejected_from
+      ON applications(team_id, round_id, rejected_from_stage)
+      WHERE stage = 'rejected'`,
 ];
 
 async function scoresNeedsScaleMigration(
@@ -362,6 +385,117 @@ async function runMigrations(db: ReturnType<typeof getDb>): Promise<void> {
   await backfillCoffeeChatsNullRoundId(db);
   await migrateRoundCommunicationsToOutcomeEmails(db);
   await migrateScoresWidenScale(db);
+  await backfillRejectedFromStage(db);
+}
+
+/** Infer cut-stage for existing rejected rows (same heuristics as outcome emails). */
+async function backfillRejectedFromStage(db: ReturnType<typeof getDb>): Promise<void> {
+  try {
+    // Anyone still on a deliberations board was cut at final selection.
+    const boards = await db.execute({
+      sql: `SELECT team_id, round_id, layout_json FROM deliberation_boards`,
+    });
+    const boardAppIds = new Set<string>();
+    for (const row of boards.rows) {
+      const teamId = row.team_id as number;
+      const roundId = row.round_id as number;
+      const raw = row.layout_json;
+      if (typeof raw !== 'string' || !raw.trim()) continue;
+      try {
+        const layout = JSON.parse(raw) as {
+          columns?: Record<string, unknown>;
+          rejected?: unknown;
+        };
+        const ids: number[] = [];
+        if (layout.columns && typeof layout.columns === 'object') {
+          for (const value of Object.values(layout.columns)) {
+            if (Array.isArray(value)) {
+              for (const id of value) {
+                if (typeof id === 'number' && Number.isFinite(id)) ids.push(id);
+              }
+            }
+          }
+        }
+        if (Array.isArray(layout.rejected)) {
+          for (const id of layout.rejected) {
+            if (typeof id === 'number' && Number.isFinite(id)) ids.push(id);
+          }
+        }
+        for (const id of ids) {
+          boardAppIds.add(`${teamId}:${roundId}:${id}`);
+        }
+      } catch {
+        // ignore malformed layout
+      }
+    }
+
+    if (boardAppIds.size > 0) {
+      const rejected = await db.execute({
+        sql: `SELECT id, team_id, round_id FROM applications
+              WHERE stage = 'rejected' AND rejected_from_stage IS NULL`,
+      });
+      for (const row of rejected.rows) {
+        const id = row.id as number;
+        const teamId = row.team_id as number;
+        const roundId = row.round_id as number;
+        if (boardAppIds.has(`${teamId}:${roundId}:${id}`)) {
+          await db.execute({
+            sql: `UPDATE applications SET rejected_from_stage = 'deliberations' WHERE id = ?`,
+            args: [id],
+          });
+        }
+      }
+    }
+
+    // Deliberations / final cuts: had final-round interview work.
+    await db.execute({
+      sql: `UPDATE applications
+            SET rejected_from_stage = 'deliberations'
+            WHERE stage = 'rejected'
+              AND rejected_from_stage IS NULL
+              AND (
+                EXISTS (
+                  SELECT 1 FROM assignments a
+                  WHERE a.application_id = applications.id AND a.stage = 'final_round'
+                )
+                OR EXISTS (
+                  SELECT 1 FROM interview_slots s
+                  WHERE s.application_id = applications.id AND s.stage = 'final_round'
+                )
+              )`,
+    });
+    // First-round cuts: had first-round work, not already classified as deliberations.
+    await db.execute({
+      sql: `UPDATE applications
+            SET rejected_from_stage = 'first_round'
+            WHERE stage = 'rejected'
+              AND rejected_from_stage IS NULL
+              AND (
+                EXISTS (
+                  SELECT 1 FROM assignments a
+                  WHERE a.application_id = applications.id AND a.stage = 'first_round'
+                )
+                OR EXISTS (
+                  SELECT 1 FROM interview_slots s
+                  WHERE s.application_id = applications.id AND s.stage = 'first_round'
+                )
+              )`,
+    });
+    // Application cuts: never interviewed.
+    await db.execute({
+      sql: `UPDATE applications
+            SET rejected_from_stage = 'application'
+            WHERE stage = 'rejected' AND rejected_from_stage IS NULL`,
+    });
+    // Clear on anyone who is no longer rejected.
+    await db.execute({
+      sql: `UPDATE applications
+            SET rejected_from_stage = NULL
+            WHERE stage != 'rejected' AND rejected_from_stage IS NOT NULL`,
+    });
+  } catch {
+    // Column may not exist yet on brand-new DBs before ALTER runs; ignore.
+  }
 }
 
 /** Copy legacy round_communications rows into application-stage outcome emails. */
@@ -617,6 +751,12 @@ export type ApplicationStage =
   | 'deliberations'
   | 'advanced'
   | 'rejected';
+/** Pipeline gate a candidate was cut at when `stage = 'rejected'`. */
+export type RejectedFromStage =
+  | 'application'
+  | 'first_round'
+  | 'final_round'
+  | 'deliberations';
 export type AssignmentStage = 'application' | 'first_round' | 'final_round';
 export type AssignmentStatus = 'pending' | 'completed';
 export type FlagColor = 'red' | 'green';
@@ -669,6 +809,7 @@ export interface Application {
   team_id: number;
   fields: Record<string, string>;
   stage: ApplicationStage;
+  rejected_from_stage: RejectedFromStage | null;
   admin_note: string | null;
   final_score: number | null;
   rank: number | null;
@@ -769,6 +910,7 @@ export function rowToApplication(row: Row): Application {
     team_id: row.team_id as number,
     fields: parseJsonFields(row.fields),
     stage: row.stage as ApplicationStage,
+    rejected_from_stage: (row.rejected_from_stage as RejectedFromStage | null) ?? null,
     admin_note: (row.admin_note as string | null) ?? null,
     final_score: (row.final_score as number | null) ?? null,
     rank: (row.rank as number | null) ?? null,

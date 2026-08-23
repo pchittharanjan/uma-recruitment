@@ -521,7 +521,7 @@ export default function AdminNewUserPage() {
               </div>
 
               <TabsContent value="single" className="m-0">
-                <form onSubmit={handleSingleSubmit} className="space-y-6 p-6">
+                <form onSubmit={handleSingleSubmit} className="space-y-6 p-6" data-tour="users-form">
                   <UserFormBody
                     idPrefix="add-page"
                     name={name}
@@ -541,7 +541,7 @@ export default function AdminNewUserPage() {
                     <Button type="button" variant="outline" onClick={() => router.push('/admin/users')}>
                       Cancel
                     </Button>
-                    <LoadingButton type="submit" loading={submitting}>
+                    <LoadingButton type="submit" loading={submitting} data-tour="users-save">
                       Add user
                     </LoadingButton>
                   </div>
@@ -778,6 +778,7 @@ Alex Chen\talex@berkeley.edu\tExec\tStrategy,Events`}
                         Cancel
                       </Button>
                       <LoadingButton
+                        data-tour="users-save"
                         type="button"
                         loading={bulkSubmitting}
                         disabled={validBulkRows.length === 0}

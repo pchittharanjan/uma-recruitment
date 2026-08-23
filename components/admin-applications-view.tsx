@@ -21,22 +21,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { ResizableSidePanel } from '@/components/resizable-side-panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ApplicationStage } from '@/lib/db';
 import { displayApplicantId } from '@/lib/applicant-id';
-import { applicationStageLabel } from '@/lib/stages';
+import { applicationPipelineStatusLabel } from '@/lib/stages';
 import { cachedJsonFetch, peekCachedJson } from '@/lib/client-fetch-cache';
 import { teamBadgeClass } from '@/lib/team-colors';
+import type { RejectedFromStage } from '@/lib/db';
 
 interface Team {
   id: number;
@@ -47,6 +42,7 @@ interface ApplicationRow {
   id: number;
   rowIndex: number;
   stage: ApplicationStage;
+  rejectedFromStage: RejectedFromStage | null;
   teamId: number;
   teamName: string;
   roundId: number;
@@ -83,7 +79,10 @@ const STAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'final_round', label: 'Final Round Interview' },
   { value: 'deliberations', label: 'Deliberations' },
   { value: 'advanced', label: 'Advanced' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'rejected', label: 'Rejected (all)' },
+  { value: 'rejected_at_application', label: 'Rejected at Application' },
+  { value: 'rejected_at_first_round', label: 'Rejected at First Round' },
+  { value: 'rejected_at_deliberations', label: 'Rejected at Deliberations' },
 ];
 
 function stageBadgeColor(stage: ApplicationStage): 'blue' | 'green' | 'gray' | 'yellow' | 'orange' {
@@ -126,8 +125,11 @@ function compareApplications(
       cmp = a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' });
       break;
     case 'stage':
-      cmp = applicationStageLabel(a.stage).localeCompare(applicationStageLabel(b.stage), undefined, {
-        sensitivity: 'base'});
+      cmp = applicationPipelineStatusLabel(a.stage, a.rejectedFromStage).localeCompare(
+        applicationPipelineStatusLabel(b.stage, b.rejectedFromStage),
+        undefined,
+        { sensitivity: 'base' },
+      );
       break;
     case 'score':
       cmp = (a.finalScore ?? -1) - (b.finalScore ?? -1);
@@ -231,21 +233,7 @@ function DetailStat({
   );
 }
 
-const SHEET_WIDTH_KEY = 'uma-application-sheet-width';
-const SHEET_WIDTH_MIN = 380;
-const SHEET_WIDTH_DEFAULT = 540;
-
-function clampSheetWidth(width: number): number {
-  const max = typeof window === 'undefined' ? 720 : Math.round(window.innerWidth * 0.85);
-  return Math.min(max, Math.max(SHEET_WIDTH_MIN, Math.round(width)));
-}
-
-function readSheetWidth(): number {
-  if (typeof window === 'undefined') return SHEET_WIDTH_DEFAULT;
-  const raw = window.localStorage.getItem(SHEET_WIDTH_KEY);
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-  return clampSheetWidth(Number.isFinite(parsed) ? parsed : SHEET_WIDTH_DEFAULT);
-}
+const PANEL_WIDTH_KEY = 'uma-application-sheet-width';
 
 function otherTeamsForApplicant(
   app: ApplicationRow,
@@ -326,17 +314,18 @@ export function AdminApplicationsView({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [sheetWidth, setSheetWidth] = useState(SHEET_WIDTH_DEFAULT);
-  const sheetDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-
-  useEffect(() => {
-    setSheetWidth(readSheetWidth());
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Skip the first default-query fetch when SSR/cache already populated the list.
+  // Do not skip when returning to default after a search/filter — otherwise the
+  // filtered rows stick around because applications.length > 0.
+  const skipInitialDefaultFetchRef = useRef(
+    !searchQuery && teamFilter === initialTeamFilter && stageFilter === 'all',
+  );
 
   const fetchApplications = useCallback(
     async (opts?: { append?: boolean; offset?: number; signal?: AbortSignal }) => {
@@ -392,12 +381,18 @@ export function AdminApplicationsView({
   useEffect(() => {
     const isDefaultQuery =
       !searchQuery && teamFilter === initialTeamFilter && stageFilter === 'all';
-    if (isDefaultQuery && applications.length > 0) return;
+    if (isDefaultQuery && skipInitialDefaultFetchRef.current && applications.length > 0) {
+      skipInitialDefaultFetchRef.current = false;
+      return;
+    }
+    skipInitialDefaultFetchRef.current = false;
 
     const controller = new AbortController();
     void fetchApplications({ append: false, offset: 0, signal: controller.signal });
     return () => controller.abort();
-  }, [fetchApplications, searchQuery, teamFilter, stageFilter, initialTeamFilter, applications.length]);
+    // applications.length is only read for the one-time initial skip above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchApplications, searchQuery, teamFilter, stageFilter, initialTeamFilter]);
 
   const sortedApplications = useMemo(
     () => [...applications].sort((a, b) => compareApplications(a, b, sortKey, sortDir)),
@@ -488,8 +483,8 @@ export function AdminApplicationsView({
                 {applications.length} of {applications.length < total ? total : allCount || total}
               </TitleCount>
             </CardTitle>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <div className="relative min-w-[200px] flex-1">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" data-tour="apps-filters">
+              <div className="relative min-w-[200px] flex-1" data-tour="apps-search">
                 <Label htmlFor="app-search" className="sr-only">
                   Search
                 </Label>
@@ -550,6 +545,7 @@ export function AdminApplicationsView({
                   'overflow-hidden px-(--card-spacing) transition-opacity',
                   loading && 'pointer-events-none opacity-60',
                 )}
+                data-tour="apps-table"
               >
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
@@ -673,7 +669,10 @@ export function AdminApplicationsView({
                         </td>
                         <td className="min-w-0 overflow-hidden p-3">
                           <StageBadge
-                            label={applicationStageLabel(app.stage)}
+                            label={applicationPipelineStatusLabel(
+                              app.stage,
+                              app.rejectedFromStage,
+                            )}
                             color={stageBadgeColor(app.stage)}
                             size="compact"
                           />
@@ -712,7 +711,7 @@ export function AdminApplicationsView({
         </Card>
       </PageSection>
 
-      <Sheet
+      <ResizableSidePanel
         open={selectedId !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -722,197 +721,168 @@ export function AdminApplicationsView({
             setDetailError('');
           }
         }}
+        side="right"
+        storageKey={PANEL_WIDTH_KEY}
+        defaultWidth={540}
+        minWidth={320}
+        maxWidthRatio={0.92}
+        title={sheetApp?.candidateName}
+        description={
+          sheetApp
+            ? `Application ID ${sheetApp.id} · ${sheetApp.teamName} · Applicant #${displayApplicantId(sheetApp.rowIndex)} · ${sheetApp.candidateEmail}`
+            : undefined
+        }
       >
-        <SheetContent
-          side="right"
-          size="lg"
-          className="relative gap-0 overflow-hidden p-0 data-[side=right]:w-auto data-[side=right]:max-w-[85vw] data-[side=right]:min-w-[22rem] data-[side=right]:sm:w-auto"
-          style={{ width: sheetWidth }}
-        >
-          <button
-            type="button"
-            aria-label="Drag to resize panel"
-            className="absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize border-0 bg-transparent p-0 hover:bg-primary/25"
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              event.preventDefault();
-              sheetDragRef.current = { startX: event.clientX, startWidth: sheetWidth };
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              const drag = sheetDragRef.current;
-              if (!drag) return;
-              const next = clampSheetWidth(drag.startWidth - (event.clientX - drag.startX));
-              setSheetWidth(next);
-            }}
-            onPointerUp={(event) => {
-              const drag = sheetDragRef.current;
-              sheetDragRef.current = null;
-              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                event.currentTarget.releasePointerCapture(event.pointerId);
-              }
-              if (!drag) return;
-              const next = clampSheetWidth(drag.startWidth - (event.clientX - drag.startX));
-              setSheetWidth(next);
-              window.localStorage.setItem(SHEET_WIDTH_KEY, String(next));
-            }}
-          />
-          {!sheetApp ? (
-            <div className="space-y-4 px-6 py-6" role="status" aria-label="Loading">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-72" />
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              <SheetHeader className="shrink-0 space-y-1 border-b border-border/70 px-6 py-4 pr-14">
-                <SheetTitle className="truncate text-lg">{sheetApp.candidateName}</SheetTitle>
-                <SheetDescription className="truncate">
-                  Application ID {sheetApp.id} · {sheetApp.teamName} · Applicant #
-                  {displayApplicantId(sheetApp.rowIndex)} · {sheetApp.candidateEmail}
-                </SheetDescription>
-              </SheetHeader>
+        {!sheetApp ? (
+          <div className="space-y-4 px-5 py-6 sm:px-6" role="status" aria-label="Loading">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-5 sm:px-6">
+              {detailError && <StatusBanner message={detailError} type="error" />}
 
-              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
-                {detailError && <StatusBanner message={detailError} type="error" />}
-
-                <dl className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl bg-muted/40 px-4 py-4">
-                  <DetailStat
-                    label="Person"
-                    tooltip="The candidate. “Also applied to …” means they have another team file."
-                  >
-                    <span className="block truncate">{sheetApp.candidateName}</span>
-                    {otherTeamsForApplicant(sheetApp, teamsByEmail).length > 0 && (
-                      <span className="mt-0.5 block truncate text-sm font-normal text-muted-foreground">
-                        Also applied to {otherTeamsForApplicant(sheetApp, teamsByEmail).join(', ')}
-                      </span>
+              <dl className="mb-6 grid grid-cols-1 gap-x-6 gap-y-4 rounded-xl bg-muted/40 px-4 py-4 @sm:grid-cols-2">
+                <DetailStat
+                  label="Person"
+                  tooltip="The candidate. “Also applied to …” means they have another team file."
+                >
+                  <span className="block truncate">{sheetApp.candidateName}</span>
+                  {otherTeamsForApplicant(sheetApp, teamsByEmail).length > 0 && (
+                    <span className="mt-0.5 block truncate text-sm font-normal text-muted-foreground">
+                      Also applied to {otherTeamsForApplicant(sheetApp, teamsByEmail).join(', ')}
+                    </span>
+                  )}
+                </DetailStat>
+                <DetailStat
+                  label="This application"
+                  tooltip="Unique file number for this team application."
+                >
+                  <span className="font-mono tabular-nums">Application ID {sheetApp.id}</span>
+                </DetailStat>
+                <DetailStat
+                  label="Applicant #"
+                  tooltip="This team's number for this person. What graders see instead of a name."
+                >
+                  <span className="font-mono tabular-nums">
+                    #{displayApplicantId(sheetApp.rowIndex)}
+                  </span>
+                </DetailStat>
+                <DetailStat label="Team" tooltip="Which team this application is for.">
+                  <Badge className={cn('border-0 font-medium', teamBadgeClass(sheetApp.teamName))}>
+                    {sheetApp.teamName}
+                  </Badge>
+                </DetailStat>
+                <DetailStat
+                  label="Stage"
+                  tooltip="Where they are in this team's pipeline. Rejected shows the stage they were cut at."
+                >
+                  <StageBadge
+                    label={applicationPipelineStatusLabel(
+                      sheetApp.stage,
+                      sheetApp.rejectedFromStage,
                     )}
-                  </DetailStat>
-                  <DetailStat
-                    label="This application"
-                    tooltip="Unique file number for this team application."
-                  >
-                    <span className="font-mono tabular-nums">Application ID {sheetApp.id}</span>
-                  </DetailStat>
-                  <DetailStat
-                    label="Applicant #"
-                    tooltip="This team's number for this person. What graders see instead of a name."
-                  >
-                    <span className="font-mono tabular-nums">
-                      #{displayApplicantId(sheetApp.rowIndex)}
-                    </span>
-                  </DetailStat>
-                  <DetailStat label="Team" tooltip="Which team this application is for.">
-                    <Badge className={cn('border-0 font-medium', teamBadgeClass(sheetApp.teamName))}>
-                      {sheetApp.teamName}
-                    </Badge>
-                  </DetailStat>
-                  <DetailStat
-                    label="Stage"
-                    tooltip="Where they are in this team's pipeline."
-                  >
-                    <StageBadge
-                      label={applicationStageLabel(sheetApp.stage)}
-                      color={stageBadgeColor(sheetApp.stage)}
-                      size="compact"
-                    />
-                  </DetailStat>
-                  <DetailStat
-                    label="Score"
-                    tooltip="Average score for this application on this team."
-                  >
-                    <span className="tabular-nums">
-                      {sheetApp.finalScore != null ? sheetApp.finalScore.toFixed(2) : '-'}
-                    </span>
-                  </DetailStat>
-                  <DetailStat
-                    label="Rank"
-                    tooltip="Place on this team's scored list. 1 is the highest score."
-                  >
-                    <span className="tabular-nums">{sheetApp.rank ?? '-'}</span>
-                  </DetailStat>
-                  <DetailStat
-                    label="Graders"
-                    tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
-                  >
-                    <span className="tabular-nums">
-                      {sheetApp.graderCompleted}/{sheetApp.graderTotal} completed
-                    </span>
-                  </DetailStat>
-                </dl>
+                    color={stageBadgeColor(sheetApp.stage)}
+                    size="compact"
+                  />
+                </DetailStat>
+                <DetailStat
+                  label="Score"
+                  tooltip="Average score for this application on this team."
+                >
+                  <span className="tabular-nums">
+                    {sheetApp.finalScore != null ? sheetApp.finalScore.toFixed(2) : '-'}
+                  </span>
+                </DetailStat>
+                <DetailStat
+                  label="Rank"
+                  tooltip="Place on this team's scored list. 1 is the highest score."
+                >
+                  <span className="tabular-nums">{sheetApp.rank ?? '-'}</span>
+                </DetailStat>
+                <DetailStat
+                  label="Graders"
+                  tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
+                >
+                  <span className="tabular-nums">
+                    {sheetApp.graderCompleted}/{sheetApp.graderTotal} completed
+                  </span>
+                </DetailStat>
+              </dl>
 
-                {sheetApp.adminNote && (
-                  <div className="mb-6">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Admin Note
-                    </p>
-                    <p className="display-field">{sheetApp.adminNote}</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Application fields
+              {sheetApp.adminNote && (
+                <div className="mb-6">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Admin Note
                   </p>
-                  {detailLoading ? (
-                    <div className="space-y-2" role="status" aria-label="Loading">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-5/6" />
-                      <Skeleton className="h-4 w-4/6" />
-                      <Skeleton className="h-24 w-full" />
-                    </div>
-                  ) : detail ? (
-                    <ApplicationFieldsList fields={detail.fields} />
-                  ) : detailError ? (
-                    <p className="text-sm text-muted-foreground">
-                      Application fields could not be loaded.
-                    </p>
-                  ) : null}
+                  <p className="display-field">{sheetApp.adminNote}</p>
                 </div>
+              )}
 
-                <div className="mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    nativeButton={false}
-                    render={<Link href={`/admin/teams/${sheetApp.teamId}`} />}
-                  >
-                    Open team
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:bg-destructive/15 hover:text-destructive"
-                    onClick={() => setDeleteOpen(true)}
-                    disabled={!detail}
-                  >
-                    <Trash2Icon className="size-4" />
-                    Delete
-                  </Button>
-                </div>
+              <div>
+                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Application fields
+                </p>
+                {detailLoading ? (
+                  <div className="space-y-2" role="status" aria-label="Loading">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-4/6" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                ) : detail ? (
+                  <ApplicationFieldsList fields={detail.fields} />
+                ) : detailError ? (
+                  <p className="text-sm text-muted-foreground">
+                    Application fields could not be loaded.
+                  </p>
+                ) : null}
               </div>
 
-              {detail && (
-                <DestructiveConfirmDialog
-                  open={deleteOpen}
-                  onOpenChange={setDeleteOpen}
-                  title="Delete application?"
-                  description={
-                    <>
-                      Remove <strong>{detail.candidateName}</strong> (Application ID {detail.id},
-                      Applicant #{displayApplicantId(detail.rowIndex)} on {detail.teamName})? This
-                      deletes scores, assignments, and flags for this application. The person
-                      record stays if they applied to other teams.
-                    </>
-                  }
-                  confirmLabel="Delete application"
-                  onConfirm={handleDelete}
-                />
-              )}
+              <div className="mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-4" data-tour="apps-actions">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  nativeButton={false}
+                  render={<Link href={`/admin/teams/${sheetApp.teamId}`} />}
+                >
+                  Open team
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/15 hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={!detail}
+                >
+                  <Trash2Icon className="size-4" />
+                  Delete
+                </Button>
+              </div>
             </div>
-          )}
-        </SheetContent>
-      </Sheet>
+
+            {detail && (
+              <DestructiveConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title="Delete application?"
+                description={
+                  <>
+                    Remove <strong>{detail.candidateName}</strong> (Application ID {detail.id},
+                    Applicant #{displayApplicantId(detail.rowIndex)} on {detail.teamName})? This
+                    deletes scores, assignments, and flags for this application. The person
+                    record stays if they applied to other teams.
+                  </>
+                }
+                confirmLabel="Delete application"
+                onConfirm={handleDelete}
+              />
+            )}
+          </div>
+        )}
+      </ResizableSidePanel>
     </PageContainer>
   );
 }

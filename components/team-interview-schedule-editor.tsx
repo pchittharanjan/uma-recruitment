@@ -894,7 +894,7 @@ export function TeamInterviewScheduleEditor({
         />
       )}
 
-      <Card>
+      <Card data-tour="schedule-day">
         <CardHeader className="border-b border-border/50 pb-3">
           <CardTitle className="text-foreground">Interview Day</CardTitle>
         </CardHeader>
@@ -963,7 +963,7 @@ export function TeamInterviewScheduleEditor({
       </Card>
 
       <PageSection>
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-tour="schedule-editor">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border/50">
             <CardTitle className="flex items-baseline gap-2.5 text-foreground">
               Schedule
@@ -996,6 +996,7 @@ export function TeamInterviewScheduleEditor({
                       size="sm"
                       className="border border-border bg-popover text-foreground uma-hover-on-panel hover:text-foreground"
                       disabled={saving || simulating}
+                      data-tour="schedule-simulate"
                     />
                   }
                   triggerLabel="Simulate Schedule"
@@ -1016,7 +1017,10 @@ export function TeamInterviewScheduleEditor({
             </div>
           </CardHeader>
           {allSlots.length > 0 && (
-            <div className="border-b border-border/50 bg-muted/20 px-4 py-3">
+            <div
+              className="border-b border-border/50 bg-muted/20 px-4 py-3"
+              data-tour="schedule-assign"
+            >
               <p className={cn('mb-2 flex items-baseline gap-2.5', SCHEDULE_SECTION_LABEL_CLASS)}>
                 Unassigned Applicants
                 <TitleCount>{unassignedApplicants.length}</TitleCount>
@@ -1197,11 +1201,14 @@ export function TeamInterviewScheduleEditor({
                   disabled={
                     !scheduleDirty || saving || scheduleValidation.messages.length > 0
                   }
+                  data-tour="schedule-save"
                 >
                   {saveButtonLabel(saving, scheduleDirty, 'Save schedule')}
                 </LoadingButton>
               ) : (
-                <SavedIndicator />
+                <span data-tour="schedule-save">
+                  <SavedIndicator />
+                </span>
               )}
             </div>
           )}

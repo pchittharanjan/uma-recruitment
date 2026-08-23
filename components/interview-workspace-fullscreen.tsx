@@ -56,6 +56,7 @@ export function InterviewWorkspaceFullscreenButton({
       type="button"
       variant="outline"
       size="sm"
+      data-tour="interview-fullscreen"
       className={cn(
         'h-8 normal-case border-foreground/25 bg-background font-medium',
         className,

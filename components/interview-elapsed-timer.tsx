@@ -16,6 +16,7 @@ export function InterviewElapsedTimer({
   return (
     <div
       className={cn('inline-flex h-8 shrink-0 items-center gap-1', className)}
+      data-tour="interview-timer"
     >
       <div
         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-foreground/15 bg-background px-2.5 text-xs font-medium tabular-nums text-muted-foreground sm:text-sm"

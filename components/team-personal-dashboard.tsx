@@ -339,7 +339,7 @@ export function TeamPersonalDashboard({
       )}
 
       {totalAssigned > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="team-overview-progress">
           <div className="flex items-baseline justify-between gap-4">
             <p className="font-heading text-base font-medium text-foreground">
               Your Current Progress
@@ -368,7 +368,7 @@ export function TeamPersonalDashboard({
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="team-overview-work">
         <p className="font-heading text-base font-medium text-foreground">Your Work</p>
         {data.work.length > 0 ? (
           <div className="space-y-3">
@@ -483,7 +483,10 @@ export function TeamPersonalDashboard({
 
                     {/* Action buttons inline at bottom of content — no border-top strip */}
                     {(showPendingDetails || showBottomCta) && (
-                      <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                      <div
+                        className="flex flex-wrap items-center justify-end gap-2 pt-2"
+                        data-tour="team-overview-next"
+                      >
                         {showPendingDetails && (
                           <NavLinkButton variant="secondary" size="sm" href={area.href}>
                             View all

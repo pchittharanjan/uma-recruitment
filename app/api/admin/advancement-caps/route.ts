@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
 import {
+  isOverCapCodeSet,
   listTeamAdvancementCaps,
   upsertTeamAdvancementCaps,
 } from '@/lib/team-advancement-caps';
@@ -15,8 +16,11 @@ export async function GET(req: NextRequest) {
     const user = await requireAuth(req, { roles: ['admin'] });
     if (!user) return unauthorized();
 
-    const teams = await listTeamAdvancementCaps();
-    return NextResponse.json({ teams });
+    const [teams, overCapCodeSet] = await Promise.all([
+      listTeamAdvancementCaps(),
+      isOverCapCodeSet(),
+    ]);
+    return NextResponse.json({ teams, overCapCodeSet });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -48,18 +52,9 @@ export async function PATCH(req: NextRequest) {
           body.deliberationsCap === undefined
             ? undefined
             : (body.deliberationsCap as number | null),
-        applicationAllowOverCap:
-          body.applicationAllowOverCap === undefined
-            ? undefined
-            : Boolean(body.applicationAllowOverCap),
-        firstRoundAllowOverCap:
-          body.firstRoundAllowOverCap === undefined
-            ? undefined
-            : Boolean(body.firstRoundAllowOverCap),
-        deliberationsAllowOverCap:
-          body.deliberationsAllowOverCap === undefined
-            ? undefined
-            : Boolean(body.deliberationsAllowOverCap),
+        clearApplicationOverCapExtra: Boolean(body.clearApplicationOverCapExtra),
+        clearFirstRoundOverCapExtra: Boolean(body.clearFirstRoundOverCapExtra),
+        clearDeliberationsOverCapExtra: Boolean(body.clearDeliberationsOverCapExtra),
       },
       user.id,
     );

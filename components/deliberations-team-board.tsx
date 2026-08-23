@@ -27,6 +27,7 @@ interface DeliberationsResponse {
   selectionComplete?: boolean;
   canSave?: boolean;
   canFinalize?: boolean;
+  canRequestOverCap?: boolean;
   phasePreview?: boolean;
   pipelineClosed?: boolean;
   /** When set, overrides pipelineClosed for board interactivity (admin stays writable). */
@@ -185,10 +186,11 @@ export function DeliberationsTeamBoard({
         initialColumns={initialColumns}
         initialSavedLayout={savedLayout}
         acceptLimit={data.board.acceptLimit}
-        allowOverCap={data.board.allowOverCap}
+        overCapExtra={data.board.overCapExtra ?? 0}
         teamName={data.team.name}
         canSave={effectiveCanSave}
         canEditAcceptCap={effectiveCanSave}
+        canRequestOverCap={Boolean(data.canRequestOverCap) && !readOnly && !selectionComplete}
         canFinalize={effectiveCanFinalize}
         readOnly={readOnly}
         selectionComplete={selectionComplete}

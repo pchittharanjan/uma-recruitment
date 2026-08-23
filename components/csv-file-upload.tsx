@@ -88,7 +88,7 @@ export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUpl
   };
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-3" data-tour="import-upload">
       <input
         id="import-csv-upload"
         ref={fileInputRef}

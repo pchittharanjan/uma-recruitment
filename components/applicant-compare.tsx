@@ -239,7 +239,10 @@ export function ApplicantCompareBar({
   if (count === 0) return null
 
   return (
-    <div className="sticky top-0 z-20 flex w-full max-w-full flex-wrap items-center gap-2 rounded-xl border border-border bg-popover/95 px-3 py-2 backdrop-blur-sm">
+    <div
+      className="sticky top-0 z-20 flex w-full max-w-full flex-wrap items-center gap-2 rounded-xl border border-border bg-popover/95 px-3 py-2 backdrop-blur-sm"
+      data-tour="deliberations-compare"
+    >
       <Columns2Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <p className="text-sm font-medium text-foreground">
         {count} selected for compare

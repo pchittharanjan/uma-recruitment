@@ -19,12 +19,12 @@ import {
 } from '@/components/applicant-compare';
 import { DeliberationsCandidateDetailPanel, prefetchDeliberationsDetail } from '@/components/deliberations-candidate-detail';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
 import LoadingButton from '@/components/loading-button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -130,45 +130,89 @@ function parseCapInput(value: string): number | null {
 function AcceptCapBadge({
   count,
   acceptLimit,
-  allowOverCap,
+  overCapExtra,
   canEdit,
+  canRequestOverCap,
   teamId,
   readOnly,
   onSaved,
+  onOverCapExtraSaved,
 }: {
   count: number;
   acceptLimit: number | null;
-  allowOverCap: boolean;
+  overCapExtra: number;
   canEdit: boolean;
+  canRequestOverCap: boolean;
   teamId: number;
   readOnly: boolean;
-  onSaved: (cap: number | null, allowOver: boolean) => void;
+  onSaved: (cap: number | null) => void;
+  onOverCapExtraSaved: (extra: number) => void;
 }) {
-  const atCapacity = acceptLimit != null && count >= acceptLimit;
+  const effectiveMax =
+    acceptLimit == null ? null : acceptLimit + Math.max(0, overCapExtra);
+  const atCapacity = effectiveMax != null && count >= effectiveMax;
   const [open, setOpen] = useState(false);
+  const [goOverOpen, setGoOverOpen] = useState(false);
   const [draftCap, setDraftCap] = useState('');
-  const [draftOver, setDraftOver] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setDraftCap(acceptLimit === null ? '' : String(acceptLimit));
-    setDraftOver(allowOverCap);
-  }, [open, acceptLimit, allowOverCap]);
+  }, [open, acceptLimit]);
+
+  const badgeLabel =
+    acceptLimit != null
+      ? overCapExtra > 0
+        ? `${count}/${acceptLimit} +${overCapExtra}`
+        : `${count}/${acceptLimit}`
+      : String(count);
 
   const badge = (
     <Badge
-      variant={atCapacity && !allowOverCap ? 'destructive' : 'outline'}
+      variant={atCapacity ? 'destructive' : 'outline'}
       className={cn(
         'font-semibold tabular-nums',
-        (!atCapacity || allowOverCap) && 'border-foreground/25 bg-white text-foreground',
+        !atCapacity && 'border-foreground/25 bg-white text-foreground',
       )}
     >
-      {acceptLimit != null ? `${count}/${acceptLimit}` : count}
+      {badgeLabel}
     </Badge>
   );
 
-  if (!canEdit || readOnly) return badge;
+  const goOverControl =
+    canRequestOverCap && !readOnly && acceptLimit != null ? (
+      <>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="h-6 px-1.5 text-[0.7rem] text-muted-foreground"
+          data-tour="deliberations-over-cap"
+          onClick={() => setGoOverOpen(true)}
+        >
+          Go over limit
+        </Button>
+        <GoOverCapDialog
+          open={goOverOpen}
+          onOpenChange={setGoOverOpen}
+          teamId={teamId}
+          stage="deliberations"
+          officialCap={acceptLimit}
+          currentExtra={overCapExtra}
+          onSuccess={onOverCapExtraSaved}
+        />
+      </>
+    ) : null;
+
+  if (!canEdit || readOnly) {
+    return (
+      <div data-tour="deliberations-cap" className="flex items-center gap-0.5">
+        {badge}
+        {goOverControl}
+      </div>
+    );
+  }
 
   const handleSave = async () => {
     const cap = parseCapInput(draftCap);
@@ -184,18 +228,17 @@ function AcceptCapBadge({
         body: JSON.stringify({
           teamId,
           deliberationsCap: cap,
-          deliberationsAllowOverCap: draftOver,
         }),
       });
       const json = (await res.json()) as {
-        team?: { deliberationsCap?: number | null; deliberationsAllowOverCap?: boolean };
+        team?: { deliberationsCap?: number | null };
         error?: string;
       };
       if (!res.ok) {
         toast.error(json.error || 'Failed to save offer limit.');
         return;
       }
-      onSaved(json.team?.deliberationsCap ?? cap, Boolean(json.team?.deliberationsAllowOverCap));
+      onSaved(json.team?.deliberationsCap ?? cap);
       toast.success('Offer limit saved.');
       setOpen(false);
     } catch {
@@ -206,8 +249,9 @@ function AcceptCapBadge({
   };
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div data-tour="deliberations-cap" className="flex items-center gap-0.5">
       {badge}
+      {goOverControl}
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           render={
@@ -243,20 +287,8 @@ function AcceptCapBadge({
             />
             <p className="text-[0.7rem] leading-snug text-muted-foreground">
               Blank = no cap on Accept. Set a number to show the slot count (e.g. 0/6).
+              {overCapExtra > 0 ? ` Directors currently have +${overCapExtra} extra.` : ''}
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`accept-over-${teamId}`}
-              checked={draftOver}
-              onCheckedChange={(checked) => setDraftOver(checked === true)}
-            />
-            <Label
-              htmlFor={`accept-over-${teamId}`}
-              className="cursor-pointer text-xs font-normal text-muted-foreground"
-            >
-              Can go over limit
-            </Label>
           </div>
           <LoadingButton
             type="button"
@@ -329,6 +361,7 @@ function ApplicantCard({
   const card = (
     <Card
       size="sm"
+      data-tour={isOverlay ? undefined : 'deliberations-card'}
       onPointerDown={handlePointerDown}
       onClick={handleClick}
       onMouseEnter={() => {
@@ -453,11 +486,13 @@ interface DelibColumnProps extends Omit<ComponentProps<typeof KanbanColumn>, 'ch
   value: DeliberationsColumnId;
   candidates: DeliberationsCandidate[];
   acceptLimit: number | null;
-  allowOverCap?: boolean;
+  overCapExtra?: number;
   teamId?: number;
   canEditAcceptCap?: boolean;
+  canRequestOverCap?: boolean;
   readOnly?: boolean;
-  onAcceptCapSaved?: (cap: number | null, allowOver: boolean) => void;
+  onAcceptCapSaved?: (cap: number | null) => void;
+  onOverCapExtraSaved?: (extra: number) => void;
   compareIds?: Set<string>;
   isOverlay?: boolean;
   onOpenCandidate?: (candidate: DeliberationsCandidate) => void;
@@ -470,11 +505,13 @@ function DelibColumn({
   value,
   candidates,
   acceptLimit,
-  allowOverCap = false,
+  overCapExtra = 0,
   teamId,
   canEditAcceptCap = false,
+  canRequestOverCap = false,
   readOnly = false,
   onAcceptCapSaved,
+  onOverCapExtraSaved,
   compareIds,
   isOverlay,
   onOpenCandidate,
@@ -511,11 +548,13 @@ function DelibColumn({
               <AcceptCapBadge
                 count={candidates.length}
                 acceptLimit={acceptLimit}
-                allowOverCap={allowOverCap}
+                overCapExtra={overCapExtra}
                 canEdit={canEditAcceptCap && teamId != null}
+                canRequestOverCap={canRequestOverCap && teamId != null}
                 teamId={teamId ?? 0}
                 readOnly={readOnly}
-                onSaved={(cap, over) => onAcceptCapSaved?.(cap, over)}
+                onSaved={(cap) => onAcceptCapSaved?.(cap)}
+                onOverCapExtraSaved={(extra) => onOverCapExtraSaved?.(extra)}
               />
             ) : (
               <Badge
@@ -622,10 +661,11 @@ export function DeliberationsKanban({
   initialColumns,
   initialSavedLayout = null,
   acceptLimit: initialAcceptLimit,
-  allowOverCap: initialAllowOverCap = false,
+  overCapExtra: initialOverCapExtra = 0,
   teamName,
   canSave = true,
   canEditAcceptCap = false,
+  canRequestOverCap = false,
   canFinalize,
   readOnly = false,
   selectionComplete = false,
@@ -640,12 +680,14 @@ export function DeliberationsKanban({
   /** Last persisted layout from the server (null if never saved). */
   initialSavedLayout?: DeliberationsBoardLayout | null;
   acceptLimit: number | null;
-  allowOverCap?: boolean;
+  overCapExtra?: number;
   teamName: string;
   /** Admin-only: persist shared board. Non-admins can still rearrange locally. */
   canSave?: boolean;
   /** Admin-only: edit Accept offer limit from the board. Defaults to canSave. */
   canEditAcceptCap?: boolean;
+  /** Team portal: enter go-over code to raise Accept extra. */
+  canRequestOverCap?: boolean;
   /** Admin-only: lock Accept → offers. Hidden during phase preview. Defaults to canSave. */
   canFinalize?: boolean;
   /** Pipeline closed / archive — no local rearranges either. */
@@ -669,12 +711,12 @@ export function DeliberationsKanban({
   const allowFinalize = canFinalize ?? canSave;
   const effectiveCanEditAcceptCap = canEditAcceptCap ?? canSave;
   const [acceptLimit, setAcceptLimit] = useState(initialAcceptLimit);
-  const [allowOverCap, setAllowOverCap] = useState(initialAllowOverCap);
+  const [overCapExtra, setOverCapExtra] = useState(initialOverCapExtra);
 
   useEffect(() => {
     setAcceptLimit(initialAcceptLimit);
-    setAllowOverCap(initialAllowOverCap);
-  }, [initialAcceptLimit, initialAllowOverCap]);
+    setOverCapExtra(initialOverCapExtra);
+  }, [initialAcceptLimit, initialOverCapExtra]);
   const detailUrl =
     resolveDetailUrl ??
     ((applicationId: number) =>
@@ -879,13 +921,18 @@ export function DeliberationsKanban({
     }
 
     const movingIntoAccept = to === 'accept' && from !== 'accept';
+    const acceptMax =
+      acceptLimit == null ? null : acceptLimit + Math.max(0, overCapExtra);
     if (
       movingIntoAccept &&
-      acceptLimit != null &&
-      !allowOverCap &&
-      destItems.length >= acceptLimit
+      acceptMax != null &&
+      destItems.length >= acceptMax
     ) {
-      toast.error(`Accept is full: offer limit is ${acceptLimit} for ${teamName}.`);
+      toast.error(
+        overCapExtra > 0
+          ? `Accept is full: offer limit is ${acceptLimit} + ${overCapExtra} extra for ${teamName}.`
+          : `Accept is full: offer limit is ${acceptLimit} for ${teamName}.`,
+      );
       return;
     }
 
@@ -910,7 +957,10 @@ export function DeliberationsKanban({
   return (
     <div className="space-y-3">
       <div className="display-panel flex flex-wrap items-center gap-3 px-3 py-2.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+          data-tour="deliberations-sort"
+        >
           <span className="text-xs font-medium text-muted-foreground">Sort by</span>
           <ToggleGroup
             value={sortMetric ? [sortMetric] : []}
@@ -978,6 +1028,7 @@ export function DeliberationsKanban({
               onClick={handleSave}
               loading={saving}
               disabled={!isDirty || locked}
+              data-tour="deliberations-save"
             >
               Save
             </LoadingButton>
@@ -989,6 +1040,7 @@ export function DeliberationsKanban({
                   loading={finalizing}
                   disabled={acceptCount === 0 || finalizing}
                   onClick={() => setFinalizeOpen(true)}
+                  data-tour="deliberations-finalize"
                 >
                   Complete final selection
                 </LoadingButton>
@@ -1025,7 +1077,10 @@ export function DeliberationsKanban({
         }}
       />
 
-      <div className="overflow-x-auto overscroll-x-contain">
+      <div
+        data-tour="deliberations-board"
+        className="overflow-x-auto overscroll-x-contain"
+      >
         <Kanban
           value={displayColumns}
           onValueChange={(value) => {
@@ -1047,13 +1102,16 @@ export function DeliberationsKanban({
                 value={columnId}
                 candidates={displayColumns[columnId] ?? []}
                 acceptLimit={acceptLimit}
-                allowOverCap={allowOverCap}
+                overCapExtra={overCapExtra}
                 teamId={teamId}
                 canEditAcceptCap={effectiveCanEditAcceptCap}
+                canRequestOverCap={canRequestOverCap}
                 readOnly={readOnly}
-                onAcceptCapSaved={(cap, over) => {
+                onAcceptCapSaved={(cap) => {
                   setAcceptLimit(cap);
-                  setAllowOverCap(over);
+                }}
+                onOverCapExtraSaved={(extra) => {
+                  setOverCapExtra(extra);
                 }}
                 compareIds={compareIdSet}
                 onOpenCandidate={(candidate) => setSelectedId(candidate.id)}
@@ -1075,7 +1133,7 @@ export function DeliberationsKanban({
                     value={columnId}
                     candidates={displayColumns[columnId] ?? []}
                     acceptLimit={acceptLimit}
-                    allowOverCap={allowOverCap}
+                    overCapExtra={overCapExtra}
                     isOverlay
                   />
                 );

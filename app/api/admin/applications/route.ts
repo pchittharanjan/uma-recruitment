@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initDb, type ApplicationStage } from '@/lib/db';
+import { initDb, type ApplicationStage, type RejectedFromStage } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
 import { listAdminApplications } from '@/lib/admin-applications';
 import { runWithRequestCache } from '@/lib/request-cache';
@@ -15,6 +15,33 @@ const STAGES: ApplicationStage[] = [
   'advanced',
   'rejected',
 ];
+
+const REJECTED_FROM_STAGES: RejectedFromStage[] = [
+  'application',
+  'first_round',
+  'final_round',
+  'deliberations',
+];
+
+function parseStageFilter(stageRaw: string | null): {
+  stage?: ApplicationStage;
+  rejectedFromStage?: RejectedFromStage;
+} {
+  if (!stageRaw || stageRaw === 'all') return {};
+
+  if (stageRaw.startsWith('rejected_at_')) {
+    const from = stageRaw.slice('rejected_at_'.length) as RejectedFromStage;
+    if (REJECTED_FROM_STAGES.includes(from)) {
+      return { rejectedFromStage: from };
+    }
+  }
+
+  if (STAGES.includes(stageRaw as ApplicationStage)) {
+    return { stage: stageRaw as ApplicationStage };
+  }
+
+  return {};
+}
 
 export async function GET(req: NextRequest) {
   return runWithRequestCache(() =>
@@ -36,15 +63,19 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ error: 'Invalid teamId.' }, { status: 400 });
         }
 
-        const stage =
-          stageRaw && stageRaw !== 'all' && STAGES.includes(stageRaw as ApplicationStage)
-            ? (stageRaw as ApplicationStage)
-            : undefined;
+        const { stage, rejectedFromStage } = parseStageFilter(stageRaw);
 
         const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
         const offset = offsetRaw ? Number.parseInt(offsetRaw, 10) : undefined;
 
-        const data = await listAdminApplications({ q, teamId, stage, limit, offset });
+        const data = await listAdminApplications({
+          q,
+          teamId,
+          stage,
+          rejectedFromStage,
+          limit,
+          offset,
+        });
         return NextResponse.json(data);
       } catch (e) {
         console.error('GET /api/admin/applications failed:', e);

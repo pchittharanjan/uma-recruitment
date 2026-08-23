@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     const serializedHistory =
       fromStage === 'application' ? history.map(blindAdvancementSubmission) : history;
     const recruitmentCycleLabel = await getRecruitmentCycleLabel();
-    const { cap: advancementCap, allowOverCap } = await getTeamAdvancementCapState(
+    const { cap: advancementCap, overCapExtra } = await getTeamAdvancementCapState(
       teamId,
       fromStage,
     );
@@ -74,12 +74,12 @@ export async function GET(req: NextRequest) {
     const selectionMin = resolveAdvancementSelectionMin({
       cap: advancementCap,
       totalRanked: preview.totalApplications,
-      allowOverCap,
+      overCapExtra,
     });
     const selectionMax = resolveAdvancementSelectionMax({
       cap: advancementCap,
       totalRanked: preview.totalApplications,
-      allowOverCap,
+      overCapExtra,
       previousSubmittedCount,
     });
 
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
       readOnly,
       canSubmit,
       advancementCap,
-      allowOverCap,
+      overCapExtra,
       selectionMin,
       selectionMax,
       currentUser: {

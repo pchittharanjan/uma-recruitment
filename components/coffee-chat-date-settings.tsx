@@ -124,6 +124,7 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
   };
 
   return (
+    <div data-tour="coffee-dates">
     <SettingsPanel
       label="Coffee chat window"
       open={open}
@@ -181,6 +182,7 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
               loading={saving}
               disabled={!isDirty}
               onClick={handleSave}
+              data-tour="coffee-save"
             >
               {saveButtonLabel(saving, isDirty)}
             </LoadingButton>
@@ -191,5 +193,6 @@ export function CoffeeChatDateSettings({ onSaved }: { onSaved?: () => void }) {
         </>
       )}
     </SettingsPanel>
+    </div>
   );
 }

@@ -54,6 +54,7 @@ import {
   recommendationsCompleteMessage,
 } from '@/lib/next-step-guidance';
 import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
 
 interface RankedApplicant {
   applicationId: number;
@@ -70,7 +71,7 @@ interface AdvancementData {
   teamId: number;
   fromStage: AdvancementFromStage;
   advancementCap: number | null;
-  allowOverCap?: boolean;
+  overCapExtra?: number;
   selectionMin?: number | null;
   selectionMax?: number | null;
   round: { id: number; label: string; status: string };
@@ -388,6 +389,7 @@ export function TeamAdvancementPanel({
   const [filterMyInterviewees, setFilterMyInterviewees] = useState<boolean | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [showSlotBreakdown, setShowSlotBreakdown] = useState(false);
+  const [goOverOpen, setGoOverOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(
@@ -447,8 +449,8 @@ export function TeamAdvancementPanel({
   }, [data, fromStage, verdicts]);
 
   const advancementCap = data?.advancementCap ?? null;
-  const allowOverCap = Boolean(data?.allowOverCap);
-  const usesFinalSelection = advancementCap !== null || allowOverCap;
+  const overCapExtra = Math.max(0, Number(data?.overCapExtra) || 0);
+  const usesFinalSelection = advancementCap !== null;
   const panelGreenCountTotal = panelGreenIds.size;
   const finalCount = finalSelection.size;
   const previousSubmittedCount =
@@ -459,7 +461,7 @@ export function TeamAdvancementPanel({
       ? resolveAdvancementSelectionMin({
           cap: advancementCap,
           totalRanked: data.preview.totalApplications,
-          allowOverCap,
+          overCapExtra,
         })
       : null);
   const selectionMax =
@@ -468,7 +470,7 @@ export function TeamAdvancementPanel({
       ? resolveAdvancementSelectionMax({
           cap: advancementCap,
           totalRanked: data.preview.totalApplications,
-          allowOverCap,
+          overCapExtra,
           previousSubmittedCount,
         })
       : null);
@@ -610,7 +612,7 @@ export function TeamAdvancementPanel({
   const isReadOnly = Boolean(data?.readOnly);
   const canSubmitList = Boolean(data?.canSubmit ?? data?.currentUser?.isDirector);
   const canSubmitAdvancement =
-    canSubmitList && (advancementCap !== null || allowOverCap);
+    canSubmitList && advancementCap !== null;
   const canMarkVerdicts = Boolean(data && !isApproved && !isReadOnly);
   const showFinalAdvanceColumn =
     usesFinalSelection && canSubmitAdvancement && (canMarkVerdicts || isPending);
@@ -775,7 +777,7 @@ export function TeamAdvancementPanel({
           fromStage,
           data.preview.totalApplications,
           advancementCap,
-          allowOverCap,
+          overCapExtra,
         )}
       />
 
@@ -831,24 +833,24 @@ export function TeamAdvancementPanel({
       {usesFinalSelection &&
         canSubmitAdvancement &&
         canMarkVerdicts &&
-        allowOverCap &&
+        overCapExtra > 0 &&
         advancementCap !== null && (
           <StatusBanner
             type="info"
-            message={`Admin allowed selecting past the usual limit of ${advancementCap}. Select at least ${minAdvanceCount} (up to ${maxAdvanceCount}).`}
+            message={`You may select past the usual limit of ${advancementCap} (+${overCapExtra} extra). Select at least ${minAdvanceCount} (up to ${maxAdvanceCount}).`}
           />
         )}
 
       {usesFinalSelection &&
         canSubmitAdvancement &&
         canMarkVerdicts &&
-        !allowOverCap &&
+        overCapExtra === 0 &&
         advancementCap !== null &&
         previousSubmittedCount != null &&
         previousSubmittedCount > advancementCap && (
           <StatusBanner
             type="warning"
-            message={`Your pending list has ${previousSubmittedCount} applicants, over the current limit of ${advancementCap}. You can keep up to ${maxAdvanceCount} but cannot add more unless an admin raises the limit or allows over cap.`}
+            message={`Your pending list has ${previousSubmittedCount} applicants, over the current limit of ${advancementCap}. You can keep up to ${maxAdvanceCount} but cannot add more unless an admin raises the limit or you enter the go-over code.`}
           />
         )}
 
@@ -856,7 +858,7 @@ export function TeamAdvancementPanel({
         canSubmitAdvancement &&
         canMarkVerdicts &&
         isPending &&
-        !allowOverCap &&
+        overCapExtra === 0 &&
         advancementCap !== null &&
         finalCount < minAdvanceCount &&
         minAdvanceCount > (previousSubmittedCount ?? 0) && (
@@ -905,11 +907,11 @@ export function TeamAdvancementPanel({
                     <CardDescription>
                       {minAdvanceCount === maxAdvanceCount
                         ? `Select exactly ${minAdvanceCount} to advance`
-                        : allowOverCap
+                        : overCapExtra > 0
                           ? `Select at least ${minAdvanceCount} to advance (up to ${maxAdvanceCount})`
                           : `Select at least ${minAdvanceCount} to advance (you may keep up to ${maxAdvanceCount} from your pending list)`}
-                      {allowOverCap && advancementCap !== null
-                        ? `, over the usual limit of ${advancementCap}`
+                      {overCapExtra > 0 && advancementCap !== null
+                        ? `, over the usual limit of ${advancementCap} (+${overCapExtra} extra)`
                         : ''}
                       . Panel color signals are advisory.
                     </CardDescription>
@@ -967,7 +969,10 @@ export function TeamAdvancementPanel({
             {canSubmitAdvancement && canMarkVerdicts && (
               <CardContent className="space-y-3 pt-3">
                 {usesFinalSelection ? (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                    data-tour="advancement-bulk"
+                  >
                     <LoadingButton
                       variant="secondary"
                       size="sm"
@@ -984,9 +989,24 @@ export function TeamAdvancementPanel({
                     >
                       Clear final list
                     </LoadingButton>
+                    {advancementCap !== null ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-auto px-0 text-sm font-normal text-foreground underline-offset-4 hover:underline"
+                        data-tour="advancement-over-cap"
+                        onClick={() => setGoOverOpen(true)}
+                      >
+                        Go over this limit
+                      </Button>
+                    ) : null}
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                    data-tour="advancement-bulk"
+                  >
                     <LoadingButton
                       variant="secondary"
                       size="sm"
@@ -1014,7 +1034,10 @@ export function TeamAdvancementPanel({
                   </div>
                 )}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                  <div
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
+                    data-tour="advancement-count"
+                  >
                     <p>
                       <span className="font-medium tabular-nums text-green-700 dark:text-green-400">
                         {usesFinalSelection ? finalCount : selectedCount}
@@ -1059,6 +1082,7 @@ export function TeamAdvancementPanel({
                     disabled={data.preview.incompleteCount > 0 || !submitSelectionReady}
                     onClick={handleSubmit}
                     className="w-full shrink-0 self-start sm:w-auto sm:min-w-44"
+                    data-tour="advancement-submit"
                   >
                     {isPending ? 'Update list to admin' : 'Submit list to admin'}
                   </LoadingButton>
@@ -1085,7 +1109,10 @@ export function TeamAdvancementPanel({
                     )}
                   </div>
                   {isFirstRound && myIntervieweeCount > 0 && (
-                    <div className="flex items-center gap-2 rounded-lg bg-muted/35 px-3 py-2">
+                    <div
+                      className="flex items-center gap-2 rounded-lg bg-muted/35 px-3 py-2"
+                      data-tour="advancement-filter"
+                    >
                       <Checkbox
                         id="filter-my-interviewees"
                         checked={Boolean(filterMyInterviewees)}
@@ -1100,7 +1127,7 @@ export function TeamAdvancementPanel({
                 </div>
               </CardHeader>
             ) : null}
-            <CardContent className="overflow-visible pt-0 pb-5">
+            <CardContent className="overflow-visible pt-0 pb-5" data-tour="advancement-detail">
             {isFirstRound && filterMyInterviewees && visibleRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No completed interviews found for you. Turn off the filter to see the full ranked
@@ -1145,7 +1172,9 @@ export function TeamAdvancementPanel({
                           <TableRow>
                             <TableHead className="px-2" />
                             {showDecisionColumn && (
-                              <TableHead className="px-3">Recommendation</TableHead>
+                              <TableHead className="px-3" data-tour="advancement-verdicts">
+                                Recommendation
+                              </TableHead>
                             )}
                             <TableHead className="px-3">Rank</TableHead>
                             <TableHead className="px-3">Applicant</TableHead>
@@ -1155,7 +1184,7 @@ export function TeamAdvancementPanel({
                             />
                             <TableHead className="px-3">Status</TableHead>
                             {showFinalAdvanceColumn && (
-                              <TableHead className="px-3">Advance</TableHead>
+                              <TableHead className="px-3" data-tour="advancement-advance">Advance</TableHead>
                             )}
                           </TableRow>
                         </TableHeader>
@@ -1301,7 +1330,7 @@ export function TeamAdvancementPanel({
                 <TableHeader>
                   <TableRow>
                     {showDecisionColumn && (
-                      <TableHead className="px-3">
+                      <TableHead className="px-3" data-tour="advancement-verdicts">
                         {usesFinalSelection ? 'Recommendation' : 'Decision'}
                       </TableHead>
                     )}
@@ -1316,7 +1345,7 @@ export function TeamAdvancementPanel({
                     />
                     <TableHead className="px-3">Status</TableHead>
                     {showFinalAdvanceColumn && (
-                      <TableHead className="px-3">Advance</TableHead>
+                      <TableHead className="px-3" data-tour="advancement-advance">Advance</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
@@ -1445,6 +1474,41 @@ export function TeamAdvancementPanel({
         </PageSection>
       )}
       </PageSection>
+
+      <GoOverCapDialog
+        open={goOverOpen}
+        onOpenChange={setGoOverOpen}
+        teamId={Number(teamId)}
+        stage={fromStage}
+        officialCap={advancementCap}
+        currentExtra={overCapExtra}
+        onSuccess={(nextExtra) => {
+          setData((prev) => {
+            if (!prev) return prev;
+            const selectionMinNext = resolveAdvancementSelectionMin({
+              cap: prev.advancementCap,
+              totalRanked: prev.preview.totalApplications,
+              overCapExtra: nextExtra,
+            });
+            const selectionMaxNext = resolveAdvancementSelectionMax({
+              cap: prev.advancementCap,
+              totalRanked: prev.preview.totalApplications,
+              overCapExtra: nextExtra,
+              previousSubmittedCount:
+                prev.submission?.status === 'submitted'
+                  ? prev.submission.candidates.length
+                  : null,
+            });
+            return {
+              ...prev,
+              overCapExtra: nextExtra,
+              selectionMin: selectionMinNext,
+              selectionMax: selectionMaxNext,
+            };
+          });
+          invalidateClientFetchCache(`/api/team/advancement?teamId=${teamId}`);
+        }}
+      />
     </PageContainer>
   );
 }

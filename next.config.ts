@@ -1,32 +1,13 @@
 import { execSync } from "node:child_process";
 import type { NextConfig } from "next";
 
-const GITHUB_REPO = "pchittharanjan/uma-recruitment";
-
-async function lastUpdatedIso(): Promise<string> {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "User-Agent": "uma-recruitment",
-      },
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { pushed_at?: string };
-      if (json.pushed_at) return json.pushed_at;
-    }
-  } catch {
-    // Fall through to Vercel build time / local git.
-  }
-
-  // A GitHub push triggers the Vercel build, so build time is the push time.
-  if (process.env.VERCEL) {
-    return new Date().toISOString();
-  }
+/** Build-time seed for the credit bar; runtime `/api/last-updated` is authoritative. */
+function lastUpdatedIso(): string {
+  const vercelCommit = process.env.VERCEL_GIT_COMMIT_DATE?.trim();
+  if (vercelCommit) return vercelCommit;
 
   try {
-    return execSync("git log -1 origin/main --format=%cI", {
+    return execSync("git log -1 --format=%cI", {
       stdio: ["ignore", "pipe", "ignore"],
     })
       .toString()
@@ -64,7 +45,7 @@ export default async function config(): Promise<NextConfig> {
   return {
     ...nextConfig,
     env: {
-      NEXT_PUBLIC_LAST_UPDATED: await lastUpdatedIso(),
+      NEXT_PUBLIC_LAST_UPDATED: lastUpdatedIso(),
     },
   };
 }

@@ -187,7 +187,7 @@ export async function buildDeliberationsBoard(
   const profile = getTeamPipelineProfile(teamName);
   const poolStages = profile.deliberationsPoolStages;
   const stagePlaceholders = poolStages.map(() => '?').join(', ');
-  const { cap, allowOverCap } = await getTeamAdvancementCapState(teamId, 'deliberations');
+  const { cap, overCapExtra } = await getTeamAdvancementCapState(teamId, 'deliberations');
 
   const appsResult = await db.execute({
     sql: `SELECT app.id, app.row_index, app.stage, c.name AS candidate_name
@@ -234,7 +234,7 @@ export async function buildDeliberationsBoard(
     teamId,
     roundId,
     acceptLimit: cap,
-    allowOverCap,
+    overCapExtra,
     candidates,
     layout,
   };
@@ -327,14 +327,23 @@ export async function commitDeliberationsFinalSelection(
     throw new Error('Move at least one applicant into Accept before completing final selection.');
   }
 
-  if (
-    board.acceptLimit != null &&
-    !board.allowOverCap &&
-    acceptIds.length > board.acceptLimit
-  ) {
-    throw new Error(
-      `Accept has ${acceptIds.length} applicants but the offer limit is ${board.acceptLimit}.`,
-    );
+  const poolSize = board.candidates.length;
+  if (board.acceptLimit != null) {
+    const minRequired = Math.min(board.acceptLimit, poolSize);
+    const maxAllowed = Math.min(poolSize, board.acceptLimit + Math.max(0, board.overCapExtra));
+    if (acceptIds.length < minRequired) {
+      throw new Error(
+        `Accept has ${acceptIds.length} applicants but the offer limit requires at least ${minRequired}.`,
+      );
+    }
+    if (acceptIds.length > maxAllowed) {
+      throw new Error(
+        `Accept has ${acceptIds.length} applicants but the offer limit is ${maxAllowed}` +
+          (board.overCapExtra > 0
+            ? ` (${board.acceptLimit} + ${board.overCapExtra} extra).`
+            : ` (${board.acceptLimit}).`),
+      );
+    }
   }
 
   // Anyone on the board not in Accept (including rejected marks) is cut.
@@ -354,7 +363,7 @@ export async function commitDeliberationsFinalSelection(
   for (const applicationId of acceptIds) {
     await db.execute({
       sql: `UPDATE applications
-            SET stage = 'advanced'
+            SET stage = 'advanced', rejected_from_stage = NULL
             WHERE id = ? AND team_id = ? AND round_id = ?
               AND stage IN (${poolPlaceholders})`,
       args: [applicationId, teamId, roundId, ...poolStages],
@@ -364,7 +373,7 @@ export async function commitDeliberationsFinalSelection(
   for (const applicationId of rejectIds) {
     await db.execute({
       sql: `UPDATE applications
-            SET stage = 'rejected'
+            SET stage = 'rejected', rejected_from_stage = 'deliberations'
             WHERE id = ? AND team_id = ? AND round_id = ?
               AND stage IN (${pendingPlaceholders})`,
       args: [applicationId, teamId, roundId, ...pendingStages],

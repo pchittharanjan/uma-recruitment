@@ -221,10 +221,12 @@ export async function applyInterviewAdvancementSelection(
 
   for (const app of ranked) {
     const stage = advancedSet.has(app.id) ? targetStage : 'rejected';
+    const rejectedFrom = stage === 'rejected' ? 'first_round' : null;
     await db.execute({
-      sql: `UPDATE applications SET final_score = ?, rank = ?, stage = ?
+      sql: `UPDATE applications
+            SET final_score = ?, rank = ?, stage = ?, rejected_from_stage = ?
             WHERE id = ? AND team_id = ? AND stage = 'first_round'`,
-      args: [app.average, app.rank, stage, app.id, teamId],
+      args: [app.average, app.rank, stage, rejectedFrom, app.id, teamId],
     });
   }
 }

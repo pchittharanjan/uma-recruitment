@@ -87,7 +87,7 @@ export default async function TeamHomePage() {
             actions={<StageBadge label={label} color="blue" size="compact" />}
           />
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="team-picker">
             {teams.map((team) => {
               const navTeam = nav.teams.find((t) => t.id === team.id);
               const href = navTeam?.round?.status

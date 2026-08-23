@@ -89,18 +89,15 @@ export function teamDotClass(teamName: string): string {
 }
 
 const TEAM_STAGE_BADGE: Record<TeamName, string> = {
-  Strategy:
-    'border-orange-500/30 bg-orange-500/[0.07] text-orange-700 dark:text-orange-300',
-  Events:
-    'border-blue-500/30 bg-blue-500/[0.07] text-blue-700 dark:text-blue-300',
-  Design:
-    'border-violet-500/30 bg-violet-500/[0.07] text-violet-700 dark:text-violet-300',
+  Strategy: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
+  Events: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  Design: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
 };
 
-/** Compact phase badge on team cards (replaces generic primary/orange). */
+/** Compact phase badge on team cards — borderless soft fill (matches StageBadge / team pills). */
 export function teamStageBadgeClass(teamName: string): string {
   if (isTeamName(teamName)) return TEAM_STAGE_BADGE[teamName];
-  return 'border-border/70 bg-muted/40 text-muted-foreground';
+  return 'bg-muted/40 text-muted-foreground';
 }
 
 const TEAM_CARD_HOVER: Record<TeamName, string> = {

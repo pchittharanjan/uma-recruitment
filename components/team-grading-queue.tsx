@@ -76,7 +76,7 @@ export function TeamGradingQueue({
               : 'Score each assigned application. When you finish, you\'ll add color recommendations next.'
         }
         actions={
-          <NavLinkButton variant="secondary" href={`/team/${teamId}`}>
+          <NavLinkButton variant="secondary" href={`/team/${teamId}`} data-tour="grade-overview">
             ← Overview
           </NavLinkButton>
         }
@@ -93,29 +93,36 @@ export function TeamGradingQueue({
                 {completeCopy.description}
               </CardDescription>
             </div>
-            <NavLinkButton className="w-full sm:w-auto" href={nextStep.href}>
+            <NavLinkButton
+              className="w-full sm:w-auto"
+              href={nextStep.href}
+              data-tour="grade-next-step"
+            >
               {completeCopy.ctaLabel}
             </NavLinkButton>
           </Card>
         )}
 
         <Card className="gap-4 p-5 sm:p-6">
-          <ProgressBar
-            value={data.progress.completed}
-            max={data.progress.total}
-            label="Applications Graded"
-          />
+          <div data-tour="grade-progress">
+            <ProgressBar
+              value={data.progress.completed}
+              max={data.progress.total}
+              label="Applications Graded"
+            />
+          </div>
           {!allDone && !gradingLocked && firstPending && (
             <NavLinkButton
               className="w-full"
               href={`/team/${teamId}/grade/${firstPending.applicationId}`}
+              data-tour="grade-start"
             >
               {data.progress.completed === 0 ? 'Start grading' : 'Continue grading'} →
             </NavLinkButton>
           )}
         </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-tour="grade-queue">
           <CardHeader>
             <CardTitle>Your Applications</CardTitle>
           </CardHeader>

@@ -740,7 +740,7 @@ export async function revertTeamPipeline(
     const placeholders = sourceStages.map(() => '?').join(', ');
     const updateResult = await db.execute({
       sql: `UPDATE applications
-            SET stage = ?, final_score = NULL, rank = NULL
+            SET stage = ?, final_score = NULL, rank = NULL, rejected_from_stage = NULL
             WHERE team_id = ? AND round_id = ? AND stage IN (${placeholders})`,
       args: [targetApplicantStage, teamId, round.id, ...sourceStages],
     });

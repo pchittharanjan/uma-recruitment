@@ -1,69 +1,86 @@
-import { execSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GITHUB_REPO = 'pchittharanjan/uma-recruitment';
+/** Top-level source roots / files whose mtimes count as “local code change”. */
+const SOURCE_ENTRIES = [
+  'app',
+  'components',
+  'lib',
+  'hooks',
+  'scripts',
+  'middleware.ts',
+  'SCHEMA.sql',
+  'SPEC.md',
+  'AGENTS.md',
+  'CLAUDE.md',
+  'next.config.ts',
+  'package.json',
+] as const;
 
-function gitOutput(command: string): string | null {
-  try {
-    const out = execSync(command, { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim();
-    return out || null;
-  } catch {
-    return null;
-  }
-}
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.next',
+  '.git',
+  'dist',
+  'coverage',
+  'public',
+  'agent-transcripts',
+]);
 
-function latestUncommittedMtimeMs(cwd: string): number | null {
-  const porcelain = gitOutput('git status --porcelain');
-  if (!porcelain) return null;
-
+function latestSourceMtimeMs(cwd: string): number | null {
   let latest = 0;
-  for (const line of porcelain.split('\n')) {
-    if (!line) continue;
-    let file = line.slice(3).trim();
-    if (file.includes(' -> ')) {
-      file = file.slice(file.lastIndexOf(' -> ') + 4);
-    }
-    file = file.replace(/^"|"$/g, '');
+
+  function walk(abs: string) {
+    let st;
     try {
-      latest = Math.max(latest, statSync(join(cwd, file)).mtimeMs);
+      st = statSync(abs);
     } catch {
-      // Ignored / deleted paths.
+      return;
+    }
+
+    if (st.isFile()) {
+      latest = Math.max(latest, st.mtimeMs);
+      return;
+    }
+
+    if (!st.isDirectory()) return;
+
+    let entries;
+    try {
+      entries = readdirSync(abs, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const ent of entries) {
+      if (ent.isDirectory() && (SKIP_DIRS.has(ent.name) || ent.name.startsWith('.'))) {
+        continue;
+      }
+      walk(join(abs, ent.name));
     }
   }
+
+  for (const entry of SOURCE_ENTRIES) {
+    walk(join(cwd, entry));
+  }
+
   return latest || null;
 }
 
-async function githubPushedAt(): Promise<string | null> {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'uma-recruitment',
-      },
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { pushed_at?: string };
-    return json.pushed_at ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** Local: newest save/commit. Production: last GitHub push (or this deploy). */
+/**
+ * Local: newest mtime under source dirs (updates as you save during `npm run dev`).
+ * Production (Vercel): commit date of the deployed GitHub push.
+ */
 export async function resolveLastUpdatedIso(): Promise<string> {
   if (process.env.VERCEL) {
-    return (await githubPushedAt()) ?? new Date().toISOString();
+    const commitDate = process.env.VERCEL_GIT_COMMIT_DATE?.trim();
+    if (commitDate) return commitDate;
+    const baked = process.env.NEXT_PUBLIC_LAST_UPDATED?.trim();
+    if (baked) return baked;
+    return new Date().toISOString();
   }
 
-  const commitIso = gitOutput('git log -1 --format=%cI');
-  const dirtyMs = latestUncommittedMtimeMs(process.cwd());
-  const commitMs = commitIso ? Date.parse(commitIso) : 0;
-  if (dirtyMs && dirtyMs >= commitMs) {
-    return new Date(dirtyMs).toISOString();
-  }
-  return commitIso ?? new Date().toISOString();
+  const mtimeMs = latestSourceMtimeMs(process.cwd());
+  if (mtimeMs) return new Date(mtimeMs).toISOString();
+  return new Date().toISOString();
 }

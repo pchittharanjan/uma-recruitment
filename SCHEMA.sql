@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS applications (
   fields TEXT NOT NULL,                        -- JSON blob of raw CSV fields, same pattern as v1.0
   stage TEXT NOT NULL DEFAULT 'application'
     CHECK (stage IN ('application', 'first_round', 'final_round', 'deliberations', 'advanced', 'rejected')),
+  -- When stage = 'rejected', which pipeline gate they were cut at (NULL if unknown / not rejected).
+  rejected_from_stage TEXT
+    CHECK (
+      rejected_from_stage IS NULL
+      OR rejected_from_stage IN ('application', 'first_round', 'final_round', 'deliberations')
+    ),
   admin_note TEXT,
   final_score REAL,
   rank INTEGER,
@@ -281,7 +287,8 @@ CREATE TABLE IF NOT EXISTS org_recruitment_cycle (
 -- application_cap: Application → First Round
 -- first_round_cap: First Round → Final Round
 -- deliberations_cap: Deliberations → Final selection (offers)
--- *_allow_over_cap: when 1, directors may select past that stage's displayed limit.
+-- *_over_cap_extra: how many past the official cap directors may take after entering the org go-over code.
+-- *_allow_over_cap: legacy boolean columns (unused by app logic; kept for DB compatibility).
 -- Note: Final Round → Deliberations has no cap — all final-round candidates enter delibs.
 CREATE TABLE IF NOT EXISTS team_advancement_caps (
   team_id INTEGER PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
@@ -294,6 +301,20 @@ CREATE TABLE IF NOT EXISTS team_advancement_caps (
     CHECK (first_round_allow_over_cap IN (0, 1)),
   deliberations_allow_over_cap INTEGER NOT NULL DEFAULT 0
     CHECK (deliberations_allow_over_cap IN (0, 1)),
+  application_over_cap_extra INTEGER NOT NULL DEFAULT 0
+    CHECK (application_over_cap_extra >= 0),
+  first_round_over_cap_extra INTEGER NOT NULL DEFAULT 0
+    CHECK (first_round_over_cap_extra >= 0),
+  deliberations_over_cap_extra INTEGER NOT NULL DEFAULT 0
+    CHECK (deliberations_over_cap_extra >= 0),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_by INTEGER REFERENCES users(id)
+);
+
+-- Org-wide secret for directors to raise a team's over-cap extra (SHA-256 hash only).
+CREATE TABLE IF NOT EXISTS org_over_cap_code (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  code_hash TEXT NOT NULL,
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_by INTEGER REFERENCES users(id)
 );

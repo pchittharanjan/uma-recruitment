@@ -108,7 +108,7 @@ export function FinalSelectionOffers({
   const title = cycleLabel ? `${cycleLabel} Newbies` : 'Final Selection';
 
   return (
-    <div style={{ margin: '0 auto', width: '100%', maxWidth: 1024 }}>
+    <div data-tour="final-offers" style={{ margin: '0 auto', width: '100%', maxWidth: 1024 }}>
       <header
         style={{
           backgroundImage: 'linear-gradient(90deg, #e4e3f0 0%, #f2efe9 48%, #f6e8df 100%)',
@@ -149,6 +149,7 @@ export function FinalSelectionOffers({
             <button
               type="button"
               onClick={() => void fireRecruitmentConfetti(2500)}
+              data-tour="final-actions"
               style={{
                 ...chipBaseStyle,
                 backgroundColor: '#ffffff',

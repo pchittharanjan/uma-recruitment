@@ -1,9 +1,10 @@
-import type { ApplicationStage } from '@/lib/db';
+import type { ApplicationStage, RejectedFromStage } from '@/lib/db';
 
 export interface AdminApplicationRow {
   id: number;
   rowIndex: number;
   stage: ApplicationStage;
+  rejectedFromStage: RejectedFromStage | null;
   teamId: number;
   teamName: string;
   roundId: number;
