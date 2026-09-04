@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
 import { AdvancementActivityLog } from '@/components/advancement-activity-log';
 import { AdvancementRankColGroup } from '@/components/advancement-rank-table-columns';
+import { ApplicationFieldsList } from '@/components/application-fields-list';
 import { AvgScoreCell, AvgScoreHeader } from '@/components/avg-score-header';
 import {
   AdvancementVerdictSelector,
@@ -20,6 +21,7 @@ import {
 import type { AdvancementVerdict } from '@/lib/advancement-verdict-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -33,6 +35,8 @@ import { advancementFromStageLabel } from '@/lib/advancement-submissions-types';
 import { advancementPageDescription } from '@/lib/advancement-cap-helpers';
 import { AdvancementRatingGuide } from '@/components/advancement-rating-guide';
 import { advancementRequiredStepIntro, advancementIncompleteReminder } from '@/lib/advancement-rating-copy';
+import { displayApplicantId } from '@/lib/applicant-id';
+import { applicantDisplayId } from '@/lib/blind';
 import { advancementStepGuide } from '@/lib/next-step-guidance';
 import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { cn } from '@/lib/utils';
@@ -100,6 +104,84 @@ function FinalAdvanceToggle({
   );
 }
 
+function AdminApplicationExpand({
+  teamId,
+  applicationId,
+  rowIndex,
+}: {
+  teamId: string | number;
+  applicationId: number;
+  rowIndex: number;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [fields, setFields] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    setFields(null);
+
+    fetch(`/api/admin/applications/${applicationId}`, { cache: 'no-store' })
+      .then(async (res) => {
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(json.error ?? 'Failed to load application.');
+          return;
+        }
+        setFields((json.application?.fields as Record<string, string>) ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load application.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applicationId]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3 px-1 py-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="px-1 py-2 text-sm text-destructive">{error}</p>;
+  }
+
+  return (
+    <div className="space-y-3 px-1 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {applicantDisplayId(rowIndex)} · application responses
+        </p>
+        <Link
+          href={`/admin/teams/${teamId}/grader-preview/${applicationId}`}
+          className="text-xs text-primary hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open grader preview
+        </Link>
+      </div>
+      {fields && Object.keys(fields).length > 0 ? (
+        <ApplicationFieldsList fields={fields} />
+      ) : (
+        <p className="text-sm italic text-muted-foreground">No application fields found.</p>
+      )}
+    </div>
+  );
+}
+
 export function AdminTeamAdvancementPanel({
   teamId,
   fromStage,
@@ -114,6 +196,7 @@ export function AdminTeamAdvancementPanel({
   const [error, setError] = useState('');
   const [verdicts, setVerdicts] = useState<Record<number, AdvancementVerdict>>({});
   const [finalSelection, setFinalSelection] = useState<Set<number>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -161,8 +244,6 @@ export function AdminTeamAdvancementPanel({
   const overCapExtra = Math.max(0, Number(data?.overCapExtra) || 0);
   const allowUncappedFirstRound = Boolean(data?.allowUncappedFirstRound);
   const usesFinalSelection = advancementCap !== null || allowUncappedFirstRound;
-  const previousSubmittedCount =
-    data?.submission?.status === 'submitted' ? data.submission.candidates.length : null;
   const minAdvanceCount = data?.selectionMin ?? 0;
   const maxAdvanceCount = data?.selectionMax ?? 0;
   const targetAdvanceCount = minAdvanceCount;
@@ -216,6 +297,15 @@ export function AdminTeamAdvancementPanel({
       } else {
         next.delete(applicationId);
       }
+      return next;
+    });
+  };
+
+  const toggleExpanded = (applicationId: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(applicationId)) next.delete(applicationId);
+      else next.add(applicationId);
       return next;
     });
   };
@@ -320,6 +410,9 @@ export function AdminTeamAdvancementPanel({
 
   const resolvedTeamName = data.teamName ?? teamName;
   const stageLabel = advancementFromStageLabel(fromStage, resolvedTeamName ?? undefined);
+  // rating? + rank + applicant + application + score + panel + advance?
+  const detailColSpan =
+    (canAct && !isApproved ? 1 : 0) + 5 + (canSubmitAdvancement ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -346,7 +439,7 @@ export function AdminTeamAdvancementPanel({
                 ? 'This advancement has been applied. Use Revert on the Advancements page if you need to undo it.'
                 : isPending
                   ? `A Director list (${data.submission!.topN} applicants) is pending. Your selection here replaces it when you apply advancement.`
-                  : 'Record verbal Director decisions on a call: set your color ratings, pick who advances, then apply. Works before or instead of a Director submission.'
+                  : 'Record verbal Director decisions on a call: set your color ratings, pick who advances, then apply. Works before or instead of a Director submission. Applicant # matches what Directors use when they send a number list.'
             }
           />
 
@@ -454,7 +547,11 @@ export function AdminTeamAdvancementPanel({
 
           <div className="overflow-x-auto rounded-lg border border-border/40">
             <Table className="w-full table-fixed border-separate border-spacing-0 [&_td]:py-2.5 [&_th]:pb-4">
-              <AdvancementRankColGroup decision advance />
+              <AdvancementRankColGroup
+                decision={canAct && !isApproved}
+                advance={canSubmitAdvancement}
+                view
+              />
               <TableHeader>
                 <TableRow>
                   {canAct && !isApproved && (
@@ -462,6 +559,7 @@ export function AdminTeamAdvancementPanel({
                   )}
                   <TableHead className="px-3">Rank</TableHead>
                   <TableHead className="px-3">Applicant</TableHead>
+                  <TableHead className="px-3">Application</TableHead>
                   <AvgScoreHeader
                     className="px-3"
                     variant={fromStage === 'first_round' ? 'interview' : 'application'}
@@ -476,63 +574,99 @@ export function AdminTeamAdvancementPanel({
                 {displayRows.map((app) => {
                   const verdict = displayVerdict(app.applicationId);
                   const advanced = usesFinalSelection && finalSelection.has(app.applicationId);
+                  const expanded = expandedIds.has(app.applicationId);
+                  const numberLabel = `#${displayApplicantId(app.rowIndex)}`;
+                  const fullLabel = `${applicantDisplayId(app.rowIndex)} · ${app.candidateName}`;
                   return (
-                    <TableRow
-                      key={app.applicationId}
-                      className={cn(
-                        verdictRowClass(verdict),
-                        advanced && 'bg-green-50/70 dark:bg-green-950/25',
-                      )}
-                    >
-                      {canAct && !isApproved && (
-                        <TableCell className="relative px-3">
-                          <VerdictAccentBar
-                            verdict={verdict}
-                            colorOverride={
-                              advanced ? VERDICT_ACCENT_HEX.green : null
-                            }
-                          />
-                          <AdvancementVerdictSelector
-                            value={verdicts[app.applicationId] ?? app.adminVerdict ?? null}
-                            onChange={(next) => void setVerdict(app.applicationId, next)}
-                            applicantLabel={app.candidateName}
-                          />
+                    <Fragment key={app.applicationId}>
+                      <TableRow
+                        className={cn(
+                          verdictRowClass(verdict),
+                          advanced && 'bg-green-50/70 dark:bg-green-950/25',
+                        )}
+                      >
+                        {canAct && !isApproved && (
+                          <TableCell className="relative px-3">
+                            <VerdictAccentBar
+                              verdict={verdict}
+                              colorOverride={
+                                advanced ? VERDICT_ACCENT_HEX.green : null
+                              }
+                            />
+                            <AdvancementVerdictSelector
+                              value={verdicts[app.applicationId] ?? app.adminVerdict ?? null}
+                              onChange={(next) => void setVerdict(app.applicationId, next)}
+                              applicantLabel={fullLabel}
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell className="px-3 tabular-nums">{app.rank}</TableCell>
+                        <TableCell className="min-w-0 px-3">
+                          <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                            {numberLabel}
+                          </p>
+                          <p className="truncate font-medium">{app.candidateName}</p>
                         </TableCell>
-                      )}
-                      <TableCell className="px-3 tabular-nums">{app.rank}</TableCell>
-                      <TableCell className="min-w-0 px-3 font-medium">{app.candidateName}</TableCell>
-                      <TableCell className="px-3 text-left">
-                        <AvgScoreCell
-                          average={app.average}
-                          rawAverage={fromStage === 'first_round' ? undefined : app.rawAverage}
-                        />
-                      </TableCell>
-                      <TableCell className="px-3 whitespace-normal">
-                        <PanelVerdictSummary
-                          panelVerdicts={app.panelVerdicts}
-                          myVerdict={verdicts[app.applicationId] ?? app.adminVerdict ?? null}
-                        />
-                      </TableCell>
-                      {canSubmitAdvancement && (
                         <TableCell className="px-3">
-                          <FinalAdvanceToggle
-                            selected={finalSelection.has(app.applicationId)}
-                            atCap={
-                              !finalSelection.has(app.applicationId) &&
-                              maxAdvanceCount > 0 &&
-                              finalSelection.size >= maxAdvanceCount
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-expanded={expanded}
+                            aria-label={
+                              expanded
+                                ? `Hide application for ${fullLabel}`
+                                : `View application for ${fullLabel}`
                             }
-                            label={app.candidateName}
-                            onToggle={() =>
-                              toggleFinalAdvance(
-                                app.applicationId,
-                                !finalSelection.has(app.applicationId),
-                              )
-                            }
+                            onClick={() => toggleExpanded(app.applicationId)}
+                          >
+                            {expanded ? 'Hide' : 'View'}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="px-3 text-left">
+                          <AvgScoreCell
+                            average={app.average}
+                            rawAverage={fromStage === 'first_round' ? undefined : app.rawAverage}
                           />
                         </TableCell>
+                        <TableCell className="px-3 whitespace-normal">
+                          <PanelVerdictSummary
+                            panelVerdicts={app.panelVerdicts}
+                            myVerdict={verdicts[app.applicationId] ?? app.adminVerdict ?? null}
+                          />
+                        </TableCell>
+                        {canSubmitAdvancement && (
+                          <TableCell className="px-3">
+                            <FinalAdvanceToggle
+                              selected={finalSelection.has(app.applicationId)}
+                              atCap={
+                                !finalSelection.has(app.applicationId) &&
+                                maxAdvanceCount > 0 &&
+                                finalSelection.size >= maxAdvanceCount
+                              }
+                              label={fullLabel}
+                              onToggle={() =>
+                                toggleFinalAdvance(
+                                  app.applicationId,
+                                  !finalSelection.has(app.applicationId),
+                                )
+                              }
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      {expanded && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={detailColSpan} className="bg-muted/20 px-3 py-3">
+                            <AdminApplicationExpand
+                              teamId={teamId}
+                              applicationId={app.applicationId}
+                              rowIndex={app.rowIndex}
+                            />
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableRow>
+                    </Fragment>
                   );
                 })}
               </TableBody>
