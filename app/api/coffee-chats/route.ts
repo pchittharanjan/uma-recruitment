@@ -4,16 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { forbidden, requireAuth, unauthorized } from '@/lib/auth';
 import type { CoffeeChatInput } from '@/lib/coffee-chats';
-import { isWithinCoffeeChatWindow, validateApplicantGradeLevel, validateApplicantEmail, validateTeamsInterested } from '@/lib/coffee-chats';
+import { validateApplicantGradeLevel, validateApplicantEmail, validateTeamsInterested } from '@/lib/coffee-chats';
 import {
-  canUserAccessCoffeeChats,
   createCoffeeChat,
   listAllCoffeeChats,
   serializeAdminCoffeeChat,
 } from '@/lib/coffee-chats-server';
+import { matchStatusForCoffeeChats } from '@/lib/coffee-chat-import-server';
 import { requireTeamPortalUser } from '@/lib/impersonation';
-import { getOrgCoffeeChatDates } from '@/lib/org-coffee-chat-dates';
-import { isPipelineClosed, PIPELINE_CLOSED_MESSAGE, assertPipelineWritable } from '@/lib/pipeline-writable';
+import { assertPipelineWritable } from '@/lib/pipeline-writable';
 
 async function resolveCoffeeChatUser(req: NextRequest) {
   const portalUser = await requireTeamPortalUser(req);
@@ -32,45 +31,17 @@ export async function GET(req: NextRequest) {
 
     if (user.role === 'admin' && view === 'all') {
       const chats = await listAllCoffeeChats();
-      return NextResponse.json({ chats: chats.map(serializeAdminCoffeeChat) });
+      const matches = await matchStatusForCoffeeChats(chats);
+      return NextResponse.json({
+        chats: chats.map((chat, index) => serializeAdminCoffeeChat(chat, matches[index])),
+      });
     }
 
-    const orgDates = await getOrgCoffeeChatDates();
-    const windowConfigured = Boolean(orgDates.coffeeChatStartDate && orgDates.applicationDueDate);
-    const windowOpen =
-      windowConfigured &&
-      isWithinCoffeeChatWindow({
-        coffee_chat_start_date: orgDates.coffeeChatStartDate,
-        application_due_date: orgDates.applicationDueDate,
-      });
-    const pipelineClosed = await isPipelineClosed();
-    const access = await canUserAccessCoffeeChats(
-      user.role === 'admin' ? { bypassWindow: true } : undefined,
+    // Member in-app entry was removed — Google Form + admin sheet upload only.
+    return NextResponse.json(
+      { error: 'Coffee chat notes are imported by admins from the Google Form sheet.' },
+      { status: 410 },
     );
-    const adminBypass = user.role === 'admin';
-
-    const unavailableReason =
-      adminBypass
-        ? null
-        : pipelineClosed
-          ? PIPELINE_CLOSED_MESSAGE
-          : windowOpen
-            ? null
-            : windowConfigured
-              ? 'Coffee chat submissions are closed outside the configured date window.'
-              : 'Coffee chat submissions are closed until an admin sets the coffee chat start and due dates.';
-
-    return NextResponse.json({
-      coffeeChatWindow: {
-        coffeeChatStartDate: orgDates.coffeeChatStartDate,
-        applicationDueDate: orgDates.applicationDueDate,
-        configured: windowConfigured,
-        open: windowOpen && !pipelineClosed,
-      },
-      pipelineClosed: pipelineClosed && !adminBypass,
-      unavailableReason:
-        adminBypass || (access.allowed && !pipelineClosed) ? null : unavailableReason,
-    });
   } catch (e) {
     console.error('GET /api/coffee-chats failed:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -82,6 +53,9 @@ export async function POST(req: NextRequest) {
     await initDb();
     const user = await resolveCoffeeChatUser(req);
     if (!user) return unauthorized();
+    if (user.role !== 'admin') {
+      return forbidden('Coffee chat notes are imported by admins from the Google Form sheet.');
+    }
     const closed = await assertPipelineWritable(user);
     if (closed) return closed;
 

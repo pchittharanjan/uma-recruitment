@@ -88,13 +88,33 @@ function SaveStepBody({
   readOnly,
   canSave,
   canFinalize,
+  personalBoard,
   selectionComplete,
 }: {
   readOnly: boolean;
   canSave: boolean;
   canFinalize: boolean;
+  personalBoard?: boolean;
   selectionComplete: boolean;
 }) {
+  if (personalBoard && canSave && !readOnly) {
+    return (
+      <p>
+        Your personal board autosaves as you move cards. The admin deliberations screen is
+        the official source for final acceptances.
+      </p>
+    );
+  }
+
+  if (readOnly && !canSave) {
+    return (
+      <p>
+        Discussion view only. An Admin saves the official board — follow the room on the
+        admin screen.
+      </p>
+    );
+  }
+
   if (readOnly) {
     return <p>Recruitment is closed. The board is view-only.</p>;
   }
@@ -102,7 +122,8 @@ function SaveStepBody({
   if (!canSave) {
     return (
       <p>
-        You can drag cards on your screen. Only an admin can save for the whole team.
+        Discussion view only. An Admin saves the official board — follow the room on the
+        admin screen.
       </p>
     );
   }
@@ -143,6 +164,7 @@ export function DeliberationsBoardInstructions({
   canEditAcceptCap,
   canFinalize,
   readOnly,
+  personalBoard = false,
   selectionComplete,
   phasePreview = false,
 }: {
@@ -151,6 +173,8 @@ export function DeliberationsBoardInstructions({
   canEditAcceptCap?: boolean;
   canFinalize: boolean;
   readOnly: boolean;
+  /** Team portal personal scratch board (autosaved, not official). */
+  personalBoard?: boolean;
   selectionComplete: boolean;
   /** Admin is browsing deliberations before this team has reached that phase. */
   phasePreview?: boolean;
@@ -186,13 +210,27 @@ export function DeliberationsBoardInstructions({
   const cardActionsStep = step++;
   const saveStep = showSaveStep ? step++ : null;
 
-  const saveTitle = readOnly
-    ? 'View only'
-    : selectionComplete
-      ? 'Offers sent'
-      : canFinalize
-        ? 'Save and finish'
-        : 'Save your work';
+  const discussionViewOnly = !canSave && !personalBoard;
+  const saveTitle = personalBoard && canSave && !readOnly
+    ? 'Personal board autosaves'
+    : readOnly && canSave
+      ? 'View only'
+      : discussionViewOnly
+        ? 'Discussion view only'
+        : selectionComplete
+          ? 'Offers sent'
+          : canFinalize
+            ? 'Save and finish'
+            : 'Save your work';
+
+  const dragStepTitle =
+    personalBoard && canSave && !readOnly
+      ? 'Drag candidates on your personal board:'
+      : readOnly && canSave
+        ? 'Board is locked — recruitment is closed:'
+        : discussionViewOnly
+          ? 'Follow the board as your team deliberates:'
+          : 'Drag each candidate as your team talks through them:';
 
   return (
     <Collapsible open={open} onOpenChange={handleOpenChange}>
@@ -210,11 +248,22 @@ export function DeliberationsBoardInstructions({
 
         <CollapsibleContent className="pt-3">
           <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3">
-            <InstructionStep
-              step={dragStep}
-              title="Drag each candidate as your team talks through them:"
-            >
-              <ColumnFlow />
+            <InstructionStep step={dragStep} title={dragStepTitle}>
+              {discussionViewOnly ? (
+                <p>
+                  Columns show where candidates stand. Watch the admin screen for live
+                  moves during the room discussion.
+                </p>
+              ) : personalBoard ? (
+                <>
+                  <ColumnFlow />
+                  <p className="mt-1.5">
+                    Experiment freely — only the admin board counts for final offers.
+                  </p>
+                </>
+              ) : (
+                <ColumnFlow />
+              )}
             </InstructionStep>
 
             <InstructionStep step={acceptLimitStep} title="Acceptances have a limit">
@@ -236,6 +285,10 @@ export function DeliberationsBoardInstructions({
                 </InlineIcon>{' '}
                 menu to reject or open candidate comparisons.
               </p>
+              <p className="mt-1">
+                Reject marks a deliberations flag until Admin finalizes — it is not the
+                same as rejection in earlier rounds.
+              </p>
             </InstructionStep>
 
             {saveStep !== null ? (
@@ -244,6 +297,7 @@ export function DeliberationsBoardInstructions({
                   readOnly={readOnly}
                   canSave={canSave}
                   canFinalize={canFinalize}
+                  personalBoard={personalBoard}
                   selectionComplete={selectionComplete}
                 />
               </InstructionStep>

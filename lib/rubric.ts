@@ -1,6 +1,6 @@
 import type { TeamName } from '@/lib/db';
 import { teamBadgeClass } from '@/lib/team-colors';
-import { splitRowsByTeam, type TeamSplitConfig } from '@/lib/team-split';
+import { isTeamHeader, splitRowsByTeam, type TeamSplitConfig } from '@/lib/team-split';
 
 /** Collapse whitespace/newlines so Google Forms headers match reliably. */
 export function normalizeHeaderText(header: string): string {
@@ -31,10 +31,15 @@ const CONTEXT_PATTERNS: RegExp[] = [
   /graduation year/,
   /^major/,
   /^minor/,
-  /college/,
+  // "college" alone is too broad — essay prompts say "college students".
+  /^college$/,
+  /\bcollege of\b/,
+  /\bhome college\b/,
+  /\bwhich college\b/,
+  /\bschool\/college\b/,
   /\bcumulative gpa\b/,
   /^gpa$/,
-  /resume/,
+  /\bresume\b/,
   /curriculum vitae/,
   /\bcv\b/,
   /hear about/,
@@ -46,7 +51,8 @@ const CONTEXT_PATTERNS: RegExp[] = [
   /which semester/,
   /what team\(s\)/,
   /team\(s\) are you applying/,
-  /which team/,
+  // Prefer "which team(s)" / "which teams" — not "…Strategy Team" essay prompts.
+  /which teams?\b/,
   /linkedin/,
   /citizenship/,
   /work authorization/,
@@ -147,6 +153,13 @@ export function columnFillRate(rows: Record<string, string>[], header: string): 
 const SUGGEST_THRESHOLD = 0.5;
 const SHOW_THRESHOLD = 0.1;
 
+function isAutoScoreExcludedHeader(header: string, contextHeaders: Set<string>): boolean {
+  if (isContextColumn(header, contextHeaders)) return true;
+  if (isTeamHeader(header)) return true;
+  const normalized = normalizeHeaderText(header);
+  return PORTFOLIO_PATTERNS.some((p) => p.test(normalized));
+}
+
 /**
  * Suggest scored columns per team based on who actually answered each question.
  * Works when prompts change every semester — no hardcoded essay text.
@@ -169,10 +182,8 @@ export function suggestScoreFieldsByTeam(
     const scored: string[] = [];
 
     for (const header of headers) {
-      if (isContextColumn(header, contextHeaders)) continue;
+      if (isAutoScoreExcludedHeader(header, contextHeaders)) continue;
       if (teamRows.length === 0) continue;
-      const normalized = normalizeHeaderText(header);
-      if (PORTFOLIO_PATTERNS.some((p) => p.test(normalized))) continue;
       if (columnFillRate(teamRows, header) >= SUGGEST_THRESHOLD) {
         scored.push(header);
       }
@@ -182,6 +193,21 @@ export function suggestScoreFieldsByTeam(
   }
 
   return result;
+}
+
+/**
+ * Teams that should score one header — same fill-rate rules as suggestScoreFieldsByTeam.
+ * Used when Restore brings a column back from Application info.
+ */
+export function suggestedScoringTeamsForHeader(
+  header: string,
+  splitByTeam: Record<TeamName, { fields: Record<string, string> }[]>,
+  contextHeaders: Set<string>,
+  teamsWithApps: TeamName[],
+): TeamName[] {
+  if (isAutoScoreExcludedHeader(header, contextHeaders)) return [];
+  const fillRates = fillRatesByTeam(header, splitByTeam);
+  return teamsWithApps.filter((team) => fillRates[team] >= SUGGEST_THRESHOLD);
 }
 
 /** Columns to show in a team's scoring checklist (includes low-fill so admin can opt in). */

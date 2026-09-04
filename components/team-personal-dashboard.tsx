@@ -32,7 +32,8 @@ import {
   workStatusBadgeColor,
   yourWorkCardLabel,
 } from '@/lib/stages';
-import { gradingCompleteGuidance } from '@/lib/next-step-guidance';
+import { gradingCompleteGuidance, FIVE_LEVEL_RATING_PHRASE, interviewCompleteGuidance } from '@/lib/next-step-guidance';
+import { advancementIncompleteReminder } from '@/lib/advancement-rating-copy';
 import { cn } from '@/lib/utils';
 
 function workStageForPhase(status: RoundStatus): AssignmentStage | null {
@@ -144,12 +145,12 @@ function personalSummary(data: TeamOverviewData): string {
     ) {
       if (adv.isDirector) {
         return currentStage === 'first_round'
-          ? `You're done scoring interviews. Next: set color recommendations, then meet with your PMs to decide who advances.`
-          : `You're done grading. Next: set color recommendations, then meet with your PMs to decide who advances.`;
+          ? `You're done scoring interviews. Next: ${FIVE_LEVEL_RATING_PHRASE}, then meet with your PMs to decide who advances.`
+          : `You're done grading. Next: ${FIVE_LEVEL_RATING_PHRASE}, then meet with your PMs to decide who advances.`;
       }
       return currentStage === 'first_round'
-        ? `You're done scoring interviews. Next: set color recommendations on who should move forward.`
-        : `You're done grading. Next: set color recommendations on who should move forward.`;
+        ? `You're done scoring interviews. Next: ${FIVE_LEVEL_RATING_PHRASE} on who should move forward.`
+        : `You're done grading. Next: ${FIVE_LEVEL_RATING_PHRASE} on who should move forward.`;
     }
     const noun = currentStage
       ? workItemNoun(currentStage, scopedSummary.totalAssigned)
@@ -241,17 +242,13 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
       !(data.interviewEditLock?.locked);
 
     if (personalGradingDone || personalInterviewsDone) {
-      const guide = gradingCompleteGuidance(adv!.isDirector);
+      const guide = personalInterviewsDone
+        ? interviewCompleteGuidance(adv!.isDirector)
+        : gradingCompleteGuidance(adv!.isDirector);
       notices.push({
-        dismissKey: `${prefix}:${personalInterviewsDone ? 'interview' : 'grading'}-next-recommendations`,
+        dismissKey: `${prefix}:${personalInterviewsDone ? 'interview' : 'grading'}-next-ratings`,
         type: 'info',
-        message: adv!.isDirector
-          ? personalInterviewsDone
-            ? 'Interviews scored. Next: set color recommendations, then meet with your PMs to decide who advances.'
-            : 'Grading done. Next: set color recommendations, then meet with your PMs to decide who advances.'
-          : personalInterviewsDone
-            ? 'Interviews scored. Next: set color recommendations on who you think should move forward.'
-            : 'Grading done. Next: set color recommendations on who you think should move forward.',
+        message: guide.description,
         actionLabel: guide.ctaLabel,
         actionHref: adv!.href,
       });
@@ -270,7 +267,9 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
       notices.push({
         dismissKey: `${prefix}:advancement-incomplete`,
         type: 'warning',
-        message: `${count} ${noun} remaining before Directors can submit the advancement list.`,
+        message: advancementIncompleteReminder(count, noun),
+        actionLabel: gradingCompleteGuidance(adv.isDirector).ctaLabel,
+        actionHref: adv.href,
       });
     }
   }
@@ -311,6 +310,7 @@ export function TeamPersonalDashboard({
       <PageHeader
         eyebrow={`${data.round.label} · ${data.team.name}`}
         title={greetingForName(data.user.name)}
+        description={personalSummary(data)}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StageBadge label={data.phase.phaseLabel} color="blue" size="compact" />
@@ -531,10 +531,11 @@ export function TeamPersonalDashboard({
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>No Active Work</CardTitle>
+              <CardTitle>Nothing assigned yet</CardTitle>
               <CardDescription>
-                You don&apos;t have access to any open phases for this team yet, or nothing has
-                been assigned to you.
+                {data.phase.unlockedStages.length === 0
+                  ? 'Admin is still setting up this phase. Check the sidebar — when a phase becomes clickable, your work will show up here.'
+                  : "You don't have any applications or interviews assigned yet. Check back once Admin imports and assigns work to you."}
               </CardDescription>
             </CardHeader>
           </Card>

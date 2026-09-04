@@ -174,6 +174,7 @@ async function handleGet(
     return NextResponse.json({
       applicationId: assignment.applicationId,
       assignmentId: assignment.assignmentId,
+      assignmentStatus: assignment.status,
       rowIndex: assignment.rowIndex,
       candidateName: assignment.candidateName,
       stage,

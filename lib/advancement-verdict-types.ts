@@ -42,6 +42,32 @@ export function verdictLabel(verdict: AdvancementVerdict): string {
   }
 }
 
+/** Plain-language meaning shown in tooltips and the rating guide. */
+export function verdictMeaning(verdict: AdvancementVerdict): string {
+  switch (verdict) {
+    case 'green':
+      return 'Strong yes — should advance';
+    case 'high_yellow':
+      return 'Lean yes — good candidate, minor concerns';
+    case 'yellow':
+      return 'Borderline — could go either way';
+    case 'low_yellow':
+      return 'Lean no — concerns outweigh strengths';
+    case 'red':
+      return 'No — should not advance';
+  }
+}
+
+export const ADVANCEMENT_RATING_LEGEND: Array<{
+  verdict: AdvancementVerdict;
+  label: string;
+  meaning: string;
+}> = ADVANCEMENT_VERDICT_VALUES.map((verdict) => ({
+  verdict,
+  label: verdictLabel(verdict),
+  meaning: verdictMeaning(verdict),
+}));
+
 /** Verdicts treated as strong advance signals for panel summaries. */
 export function isStrongAdvanceSignal(verdict: AdvancementVerdict | null): boolean {
   return verdict === 'green' || verdict === 'high_yellow';

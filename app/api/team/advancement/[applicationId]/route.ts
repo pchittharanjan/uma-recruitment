@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, initDb } from '@/lib/db';
+import { getDb, getTeamById, initDb } from '@/lib/db';
 import { applicantDisplayId } from '@/lib/blind';
 import { extractCandidateFromFields } from '@/lib/candidates';
 import { forbidden, unauthorized } from '@/lib/auth';
@@ -14,6 +14,14 @@ import {
   serializeApplicationFields,
   userSeesBlindApplications,
 } from '@/lib/team-dashboard';
+import {
+  criterionScoreKey,
+  primaryScoredQuestions,
+  questionsLinkedTo,
+  resolveGradingRubric,
+  responseFieldsForQuestion,
+  splitScoreRows,
+} from '@/lib/grading-model';
 
 export async function GET(
   req: NextRequest,
@@ -81,18 +89,86 @@ export async function GET(
     // Keep application-stage advancement blind for Directors too (API-layer strip).
     const blind = userSeesBlindApplications(user);
 
+    const displayFields = serializeApplicationFields(fields, settings, blind);
+
     let existingScores: Record<string, number> = {};
     let existingComment: string | null = null;
+    let questionNotes: Array<{ label: string; note: string }> = [];
+    let scoreFieldLabels: Record<string, string> = {};
+    let questionReviews: Array<{
+      id: string;
+      label: string;
+      responses: Array<{ field: string; value: string }>;
+      criteria: Array<{ key: string; name: string; score: number | null }>;
+      note: string | null;
+    }> | null = null;
+    let leftoverFields: Record<string, string> = displayFields;
+
+    const team = await getTeamById(teamId);
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found.' }, { status: 404 });
+    }
 
     if (assignment) {
       const scoresResult = await db.execute({
-        sql: 'SELECT field_name, score FROM scores WHERE assignment_id = ?',
+        sql: 'SELECT field_name, score, note FROM scores WHERE assignment_id = ?',
         args: [assignment.assignmentId],
       });
-      for (const scoreRow of scoresResult.rows) {
-        existingScores[scoreRow.field_name as string] = scoreRow.score as number;
-      }
+      const split = splitScoreRows(scoresResult.rows);
+      existingScores = split.scores;
       existingComment = assignment.comment || null;
+
+      const rubric = resolveGradingRubric(settings, team.name);
+      if (rubric.usesCriterionRubric) {
+        const usedFields = new Set<string>();
+        questionReviews = [];
+
+        for (const question of primaryScoredQuestions(rubric.applicationQuestions)) {
+          const responses: Array<{ field: string; value: string }> = [];
+          const pushResponseFields = (q: typeof question) => {
+            for (const field of responseFieldsForQuestion(q)) {
+              if (!(field in displayFields) || usedFields.has(field)) continue;
+              usedFields.add(field);
+              responses.push({ field, value: displayFields[field] ?? '' });
+            }
+          };
+          pushResponseFields(question);
+          for (const linked of questionsLinkedTo(rubric.applicationQuestions, question.id)) {
+            pushResponseFields(linked);
+          }
+
+          const criteria = question.criteria.map((criterion) => {
+            const key = criterionScoreKey(question.id, criterion.id);
+            return {
+              key,
+              name: criterion.name,
+              score:
+                existingScores[key] !== undefined ? existingScores[key] : null,
+            };
+          });
+
+          const note = split.notes[question.id]?.trim() || null;
+          if (note) questionNotes.push({ label: question.label, note });
+
+          questionReviews.push({
+            id: question.id,
+            label: question.label,
+            responses,
+            criteria,
+            note,
+          });
+        }
+
+        leftoverFields = Object.fromEntries(
+          Object.entries(displayFields).filter(([key]) => !usedFields.has(key)),
+        );
+      } else {
+        for (const field of [...settings.score_fields, ...settings.custom_score_fields]) {
+          const note = split.notes[field]?.trim();
+          if (note) questionNotes.push({ label: field, note });
+          scoreFieldLabels[field] = field;
+        }
+      }
     }
 
     return NextResponse.json({
@@ -100,11 +176,14 @@ export async function GET(
       rowIndex,
       displayId: applicantDisplayId(rowIndex),
       candidateName: blind ? null : candidateName,
-      fields: serializeApplicationFields(fields, settings, blind),
+      fields: leftoverFields,
       existingScores,
       existingComment,
+      questionNotes,
+      questionReviews,
       scoreFields: settings.score_fields,
       customScoreFields: settings.custom_score_fields,
+      scoreFieldLabels,
       blind,
     });
   } catch (e) {

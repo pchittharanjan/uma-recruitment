@@ -1,5 +1,25 @@
-import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
-import { getLatestAdvancementSubmission } from '@/lib/advancement-submissions';
+import type {
+  AdvancementFromStage,
+  AdvancementPanelVerdict,
+  AdvancementSubmission,
+} from '@/lib/advancement-submissions-types';
+import {
+  getAdvancementPreview,
+  getLatestAdvancementSubmission,
+  isAdvancementReadOnly,
+  listAdvancementSubmissionHistory,
+} from '@/lib/advancement-submissions';
+import { listAdminAdvancementVerdicts } from '@/lib/admin-advancement-verdicts';
+import { listTeamAdvancementVerdicts } from '@/lib/advancement-verdicts';
+import type { AdvancementVerdict } from '@/lib/advancement-verdict-types';
+import {
+  resolveAdvancementSelectionMax,
+  resolveAdvancementSelectionMin,
+  teamAllowsUncappedFirstRoundAdvancement,
+} from '@/lib/advancement-cap-helpers';
+import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
+import { getActiveRoundForTeam } from '@/lib/rounds';
+import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 import type { User } from '@/lib/db';
 import { getDb, getTeamById } from '@/lib/db';
 import { cachedPerRequest } from '@/lib/request-cache';
@@ -9,6 +29,126 @@ import {
 } from '@/lib/team-pipeline-profile';
 
 export type AdvancementOutcomeLabel = 'advanced' | 'rejected' | 'on_list' | 'pending';
+
+export interface AdminAdvancementApplicantRow {
+  applicationId: number;
+  rowIndex: number;
+  candidateName: string;
+  average: number;
+  rawAverage?: number;
+  rank: number;
+  adminVerdict: AdvancementVerdict | null;
+  panelVerdicts: AdvancementPanelVerdict[];
+}
+
+export interface AdminAdvancementWorkspace {
+  teamId: number;
+  teamName: string | null;
+  fromStage: AdvancementFromStage;
+  round: { id: number; label: string; status: string };
+  advancementCap: number | null;
+  overCapExtra: number;
+  selectionMin: number | null;
+  selectionMax: number | null;
+  allowUncappedFirstRound: boolean;
+  preview: {
+    applications: AdminAdvancementApplicantRow[];
+    incompleteCount: number;
+    totalApplications: number;
+  };
+  submission: AdvancementSubmission | null;
+  history: AdvancementSubmission[];
+  readOnly: boolean;
+  canAct: boolean;
+}
+
+export async function getAdminAdvancementWorkspace(
+  admin: User,
+  teamId: number,
+  fromStage: AdvancementFromStage,
+): Promise<AdminAdvancementWorkspace> {
+  if (admin.role !== 'admin') {
+    throw new Error('Only admins can access admin advancement workspace.');
+  }
+
+  const round = await getActiveRoundForTeam(teamId);
+  if (!round) throw new Error('No active round for this team.');
+
+  const previewRaw = await getAdvancementPreview(teamId, round.id, fromStage);
+  const applicationIds = previewRaw.applications.map((app) => app.applicationId);
+
+  const [panelByApp, adminByApp, submission, history, recruitmentCycleLabel, capState] =
+    await Promise.all([
+      listTeamAdvancementVerdicts(teamId, round.id, fromStage, applicationIds),
+      listAdminAdvancementVerdicts(teamId, round.id, fromStage, admin.id, applicationIds),
+      getLatestAdvancementSubmission(teamId, round.id, fromStage),
+      listAdvancementSubmissionHistory(teamId, round.id, fromStage),
+      getRecruitmentCycleLabel(),
+      getTeamAdvancementCapState(teamId, fromStage),
+    ]);
+
+  const applications: AdminAdvancementApplicantRow[] = previewRaw.applications.map((app) => {
+    const panelRows = panelByApp.get(app.applicationId) ?? [];
+    const rawAverage = 'rawAverage' in app ? app.rawAverage : undefined;
+    return {
+      applicationId: app.applicationId,
+      rowIndex: app.rowIndex,
+      candidateName: app.candidateName ?? app.displayId,
+      average: app.average,
+      ...(rawAverage !== undefined ? { rawAverage } : {}),
+      rank: app.rank,
+      adminVerdict: adminByApp.get(app.applicationId) ?? null,
+      panelVerdicts: panelRows.map((row) => ({
+        name: row.name,
+        verdict: row.verdict,
+      })),
+    };
+  });
+
+  const readOnly = isAdvancementReadOnly(round.status, fromStage);
+  const canAct = !readOnly && submission?.status !== 'approved';
+  const { cap: advancementCap, overCapExtra } = capState;
+  const team = await getTeamById(teamId);
+  const allowUncappedFirstRound =
+    fromStage === 'first_round' &&
+    Boolean(team?.name && teamAllowsUncappedFirstRoundAdvancement(team.name));
+  const previousSubmittedCount =
+    submission?.status === 'submitted' ? submission.candidates.length : null;
+  const selectionMin = resolveAdvancementSelectionMin({
+    cap: advancementCap,
+    totalRanked: previewRaw.totalApplications,
+    overCapExtra,
+    allowUncapped: allowUncappedFirstRound,
+  });
+  const selectionMax = resolveAdvancementSelectionMax({
+    cap: advancementCap,
+    totalRanked: previewRaw.totalApplications,
+    overCapExtra,
+    previousSubmittedCount,
+    allowUncapped: allowUncappedFirstRound,
+  });
+
+  return {
+    teamId,
+    teamName: team?.name ?? null,
+    fromStage,
+    round: { id: round.id, label: recruitmentCycleLabel, status: round.status },
+    advancementCap,
+    overCapExtra,
+    selectionMin,
+    selectionMax,
+    allowUncappedFirstRound,
+    preview: {
+      applications,
+      incompleteCount: previewRaw.incompleteCount,
+      totalApplications: previewRaw.totalApplications,
+    },
+    submission,
+    history,
+    readOnly,
+    canAct,
+  };
+}
 
 export interface TeamAdvancementOutcomeRow {
   applicationId: number;

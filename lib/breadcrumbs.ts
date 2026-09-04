@@ -24,6 +24,7 @@ const ADMIN_SEGMENT_LABELS: Record<string, string> = {
   'interview-setup': 'Interview Setup',
   setup: 'Setup',
   'grader-preview': 'Grader Preview',
+  grade: 'Application Grading',
   'interview-preview': 'Interviewer Preview',
   deliberations: 'Deliberations',
   'final-selection': 'Final Selection',
@@ -110,6 +111,16 @@ function buildAdminBreadcrumbs(
             : 'Interviewer Preview',
       });
       index += hasStage ? 2 : 1;
+      continue;
+    }
+
+    if (segment === 'grade' && parts[index + 1] && /^\d+$/.test(parts[index + 1])) {
+      crumbs.push({
+        label: ADMIN_SEGMENT_LABELS.grade,
+        href: `/admin/teams/${parts[2]}/grade`,
+      });
+      crumbs.push({ label: 'Score' });
+      index += 2;
       continue;
     }
 

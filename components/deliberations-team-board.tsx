@@ -32,6 +32,9 @@ interface DeliberationsResponse {
   pipelineClosed?: boolean;
   /** When set, overrides pipelineClosed for board interactivity (admin stays writable). */
   readOnly?: boolean;
+  /** Team portal: this board is a per-user scratch workspace, not the official admin board. */
+  personalBoard?: boolean;
+  autosave?: boolean;
   error?: string;
 }
 
@@ -160,10 +163,23 @@ export function DeliberationsTeamBoard({
 
   return (
     <div className="space-y-4">
-      {readOnly && (
+      {data.personalBoard && !readOnly && (
+        <StatusBanner
+          type="info"
+          title="Your personal board — autosaved."
+          message="Drag cards to explore placements here. The admin deliberations screen is the official source for final acceptances."
+        />
+      )}
+      {readOnly && data.pipelineClosed && (
         <StatusBanner
           type="info"
           message="Recruitment is closed. Deliberations are view-only."
+        />
+      )}
+      {readOnly && selectionComplete && !data.pipelineClosed && (
+        <StatusBanner
+          type="info"
+          message="Final selection is complete. Your personal board is view-only."
         />
       )}
       {candidateCount === 0 && !data.phasePreview && (
@@ -174,9 +190,10 @@ export function DeliberationsTeamBoard({
       )}
       <DeliberationsBoardInstructions
         canSave={effectiveCanSave}
-        canEditAcceptCap={effectiveCanSave}
+        canEditAcceptCap={effectiveCanSave && !data.personalBoard}
         canFinalize={effectiveCanFinalize}
         readOnly={readOnly}
+        personalBoard={Boolean(data.personalBoard)}
         selectionComplete={selectionComplete}
         phasePreview={Boolean(data.phasePreview)}
       />
@@ -189,10 +206,11 @@ export function DeliberationsTeamBoard({
         overCapExtra={data.board.overCapExtra ?? 0}
         teamName={data.team.name}
         canSave={effectiveCanSave}
-        canEditAcceptCap={effectiveCanSave}
+        canEditAcceptCap={effectiveCanSave && !data.personalBoard}
         canRequestOverCap={Boolean(data.canRequestOverCap) && !readOnly && !selectionComplete}
         canFinalize={effectiveCanFinalize}
         readOnly={readOnly}
+        autosave={Boolean(data.autosave) && effectiveCanSave}
         selectionComplete={selectionComplete}
         saveUrl={effectiveCanSave ? boardUrl : undefined}
         resolveDetailUrl={resolveDetailUrl}

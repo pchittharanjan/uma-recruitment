@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CircleHelpIcon, PencilIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { gradingAppHref, type GradingAudience } from '@/lib/grading-paths';
 
 export function GradingEditControl({
   teamId,
@@ -10,14 +11,16 @@ export function GradingEditControl({
   locked,
   lockMessage,
   label = 'Edit scores',
+  audience = 'team',
 }: {
   teamId: string;
   applicationId: number;
   locked: boolean;
   lockMessage: string;
   label?: string;
+  audience?: GradingAudience;
 }) {
-  const href = `/team/${teamId}/grade/${applicationId}`;
+  const href = gradingAppHref(teamId, applicationId, audience);
 
   if (!locked) {
     return (

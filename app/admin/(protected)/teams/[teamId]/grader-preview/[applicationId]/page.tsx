@@ -4,6 +4,7 @@ import React, { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageContent } from '@/components/page-shell';
+import { ResponseText } from '@/components/response-text';
 import { Card } from '@/components/ui/card';
 import LoadingButton from '@/components/loading-button';
 import ScoreSelector from '@/components/ScoreSelector';
@@ -59,29 +60,7 @@ export default function AdminGraderPreviewPage({
     return <PageLoading />;
   }
 
-  const renderWithLinks = (text: string) => {
-    const urlRegex = /https?:\/\/[^\s]+/g;
-    const parts: (string | React.ReactElement)[] = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = urlRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      parts.push(
-        <a
-          key={match.index}
-          href={match[0]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="break-all text-primary underline"
-        >
-          {match[0]}
-        </a>,
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts;
-  };
+  const renderWithLinks = (text: string) => <ResponseText text={text} />;
 
   return (
     <div className="pb-8">

@@ -5,6 +5,7 @@ import ScoreSelector from '@/components/ScoreSelector';
 import { RequiredAsterisk } from '@/components/ui/label';
 import {
   interviewNoteFieldsFromGuide,
+  interviewBehavioralNoteFieldsFromGuide,
   interviewScaleMax,
   interviewScoreFieldGroups,
   interviewWeightPercents,
@@ -184,6 +185,7 @@ export function InterviewNotesAndScoringForm({
   comment,
   disabled,
   compact = false,
+  phase,
   onNoteChange,
   onScoreChange,
   onCommentChange,
@@ -194,21 +196,43 @@ export function InterviewNotesAndScoringForm({
   comment: string;
   disabled?: boolean;
   compact?: boolean;
+  /** When set, only show fields for this interview phase (case → behavioral). */
+  phase?: 'case' | 'behavioral';
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
 }) {
-  const noteQuestions = interviewNoteFieldsFromGuide(guide);
-  const fieldGroups = interviewScoreFieldGroups(guide);
+  const noteQuestions =
+    phase === 'behavioral'
+      ? interviewBehavioralNoteFieldsFromGuide(guide)
+      : phase === 'case'
+        ? interviewNoteFieldsFromGuide(guide)
+        : [
+            ...interviewNoteFieldsFromGuide(guide),
+            ...interviewBehavioralNoteFieldsFromGuide(guide),
+          ];
+  const allGroups = interviewScoreFieldGroups(guide);
+  const fieldGroups =
+    phase != null
+      ? allGroups.filter((g) => g.key === phase)
+      : allGroups;
   const scaleMax = interviewScaleMax(guide);
+  const noteSectionLabel =
+    phase === 'behavioral'
+      ? 'Part 2: Behavioral questions'
+      : phase === 'case'
+        ? caseQuestionsLabel(guide)
+        : null;
 
   return (
     <div className="uma-stack-page">
       {noteQuestions.length > 0 ? (
         <section className="uma-stack-section">
-          <p className="uma-section-label font-normal text-muted-foreground/75">
-            {caseQuestionsLabel(guide)}
-          </p>
+          {noteSectionLabel ? (
+            <p className="uma-section-label font-normal text-muted-foreground/75">
+              {noteSectionLabel}
+            </p>
+          ) : null}
           <div className="flex flex-col">
             {noteQuestions.map((question, index) => (
               <div
@@ -241,19 +265,21 @@ export function InterviewNotesAndScoringForm({
         onScoreChange={onScoreChange}
       />
 
-      <section className="uma-stack-section">
-        <p className="uma-section-label font-normal text-muted-foreground/75">
-          Overall notes
-        </p>
-        <textarea
-          value={comment}
-          onChange={(e) => onCommentChange(e.target.value)}
-          disabled={disabled}
-          placeholder="Anything else from the interview (not visible to other stages until deliberations)"
-          rows={3}
-          className={cn(interviewNoteTextareaClass, 'resize-none')}
-        />
-      </section>
+      {(phase == null || phase === 'behavioral') && (
+        <section className="uma-stack-section">
+          <p className="uma-section-label font-normal text-muted-foreground/75">
+            Overall notes
+          </p>
+          <textarea
+            value={comment}
+            onChange={(e) => onCommentChange(e.target.value)}
+            disabled={disabled}
+            placeholder="Anything else from the interview (not visible to other stages until deliberations)"
+            rows={3}
+            className={cn(interviewNoteTextareaClass, 'resize-none')}
+          />
+        </section>
+      )}
     </div>
   );
 }

@@ -14,7 +14,8 @@ const ERASE_DESCRIPTION = (
     <code className="text-xs">.test@berkeley.edu</code> grader accounts.
     <br />
     <br />
-    This cannot be undone. After erasing, you can import again from the Import flow.
+    This cannot be undone. After erasing, teams are reset to Application so you can
+    import again immediately.
   </>
 );
 

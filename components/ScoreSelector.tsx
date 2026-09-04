@@ -27,8 +27,8 @@ export default function ScoreSelector({ value, onChange, disabled, max = 5 }: Pr
             'size-11 rounded-lg border-2 text-sm font-semibold transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             value === n
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border bg-background text-foreground hover:border-primary/50 hover:text-primary',
+              ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+              : 'border-foreground/35 bg-[var(--surface-raised)] text-foreground shadow-sm hover:border-primary hover:text-primary',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           )}
         >

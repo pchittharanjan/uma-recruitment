@@ -12,6 +12,11 @@ import { applicantDisplayId } from '@/lib/blind';
 import { GradingEditControl } from '@/components/grading-edit-control';
 import { gradingCompleteGuidance } from '@/lib/next-step-guidance';
 import {
+  gradingBackHref,
+  gradingAppHref,
+  type GradingAudience,
+} from '@/lib/grading-paths';
+import {
   assignmentWorkStatus,
   WORK_STATUS_DISPLAY,
   workStatusBadgeColor,
@@ -23,21 +28,28 @@ export function TeamGradingQueue({
   teamId,
   data,
   accessError,
+  audience = 'team',
+  teamName: teamNameProp,
 }: {
   teamId: string;
   data: TeamGradingData | null;
   accessError?: string;
+  audience?: GradingAudience;
+  teamName?: string;
 }) {
   const { teams } = useShellUser();
-  const teamName = teams.find((t) => String(t.id) === teamId)?.name ?? '';
+  const teamName = teamNameProp || teams.find((t) => String(t.id) === teamId)?.name || '';
+  const isAdmin = audience === 'admin' || data?.isAdminGrader;
+  const gradingAudience: GradingAudience = isAdmin ? 'admin' : 'team';
+  const backHref = gradingBackHref(teamId, gradingAudience);
 
   if (accessError && !data) {
     return (
       <CenteredMessage
         title="Can't open grading"
         description={accessError}
-        ctaLabel="← Team Overview"
-        ctaHref={`/team/${teamId}`}
+        ctaLabel={isAdmin ? '← Back to team' : '← Team Overview'}
+        ctaHref={backHref}
       />
     );
   }
@@ -56,9 +68,13 @@ export function TeamGradingQueue({
       <CenteredMessage
         icon={ClipboardListIcon}
         title="No applications assigned"
-        description="Nothing to grade yet. You'll see applicants here once an admin imports and assigns them to you."
-        ctaLabel="← Overview"
-        ctaHref={`/team/${teamId}`}
+        description={
+          isAdmin
+            ? 'Add yourself as a grader during import, or move leftover apps to yourself on Review assignments. This queue is name-blind — the spreadsheet still shows names.'
+            : "Nothing to grade yet. You'll see applicants here once an admin imports and assigns them to you."
+        }
+        ctaLabel={isAdmin ? '← Back to team' : '← Overview'}
+        ctaHref={backHref}
       />
     );
   }
@@ -66,18 +82,20 @@ export function TeamGradingQueue({
   return (
     <PageContainer className="space-y-6">
       <PageHeader
-        eyebrow={teamName || 'Your team'}
+        eyebrow={teamName || (isAdmin ? 'Admin' : 'Your team')}
         title="Application Grading"
         description={
           completeCopy
             ? undefined
             : allDone
               ? undefined
-              : 'Score each assigned application. When you finish, you\'ll add color recommendations next.'
+              : isAdmin
+                ? 'Score each assigned application. Names and identifying fields are hidden here.'
+                : 'Score each assigned application. Names are hidden during application grading — that is intentional. When you finish, you will rate who should advance using five color ratings (Green → Red).'
         }
         actions={
-          <NavLinkButton variant="secondary" href={`/team/${teamId}`} data-tour="grade-overview">
-            ← Overview
+          <NavLinkButton variant="secondary" href={backHref} data-tour="grade-overview">
+            {isAdmin ? '← Back to team' : '← Overview'}
           </NavLinkButton>
         }
       />
@@ -103,6 +121,35 @@ export function TeamGradingQueue({
           </Card>
         )}
 
+        {data.isAdHocExec && allDone && (
+          <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
+            <div className="space-y-1">
+              <CardTitle className="text-base">All applications graded</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
+                You&apos;re done — no ratings step for your role.
+              </CardDescription>
+            </div>
+            <NavLinkButton className="w-full sm:w-auto" href={backHref}>
+              ← Overview
+            </NavLinkButton>
+          </Card>
+        )}
+
+        {isAdmin && allDone && (
+          <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
+            <div className="space-y-1">
+              <CardTitle className="text-base">All applications graded</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
+                You&apos;re done grading this queue. Advancement still happens from the team
+                dashboard — this view stays name-blind.
+              </CardDescription>
+            </div>
+            <NavLinkButton className="w-full sm:w-auto" href={backHref}>
+              ← Back to team
+            </NavLinkButton>
+          </Card>
+        )}
+
         <Card className="gap-4 p-5 sm:p-6">
           <div data-tour="grade-progress">
             <ProgressBar
@@ -114,7 +161,7 @@ export function TeamGradingQueue({
           {!allDone && !gradingLocked && firstPending && (
             <NavLinkButton
               className="w-full"
-              href={`/team/${teamId}/grade/${firstPending.applicationId}`}
+              href={gradingAppHref(teamId, firstPending.applicationId, gradingAudience)}
               data-tour="grade-start"
             >
               {data.progress.completed === 0 ? 'Start grading' : 'Continue grading'} →
@@ -148,6 +195,7 @@ export function TeamGradingQueue({
                       applicationId={a.applicationId}
                       locked={gradingLocked}
                       lockMessage={lockMessage}
+                      audience={gradingAudience}
                       label={a.status === 'completed' ? 'Edit scores' : 'Grade application'}
                     />
                   </div>

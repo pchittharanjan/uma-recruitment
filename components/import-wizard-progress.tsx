@@ -4,14 +4,23 @@ import { CheckIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-export type WizardStepId = 'upload' | 'teams' | 'scoring' | 'graders' | 'confirm';
+export type WizardStepId =
+  | 'upload'
+  | 'teams'
+  | 'scoring'
+  | 'criteria'
+  | 'preview'
+  | 'graders'
+  | 'assign';
 
 const WIZARD_STEPS: ReadonlyArray<{ id: WizardStepId; label: string }> = [
   { id: 'upload', label: 'Upload' },
   { id: 'teams', label: 'Teams' },
-  { id: 'scoring', label: 'Review' },
+  { id: 'scoring', label: 'Questions' },
+  { id: 'criteria', label: 'Criteria' },
+  { id: 'preview', label: 'Preview' },
   { id: 'graders', label: 'Users' },
-  { id: 'confirm', label: 'Confirm' },
+  { id: 'assign', label: 'Assign' },
 ];
 
 export const WIZARD_STEP_IDS = WIZARD_STEPS.map((step) => step.id);

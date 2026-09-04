@@ -7,6 +7,9 @@ import LoadingButton from '@/components/loading-button';
 import StageBadge from '@/components/stage-badge';
 import StatusBanner from '@/components/status-banner';
 import { PageHeader, PageSection } from '@/components/page-shell';
+import { NavLinkButton } from '@/components/nav-link-button';
+import { useShellUser } from '@/components/shell-user-provider';
+import { gradingQueueHref } from '@/lib/grading-paths';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,8 +48,17 @@ interface GraderData {
   assignments: AssignmentEntry[];
 }
 
+export interface AssignmentCoverageSummary {
+  applicationCount: number;
+  totalAssignments: number;
+  byGraderCount: { zero: number; one: number; two: number; three: number; fourPlus: number };
+  exact: boolean;
+}
+
 export interface AssignmentReviewData {
   team: { id: number; name: string };
+  gradersPerApplication?: number;
+  coverage?: AssignmentCoverageSummary;
   graders: GraderData[];
   load: LoadSummary | null;
 }
@@ -104,6 +116,7 @@ export function AdminAssignmentReview({
   teamId: string;
   initialData: AssignmentReviewData;
 }) {
+  const { user } = useShellUser();
   const [data, setData] = useState(initialData);
   const [search, setSearch] = useState('');
   const [loadDrafts, setLoadDrafts] = useState<Record<number, string>>({});
@@ -137,6 +150,10 @@ export function AdminAssignmentReview({
   const assignedGraders = useMemo(
     () => data.graders.filter((g) => g.total > 0),
     [data.graders],
+  );
+  const myGrading = useMemo(
+    () => (user.id ? data.graders.find((g) => g.id === user.id && g.total > 0) : undefined),
+    [data.graders, user.id],
   );
 
   const moveCapacity = moveDraft
@@ -356,22 +373,42 @@ export function AdminAssignmentReview({
       <PageHeader
         eyebrow={data.team.name}
         title="Review grader assignments"
-        description="Anytime after import — including during grading — you can even out counts, give someone fewer apps, or move leftover apps to specific people if a grader has an emergency or is going slowly. Names are visible here for admins only; graders still see applicant numbers."
+        description="Anytime after import — including during grading — you can even out counts, give someone fewer apps, or move leftover apps to specific people if a grader has an emergency or is going slowly. Names are visible here; if you grade, use the name-blind queue so you don't see them while scoring."
         actions={
-          load?.rebalanceable ? (
-            <LoadingButton
-              onClick={handleRebalance}
-              loading={rebalancing}
-              data-tour="assignments-actions"
-            >
-              Even out loads
-            </LoadingButton>
-          ) : null
+          <div className="flex flex-wrap items-center gap-2">
+            {myGrading && (
+              <NavLinkButton href={gradingQueueHref(teamId, 'admin')}>
+                {myGrading.completed >= myGrading.total
+                  ? 'Review my scores (name-blind)'
+                  : `Grade mine, name-blind (${myGrading.total - myGrading.completed} left)`}
+              </NavLinkButton>
+            )}
+            {load?.rebalanceable ? (
+              <LoadingButton
+                onClick={handleRebalance}
+                loading={rebalancing}
+                data-tour="assignments-actions"
+              >
+                Even out loads
+              </LoadingButton>
+            ) : null}
+          </div>
         }
       />
 
       {successMsg && <StatusBanner message={successMsg} type="success" />}
       {error && <StatusBanner message={error} type="error" />}
+
+      {data.coverage && data.gradersPerApplication != null && (
+        <StatusBanner
+          type={data.coverage.exact ? 'info' : 'warning'}
+          message={
+            data.coverage.exact
+              ? `Each of ${data.coverage.applicationCount} applicants has exactly ${data.gradersPerApplication} graders (${data.coverage.totalAssignments} assignments). Per-grader loads of ${load?.min ?? '—'}–${load?.max ?? '—'} across ${assignedGraders.length} people is the expected even split.`
+              : `Not every applicant has exactly ${data.gradersPerApplication} graders (0: ${data.coverage.byGraderCount.zero}, 1: ${data.coverage.byGraderCount.one}, 2: ${data.coverage.byGraderCount.two}, 3: ${data.coverage.byGraderCount.three}, 4+: ${data.coverage.byGraderCount.fourPlus}). Fix before grading.`
+          }
+        />
+      )}
 
       {data.graders.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -600,10 +637,10 @@ export function AdminAssignmentReview({
       </Dialog>
 
       <Dialog open={moveDraft !== null} onOpenChange={(open) => !open && setMoveDraft(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="gap-5 p-5 sm:max-w-md sm:p-6">
+          <DialogHeader className="gap-3">
             <DialogTitle>Move remaining applications</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="leading-relaxed">
               {moveDraft && (
                 <>
                   Take leftover apps from <strong>{moveDraft.fromGraderName}</strong> and give them
@@ -615,13 +652,14 @@ export function AdminAssignmentReview({
           </DialogHeader>
 
           {moveDraft && (
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="space-y-5">
+              <div className="space-y-2.5">
                 <Label htmlFor="moveCount" required>
                   How many to move
                 </Label>
                 <Input
                   id="moveCount"
+                  className="h-9"
                   type="number"
                   min={1}
                   max={Math.max(moveCapacity, 1)}
@@ -638,7 +676,7 @@ export function AdminAssignmentReview({
               </div>
 
               {moveDraft.inProgress > 0 && (
-                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg px-1 py-1 text-sm leading-snug">
                   <Checkbox
                     className="mt-0.5"
                     checked={moveIncludeInProgress}
@@ -659,15 +697,15 @@ export function AdminAssignmentReview({
                 </label>
               )}
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <Label required>Assign to</Label>
                 {moveRecipients.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No other people on this team’s pool.</p>
                 ) : (
-                  <ul className="max-h-56 space-y-1 overflow-auto rounded-md border border-border/60 p-2">
+                  <ul className="max-h-56 overflow-auto rounded-lg border border-border/60 bg-muted/15 divide-y divide-border/40">
                     {moveRecipients.map((g) => (
                       <li key={g.id}>
-                        <label className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-sm uma-hover-on-panel">
+                        <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm uma-hover-on-panel">
                           <Checkbox
                             checked={moveToIds.includes(g.id)}
                             onCheckedChange={(checked) =>
@@ -675,7 +713,7 @@ export function AdminAssignmentReview({
                             }
                           />
                           <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                             {g.total}
                           </span>
                         </label>
@@ -689,7 +727,7 @@ export function AdminAssignmentReview({
 
           {moveError && <p className="text-sm text-destructive">{moveError}</p>}
 
-          <DialogFooter>
+          <DialogFooter className="gap-3 pt-1">
             <Button type="button" variant="outline" onClick={() => setMoveDraft(null)}>
               Cancel
             </Button>

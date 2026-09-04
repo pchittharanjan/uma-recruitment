@@ -70,7 +70,7 @@ export function initDb(): Promise<void> {
  * Bump to force a full re-init when schema work happens outside SCHEMA.sql and
  * the MIGRATIONS list (e.g. editing a backfill function's logic).
  */
-const INIT_REVISION = 2;
+const INIT_REVISION = 4;
 
 /** Fingerprint of everything initDbOnce runs; changes whenever schema work changes. */
 function computeSchemaFingerprint(): string {
@@ -302,6 +302,16 @@ const MIGRATIONS = [
       updated_by INTEGER REFERENCES users(id),
       PRIMARY KEY (team_id, round_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS deliberation_personal_boards (
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      layout_json TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (team_id, round_id, user_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_deliberation_personal_boards_user
+      ON deliberation_personal_boards(user_id)`,
     `CREATE TABLE IF NOT EXISTS notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -331,6 +341,19 @@ const MIGRATIONS = [
     `CREATE INDEX IF NOT EXISTS idx_applications_rejected_from
       ON applications(team_id, round_id, rejected_from_stage)
       WHERE stage = 'rejected'`,
+    'ALTER TABLE round_settings ADD COLUMN grading_model TEXT',
+    `CREATE TABLE IF NOT EXISTS admin_advancement_verdicts (
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      from_stage TEXT NOT NULL CHECK (from_stage IN ('application', 'first_round')),
+      admin_user_id INTEGER NOT NULL REFERENCES users(id),
+      verdict TEXT CHECK (verdict IN ('green', 'high_yellow', 'yellow', 'low_yellow', 'red')),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (team_id, round_id, application_id, from_stage, admin_user_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_admin_advancement_verdicts_team_round
+      ON admin_advancement_verdicts(team_id, round_id, from_stage)`,
 ];
 
 async function scoresNeedsScaleMigration(
@@ -936,7 +959,7 @@ export function rowToScore(row: Row): Score {
     id: row.id as number,
     assignment_id: row.assignment_id as number,
     field_name: row.field_name as string,
-    score: row.score as number,
+    score: (row.score as number | null) ?? null,
     note: (row.note as string | null) ?? null,
   };
 }

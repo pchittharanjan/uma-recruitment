@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
 async function handleGet(req: NextRequest) {
   try {
     await initDb();
-    if (!(await requireAuth(req, { roles: ['admin'] }))) return unauthorized();
+    const admin = await requireAuth(req, { roles: ['admin'] });
+    if (!admin) return unauthorized();
 
-    const data = await buildAdminDashboardPayload();
+    const data = await buildAdminDashboardPayload(admin.id);
     return NextResponse.json(data);
   } catch (e) {
     console.error('GET /api/admin/dashboard failed:', e);

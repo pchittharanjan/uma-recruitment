@@ -189,10 +189,10 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
 
             if (!accessible || !href) {
               const reason = isCurrentButLocked
-                ? `${phaseLabelText} — still being set up`
+                ? `${phaseLabelText} — Admin is still setting up`
                 : isFuture
-                  ? `${phaseLabelText} - Not Open Yet`
-                  : `${phaseLabelText} - Not Available for Your Role`;
+                  ? `${phaseLabelText} — not open yet`
+                  : `${phaseLabelText} — not available for your role`;
               return (
                 <DisabledPhaseItem
                   key={phase.status}
@@ -249,8 +249,8 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                         />
                         <span className={cn(advancePast && 'text-muted-foreground')}>
                           {profile.skipFinalRoundPhase
-                            ? 'Advance to Interview'
-                            : 'Advance to First Round Interview'}
+                            ? 'Rate who advances to interview'
+                            : 'Rate who advances to 1st round'}
                         </span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -273,8 +273,8 @@ export function TeamSidebarPhaseNav({ teams }: { teams: { id: number; name: stri
                         />
                         <span className={cn(firstRoundAdvancePast && 'text-muted-foreground')}>
                           {profile.skipFinalRoundPhase
-                            ? 'Advance to Deliberations'
-                            : 'Advance to Final Round Interview'}
+                            ? 'Rate who advances to deliberations'
+                            : 'Rate who advances to final round'}
                         </span>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

@@ -11,6 +11,7 @@ import CsvFileUpload, { type CsvParseResult } from '@/components/csv-file-upload
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageContainer, PageContent, PageHeader, PagePanel, PageSection, TitleCount } from '@/components/page-shell';
+import { SpreadsheetUploadPanel } from '@/components/spreadsheet-upload-panel';
 import { phasePageEyebrow } from '@/lib/stages';
 import StatusBanner from '@/components/status-banner';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ import {
   reviewableHeaders,
   scopeBadgeClass,
   shortHeaderLabel,
+  suggestedScoringTeamsForHeader,
   type QuestionReviewRow,
 } from '@/lib/rubric';
 import {
@@ -33,10 +35,20 @@ import {
   summarizeSplit,
   type TeamSplitConfig,
 } from '@/lib/team-split';
+import {
+  buildFall2026ScoreFieldSets,
+  fall2026ScoredHeaders,
+  fall2026ScoringTeamsForHeader,
+  isFall2026ApplicationCsv,
+} from '@/lib/fall-2026-grading-model';
 import type { TeamName } from '@/lib/db';
 import type { EligibleGraderUser } from '@/lib/import-graders';
 
 import GraderTeamColumn, { GraderTeamColumnSkeleton } from '@/components/grader-team-column';
+import ImportCriteriaStep, {
+  validateGradingModels,
+} from '@/components/import-criteria-step';
+import ImportGraderPreview from '@/components/import-grader-preview';
 import { StepTransition } from '@/components/step-transition';
 import { EraseTestDataButton } from '@/components/erase-test-data-button';
 import {
@@ -47,6 +59,8 @@ import {
   type GraderInput,
 } from '@/lib/grader-parse';
 import { DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
+import type { TeamGradingModel } from '@/lib/grading-model-types';
+import { getApplicationComponent } from '@/lib/grading-model';
 import { cn } from '@/lib/utils';
 import { teamDotClass } from '@/lib/team-colors';
 import {
@@ -104,6 +118,9 @@ export default function UnifiedImportPage() {
   const [scoreFieldsByTeam, setScoreFieldsByTeam] = useState<Record<TeamName, Set<string>>>(
     emptyScoreSets(),
   );
+  const [gradingModelByTeam, setGradingModelByTeam] = useState<
+    Partial<Record<TeamName, TeamGradingModel>>
+  >({});
   const [graderDraftByTeam, setGraderDraftByTeam] =
     useState<Record<TeamName, GraderInput[]>>(emptyGraderDraft);
   const [gradersPerApplication, setGradersPerApplication] = useState(DEFAULT_GRADERS_PER_APPLICATION);
@@ -146,6 +163,11 @@ export default function UnifiedImportPage() {
     prevStepRef.current = step;
     contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [step]);
+
+  const isFall2026Csv = useMemo(
+    () => headers.length > 0 && isFall2026ApplicationCsv(headers),
+    [headers],
+  );
 
   const splitSummary = useMemo(() => {
     if (!teamSplitConfig || allRows.length === 0) return null;
@@ -259,6 +281,18 @@ export default function UnifiedImportPage() {
     );
   }, [headers, splitByTeam, contextHeaders, scoreFieldsByTeam, teamsWithApps]);
 
+  const previewPortfolioByTeam = useMemo(() => {
+    if (!teamSplitConfig) return undefined;
+    const sets = buildPortfolioFieldSets(headers, allRows, teamSplitConfig, contextHeaders);
+    const out: Partial<Record<TeamName, string[]>> = {};
+    for (const team of teamsWithApps) {
+      out[team] = Array.from(sets[team]).filter(
+        (h) => !scoreFieldsByTeam[team].has(h) && !contextHeaders.has(h),
+      );
+    }
+    return out;
+  }, [teamSplitConfig, headers, allRows, contextHeaders, teamsWithApps, scoreFieldsByTeam]);
+
   const contextRows = useMemo(
     () => questionReview.filter((r) => r.isContext),
     [questionReview],
@@ -280,6 +314,27 @@ export default function UnifiedImportPage() {
     teamsWithApps,
   ]);
 
+  /**
+   * Same team-scope rules for initial auto-check and Restore.
+   * Fall 2026 → csvFieldMap fuzzy match; otherwise fill-rate primaries.
+   */
+  const suggestedScoreTeamsForHeader = useCallback(
+    (header: string, fields: string[], context: Set<string>, activeTeams: TeamName[]) => {
+      if (isFall2026ApplicationCsv(fields)) {
+        return fall2026ScoringTeamsForHeader(header, fields, activeTeams);
+      }
+      if (!splitByTeam && !teamSplitConfig) return [];
+      const split =
+        splitByTeam ??
+        (teamSplitConfig
+          ? splitRowsByTeam(allRows, fields, teamSplitConfig).byTeam
+          : null);
+      if (!split) return [];
+      return suggestedScoringTeamsForHeader(header, split, context, activeTeams);
+    },
+    [allRows, splitByTeam, teamSplitConfig],
+  );
+
   const applySuggestions = useCallback(
     (
       fields: string[],
@@ -287,6 +342,16 @@ export default function UnifiedImportPage() {
       config: TeamSplitConfig,
       context: Set<string>,
     ) => {
+      const fall2026Sets = buildFall2026ScoreFieldSets(fields, TEAM_NAMES);
+      if (fall2026Sets) {
+        setScoreFieldsByTeam(fall2026Sets);
+        // Scored essays must not sit in Application info (e.g. old /college/ false positives).
+        const scored = fall2026ScoredHeaders(fields, TEAM_NAMES);
+        if ([...context].some((h) => scored.has(h))) {
+          setContextHeaders(new Set([...context].filter((h) => !scored.has(h))));
+        }
+        return;
+      }
       setScoreFieldsByTeam(buildScoreFieldSets(fields, rows, config, context));
     },
     [],
@@ -300,6 +365,7 @@ export default function UnifiedImportPage() {
       return next;
     });
     if (isContext) {
+      // Moving to Application info — drop from every team's score set.
       setScoreFieldsByTeam((prev) => {
         const next = { ...prev };
         for (const team of TEAM_NAMES) {
@@ -309,7 +375,29 @@ export default function UnifiedImportPage() {
         }
         return next;
       });
+      return;
     }
+
+    // Restore: identical team scope as applySuggestions / initial auto-check.
+    const contextWithoutHeader = new Set(contextHeaders);
+    contextWithoutHeader.delete(header);
+    const restoreTeams = suggestedScoreTeamsForHeader(
+      header,
+      headers,
+      contextWithoutHeader,
+      teamsWithApps,
+    );
+
+    setScoreFieldsByTeam((prev) => {
+      const next = { ...prev };
+      for (const team of TEAM_NAMES) {
+        const teamSet = new Set(prev[team]);
+        if (restoreTeams.includes(team)) teamSet.add(header);
+        else teamSet.delete(header);
+        next[team] = teamSet;
+      }
+      return next;
+    });
   };
 
   const moveToApplicationInfo = (header: string) => {
@@ -335,7 +423,11 @@ export default function UnifiedImportPage() {
         config = { mode: 'single_column', singleColumn: suggested };
       }
       setTeamSplitConfig(config);
-      const context = detectContextHeaders(fields);
+      const detectedContext = detectContextHeaders(fields);
+      const scoredEssays = fall2026ScoredHeaders(fields, TEAM_NAMES);
+      const context = new Set(
+        [...detectedContext].filter((header) => !scoredEssays.has(header)),
+      );
       setContextHeaders(context);
       applySuggestions(fields, rows, config, context);
     },
@@ -363,6 +455,7 @@ export default function UnifiedImportPage() {
     setShowContextEditor(false);
     setShowAllColumns(false);
     setScoreFieldsByTeam(emptyScoreSets());
+    setGradingModelByTeam({});
     setGraderDraftByTeam(emptyGraderDraft());
     setGradersPerApplication(DEFAULT_GRADERS_PER_APPLICATION);
     setGradersByTeam({});
@@ -450,7 +543,17 @@ export default function UnifiedImportPage() {
       }
     }
     setError('');
-    setStep('graders');
+    setStep('criteria');
+  };
+
+  const handleCriteriaNext = () => {
+    const err = validateGradingModels(teamsWithApps, gradingModelByTeam);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError('');
+    setStep('preview');
   };
 
   const parseAllGraders = () => {
@@ -476,7 +579,7 @@ export default function UnifiedImportPage() {
 
     setGraderErrorsByTeam({});
     setGradersByTeam(parsed);
-    setStep('confirm');
+    setStep('assign');
   };
 
   const fillTestGraders = () => {
@@ -535,6 +638,13 @@ export default function UnifiedImportPage() {
       fd.append('contextFields', JSON.stringify(Array.from(contextHeaders)));
       fd.append('gradersPerApplication', String(gradersPerApplication));
 
+      const gradingModelPayload: Partial<Record<TeamName, TeamGradingModel>> = {};
+      for (const team of teamsWithApps) {
+        const model = gradingModelByTeam[team];
+        if (model) gradingModelPayload[team] = model;
+      }
+      fd.append('gradingModelByTeam', JSON.stringify(gradingModelPayload));
+
       const res = await fetch('/api/admin/import', { method: 'POST', body: fd });
       const contentType = res.headers.get('content-type') ?? '';
 
@@ -543,13 +653,13 @@ export default function UnifiedImportPage() {
         const message = data.error ?? 'Import failed.';
         setError(message);
         toast.error(message);
-        setStep('confirm');
+        setStep('assign');
         return;
       }
 
       if (!res.body) {
         setError('No response from server.');
-        setStep('confirm');
+        setStep('assign');
         return;
       }
 
@@ -642,7 +752,7 @@ export default function UnifiedImportPage() {
       if (streamError) {
         setError(streamError);
         toast.error(streamError);
-        setStep('confirm');
+        setStep('assign');
         return;
       }
 
@@ -654,13 +764,13 @@ export default function UnifiedImportPage() {
         const message = 'Import finished without a result.';
         setError(message);
         toast.error(message);
-        setStep('confirm');
+        setStep('assign');
       }
     } catch {
       const message = 'Network error. Please try again.';
       setError(message);
       toast.error(message);
-      setStep('confirm');
+      setStep('assign');
     } finally {
       setLoading(false);
       setImportProgress(null);
@@ -672,7 +782,7 @@ export default function UnifiedImportPage() {
       <PageHeader
         eyebrow={phasePageEyebrow('application')}
         title="Import Applications"
-        description="Load this cycle’s spreadsheet, map teams, then assign graders. Unlock grading later from the dashboard."
+        description="Load this cycle’s spreadsheet, pick questions and criteria, preview the grader view, then assign users. Unlock grading later from the dashboard."
         actions={<EraseTestDataButton onSuccess={resetImportWizard} redirectTo="/admin/import" />}
       />
 
@@ -688,22 +798,17 @@ export default function UnifiedImportPage() {
         <StepTransition stepKey={step} direction={stepDirection}>
         {step === 'upload' && (
           <PageContent width="narrow">
-            <div className="space-y-6 pt-4 sm:pt-6">
-              <div className="space-y-1.5">
-                <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground">
-                  Upload spreadsheet
-                </h2>
-                <p className="max-w-prose text-pretty text-sm leading-relaxed text-muted-foreground">
-                  Export from Google Forms, Excel, or Numbers (as Excel/CSV), then drop the file
-                  here. Next steps split applicants by team and set up graders.
-                </p>
-              </div>
-
+            <SpreadsheetUploadPanel
+              title="Upload spreadsheet"
+              description="Export from Google Forms, Excel, or Numbers (as Excel/CSV), then drop the file here. Next: teams, questions, criteria, preview, then assign."
+            >
               <CsvFileUpload
                 key={csvUploadKey}
                 onParsed={handleParsed}
                 onError={setError}
                 onClear={handleRemoveCsv}
+                dropLabel="Drop your applications spreadsheet here"
+                ariaLabel="Upload applications spreadsheet"
               />
 
               {uploadReady && csvFile ? (
@@ -726,7 +831,7 @@ export default function UnifiedImportPage() {
                   Continue →
                 </LoadingButton>
               </div>
-            </div>
+            </SpreadsheetUploadPanel>
           </PageContent>
         )}
 
@@ -799,11 +904,18 @@ export default function UnifiedImportPage() {
         {step === 'scoring' && teamSplitConfig && splitByTeam && (
           <PagePanel className="space-y-6" data-tour="import-map">
             <div>
-              <h2 className="text-lg font-semibold">Review Question Tagging</h2>
+              <h2 className="text-lg font-semibold">Select scored questions</h2>
               <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-                Link columns (Google Drive, Figma, portfolio URLs) are auto-classified as portfolio
-                fields for Design. Graders see them in a separate panel without names or email.
+                Check which columns each team grades. Link columns (Google Drive, Figma, portfolio
+                URLs) are auto-classified as portfolio fields for Design. Next you&apos;ll edit
+                criteria and anchors per question.
               </p>
+              {isFall2026Csv && (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                  Fall 2026 application detected — team questions are pre-checked. You&apos;ll edit
+                  the weighted criterion rubric on the next step.
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -935,14 +1047,50 @@ export default function UnifiedImportPage() {
           </PagePanel>
         )}
 
+        {step === 'criteria' && (
+          <PagePanel className="space-y-6" data-tour="import-criteria">
+            <ImportCriteriaStep
+              teams={teamsWithApps}
+              headers={headers}
+              scoreFieldsByTeam={scoreFieldsByTeam}
+              gradingModelByTeam={gradingModelByTeam}
+              onChange={setGradingModelByTeam}
+            />
+            <div className="flex justify-between">
+              <LoadingButton variant="secondary" onClick={() => setStep('scoring')}>
+                Back
+              </LoadingButton>
+              <LoadingButton onClick={handleCriteriaNext}>Continue →</LoadingButton>
+            </div>
+          </PagePanel>
+        )}
+
+        {step === 'preview' && splitByTeam && (
+          <PagePanel className="space-y-6" data-tour="import-preview">
+            <ImportGraderPreview
+              teams={teamsWithApps}
+              splitByTeam={splitByTeam}
+              gradingModelByTeam={gradingModelByTeam}
+              portfolioFieldsByTeam={previewPortfolioByTeam}
+            />
+            <div className="flex justify-between">
+              <LoadingButton variant="secondary" onClick={() => setStep('criteria')}>
+                Back
+              </LoadingButton>
+              <LoadingButton onClick={() => setStep('graders')}>Continue →</LoadingButton>
+            </div>
+          </PagePanel>
+        )}
+
         {step === 'graders' && (
           <PagePanel className="space-y-5" data-tour="import-graders">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Users per Team</h2>
                 <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-                  Applications are randomized across these users. After import you can see who got
-                  whom, even out counts, give someone fewer apps, or reassign a conflict.
+                  Applications are randomized across these users. You can add yourself (Admin) from
+                  People. You&apos;ll grade name-blind like everyone else. After import you can see
+                  who got whom, even out counts, or reassign a conflict.
                 </p>
                 {hasSimulatedGraders && (
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -1048,7 +1196,7 @@ export default function UnifiedImportPage() {
             </div>
 
             <div className="flex items-center justify-between gap-3 pt-4">
-              <LoadingButton variant="secondary" onClick={() => setStep('scoring')}>
+              <LoadingButton variant="secondary" onClick={() => setStep('preview')}>
                 Back
               </LoadingButton>
               <LoadingButton onClick={parseAllGraders}>Continue →</LoadingButton>
@@ -1056,16 +1204,16 @@ export default function UnifiedImportPage() {
           </PagePanel>
         )}
 
-        {step === 'confirm' && splitSummary && (
+        {step === 'assign' && splitSummary && (
           <PageContent width="narrow">
-            <div className="space-y-6" data-tour="import-confirm">
+            <div className="space-y-6" data-tour="import-assign">
               <div className="space-y-1.5">
                 <h2 className="font-heading text-lg font-semibold tracking-tight">
-                  Confirm import
+                  Assign applications
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Double-check the split, then import. This creates applications and grader
-                  assignments for each team.
+                  This creates applications in the database and randomly assigns graders for each
+                  team. Nothing has been imported yet.
                 </p>
               </div>
 
@@ -1100,7 +1248,9 @@ export default function UnifiedImportPage() {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {scoreFieldsByTeam[team].size} questions ·{' '}
-                        {gradersByTeam[team]?.length ?? 0} users
+                        {getApplicationComponent(gradingModelByTeam[team] ?? { components: [] })
+                          ?.questions.reduce((n, q) => n + q.criteria.length, 0) ?? 0}{' '}
+                        criteria · {gradersByTeam[team]?.length ?? 0} users
                       </p>
                     </li>
                   ))}
@@ -1161,7 +1311,7 @@ export default function UnifiedImportPage() {
                   disabled={loading}
                   className="uma-cta-primary"
                 >
-                  {loading ? 'Importing…' : 'Import all teams →'}
+                  {loading ? 'Assigning…' : 'Assign all teams →'}
                 </LoadingButton>
               </div>
             </div>
@@ -1179,6 +1329,9 @@ export default function UnifiedImportPage() {
                   Review each team&apos;s random assignments next: counts, who each grader got, then
                   even out or reassign conflicts. Unlock grading from the dashboard when you&apos;re
                   ready.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Import runs once per cycle. To import again, use Erase test data first.
                 </p>
               </div>
 
@@ -1230,7 +1383,7 @@ export default function UnifiedImportPage() {
                   variant="secondary"
                   onClick={() => router.push('/admin/dashboard#pipeline-controls')}
                 >
-                  Click to unlock each phase
+                  Unlock grading on dashboard
                 </LoadingButton>
                 <LoadingButton
                   onClick={() => router.push('/admin/dashboard')}

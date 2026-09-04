@@ -13,9 +13,9 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-[var(--primary-active)]",
         outline:
-          "border-border bg-background hover:border-foreground/18 hover:bg-muted/50 hover:text-foreground aria-expanded:border-foreground/18 aria-expanded:bg-muted/50 aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/60",
+          "border-input bg-background hover:border-foreground/22 hover:bg-muted/50 hover:text-foreground aria-expanded:border-foreground/22 aria-expanded:bg-muted/50 aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/60",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_12%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "border border-input bg-secondary text-secondary-foreground hover:border-foreground/18 hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_12%)] aria-expanded:border-input aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           // Ghost buttons are often used for "secondary" nav actions (e.g. "View all").
           // Make hover clearly look clickable without changing layout/semantics.

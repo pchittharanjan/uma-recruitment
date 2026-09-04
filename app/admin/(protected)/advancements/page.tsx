@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -140,6 +140,7 @@ export default function AdminAdvancementsPage() {
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [approveError, setApproveError] = useState('');
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const capsScrolledRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async (opts?: { force?: boolean }) => {
     const { status, ok, json } = await cachedJsonFetch<{
@@ -170,6 +171,20 @@ export default function AdminAdvancementsPage() {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!submissions || !activity || typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (hash !== '#advancement-caps') {
+      capsScrolledRef.current = null;
+      return;
+    }
+    if (capsScrolledRef.current === hash) return;
+    const el = document.getElementById('advancement-caps');
+    if (!el) return;
+    capsScrolledRef.current = hash;
+    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+  }, [submissions, activity]);
 
   const handleApprove = async (submissionId: number, force = false) => {
     setApproveError('');
@@ -213,12 +228,20 @@ export default function AdminAdvancementsPage() {
 
   if (!submissions || !activity) return <PageLoading />;
 
+  const confirmSubmission =
+    confirmId !== null ? submissions.find((sub) => sub.id === confirmId) : undefined;
+  const forceApproveDescription =
+    confirmSubmission?.fromStage === 'first_round'
+      ? 'Some interviews are still unscored. Approve anyway and apply this advancement list?'
+      : 'Some applications are still ungraded. Approve anyway and apply this advancement list?';
+
   return (
     <PageContainer>
       <PageSection>
       <PageHeader
         eyebrow="Admin"
         title="Team Advancement Submissions"
+        description="Approve Director lists, or open a team’s advancement workspace to apply advancement directly on a call."
       />
 
       {approveError && <StatusBanner type="error" message={approveError} />}
@@ -350,15 +373,17 @@ export default function AdminAdvancementsPage() {
         </PageSection>
       )}
 
-      <PageSection data-tour="admin-advancement-caps">
-        <TeamAdvancementCapSettings />
+      <PageSection>
+        <div id="advancement-caps" data-tour="admin-advancement-caps">
+          <TeamAdvancementCapSettings />
+        </div>
       </PageSection>
 
       <DestructiveConfirmDialog
         open={confirmId !== null}
         onOpenChange={(open) => !open && setConfirmId(null)}
-        title="Incomplete Grading"
-        description="Some interview assignments are still pending. Approve anyway and apply this advancement list?"
+        title="Incomplete ratings"
+        description={forceApproveDescription}
         confirmLabel="Approve anyway"
         onConfirm={async () => {
           if (confirmId !== null) await handleApprove(confirmId, true);

@@ -27,7 +27,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { normalizeWorkspaceHref, workspaceDestinations } from '@/lib/workspace';
+import {
+  filterWorkspaceDestinations,
+  normalizeWorkspaceHref,
+  workspaceDestinations,
+} from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 
 const DESTINATION_ICONS: Record<string, typeof LayoutDashboardIcon> = {
@@ -59,24 +63,26 @@ export function WorkspaceNewTabMenu({
   onSelect?: (href: string) => void;
 }) {
   const pathname = usePathname();
-  const { area, tabs, activeHref, openTab } = useWorkspace();
+  const { area, tabs, activeHref, teamNames, openTab } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Explicit null means empty pane — do not fall back to the left/active href.
   const selectedHref = currentHref === undefined ? activeHref : currentHref;
 
-  const destinations = useMemo(() => workspaceDestinations(pathname, area), [pathname, area]);
+  const destinations = useMemo(
+    () => workspaceDestinations(pathname, area, { teamNames }),
+    [pathname, area, teamNames],
+  );
   const openHrefs = useMemo(
     () => new Set(tabs.map((tab) => normalizeWorkspaceHref(tab.href))),
     [tabs],
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return destinations;
-    return destinations.filter((item) => item.title.toLowerCase().includes(q));
-  }, [destinations, query]);
+  const filtered = useMemo(
+    () => filterWorkspaceDestinations(destinations, query),
+    [destinations, query],
+  );
 
   const clearHoverCloseTimer = useCallback(() => {
     if (hoverCloseTimer.current) {

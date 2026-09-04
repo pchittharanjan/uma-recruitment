@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
-import LoadingButton from '@/components/loading-button';
+import { Button } from '@/components/ui/button';
 import StageBadge from '@/components/stage-badge';
 
 interface ApplicationData {
@@ -81,9 +81,14 @@ export default function TeamFinalizePage({ params }: { params: Promise<{ teamId:
         title="Final Results"
         description={`${ranked.length} applications ranked`}
         actions={
-          <a href={`/api/admin/teams/${teamId}/export`} download data-tour="finalize-actions">
-            <LoadingButton variant="secondary">Export CSV</LoadingButton>
-          </a>
+          <Button
+            variant="ghost"
+            nativeButton={false}
+            render={<a href={`/api/admin/teams/${teamId}/export`} download />}
+            data-tour="finalize-actions"
+          >
+            Export CSV
+          </Button>
         }
       />
 

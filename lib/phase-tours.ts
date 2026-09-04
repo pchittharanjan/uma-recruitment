@@ -38,18 +38,18 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
     iconClass: 'text-amber-700',
     ringClass: 'bg-amber-100 ring-amber-200/80',
     message:
-      'Record & Evaluate your coffee chats here. You will be able to edit your notes while coffee chats are open and view them once the period has closed.',
-    cta: 'Log a Coffee Chat',
+      'Coffee chat notes are collected through the Google Form. Admins import the responses sheet and match notes to members and applicants.',
+    cta: 'Got it',
     steps: [
       {
         icon: PenLineIcon,
-        title: 'Log Each Coffee Chat',
-        description: 'Record notes and impressions right after you meet someone.',
+        title: 'Submit Via Google Form',
+        description: 'After each chat, fill out the shared form with notes and impressions.',
       },
       {
         icon: ListChecksIcon,
-        title: 'Track Who You Have Met',
-        description: 'See your history and follow up before applications begin.',
+        title: 'Admins Import Responses',
+        description: 'Form responses are uploaded from Sheets and matched to UMA members.',
       },
       {
         icon: ClipboardCheckIcon,
@@ -73,9 +73,9 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: FlagIcon,
-        title: 'Add Color Recommendations',
+        title: 'Rate Who Advances',
         description:
-          'After grading, mark who you think should move forward with color signals.',
+          'After grading, pick five color ratings (Green → Red) on each applicant. Required before directors submit.',
       },
       {
         icon: UsersIcon,
@@ -92,9 +92,9 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: FlagIcon,
-        title: 'Color Recommendations',
+        title: 'Rate Who Advances',
         description:
-          'Graders set signals; Directors align with PMs and submit the list.',
+          'Graders set five color ratings (Green → Red); directors align with PMs and submit the list.',
       },
       {
         icon: ClipboardCheckIcon,
@@ -122,8 +122,9 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: FlagIcon,
-        title: 'Add Color Recommendations',
-        description: 'After scoring, mark each candidate Green, Yellow, or Red.',
+        title: 'Rate Who Advances',
+        description:
+          'After scoring, pick five color ratings (Green → Red) on each candidate you interviewed.',
       },
     ],
     execSteps: [
@@ -139,8 +140,8 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: FlagIcon,
-        title: 'Collect Color Signals',
-        description: 'Gather Green/Yellow/Red signals from interviewers.',
+        title: 'Collect color ratings',
+        description: 'Gather five color ratings (Green → Red) from interviewers.',
       },
       {
         icon: UsersIcon,
@@ -212,15 +213,15 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: UsersIcon,
-        title: 'Execs Save & Advance',
-        description: 'Only team execs can lock placements and move forward.',
+        title: 'Admin Saves Official Board',
+        description: 'Only admins lock final acceptances on the official deliberations screen.',
       },
     ],
     execSteps: [
       {
         icon: LayoutGridIcon,
-        title: 'Lead the Canvas Session',
-        description: 'Organize candidates and guide the team discussion.',
+        title: 'Use Your Personal Board',
+        description: 'Drag candidates and explore placements — your board autosaves.',
       },
       {
         icon: FlagIcon,
@@ -229,8 +230,8 @@ export const PHASE_TOURS: Partial<Record<RoundStatus, PhaseTourContent>> = {
       },
       {
         icon: ClipboardCheckIcon,
-        title: 'Save Placements & Advance',
-        description: 'Lock your selections and close out the cycle.',
+        title: 'Follow the Admin Screen',
+        description: 'Final acceptances come from the admin deliberations board.',
       },
     ],
   },

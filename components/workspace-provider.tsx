@@ -33,6 +33,7 @@ interface WorkspaceContextValue {
   area: WorkspaceArea;
   tabs: WorkspaceTab[];
   activeHref: string;
+  teamNames: Record<string, string>;
   split: boolean;
   splitHref: string | null;
   splitRatio: number;
@@ -371,6 +372,7 @@ export function WorkspaceProvider({
       area: resolvedArea,
       tabs,
       activeHref: href,
+      teamNames: titleContext.teamNames ?? {},
       split,
       splitHref,
       splitRatio,
@@ -385,6 +387,7 @@ export function WorkspaceProvider({
       resolvedArea,
       tabs,
       href,
+      titleContext.teamNames,
       split,
       splitHref,
       splitRatio,

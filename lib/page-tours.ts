@@ -78,7 +78,7 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       {
         id: 'grade-next-step',
         title: 'Next phase action',
-        description: 'Continue to color recommendations when grading is done.',
+        description: 'Continue to five color ratings (Green → Red) when grading is done.',
       },
     ],
   },
@@ -97,8 +97,8 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'grade-form-scores',
-        title: 'Enter scores',
-        description: 'Read each response and fill its scoring field.',
+        title: 'Score each question',
+        description: 'Read the response, score the criteria, and add notes.',
       },
       {
         id: 'grade-form-portfolio',
@@ -107,8 +107,68 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'grade-form-comments',
-        title: 'Add comments',
-        description: 'Note flags or context for later reviewers.',
+        title: 'Overall comments',
+        description: 'Add anything that is not tied to one question.',
+      },
+      {
+        id: 'grade-form-submit',
+        title: 'Submit scores',
+        description: 'Save when every required field is complete.',
+      },
+    ],
+  },
+  {
+    pattern: '/admin/teams/:teamId/grade',
+    steps: [
+      {
+        id: 'grade-overview',
+        title: 'Back to team',
+        description: 'Return to the named admin dashboard when you are done scoring.',
+      },
+      {
+        id: 'grade-progress',
+        title: 'Track progress',
+        description: 'See how many assigned applications you have left.',
+      },
+      {
+        id: 'grade-start',
+        title: 'Start grading',
+        description: 'Open the next pending application. Names stay hidden here.',
+      },
+      {
+        id: 'grade-queue',
+        title: 'Open an application',
+        description: 'Grade or edit any assigned file from this list.',
+      },
+    ],
+  },
+  {
+    pattern: '/admin/teams/:teamId/grade/:applicationId',
+    steps: [
+      {
+        id: 'grade-form-nav',
+        title: 'Queue navigation',
+        description: 'Jump to the next assignment or back to the queue.',
+      },
+      {
+        id: 'grade-form-progress',
+        title: 'Scoring progress',
+        description: 'Watch how many required fields still need scores.',
+      },
+      {
+        id: 'grade-form-scores',
+        title: 'Score each question',
+        description: 'Read the response, score the criteria, and add notes.',
+      },
+      {
+        id: 'grade-form-portfolio',
+        title: 'Portfolio links',
+        description: 'Open supplementary links when present.',
+      },
+      {
+        id: 'grade-form-comments',
+        title: 'Overall comments',
+        description: 'Add anything that is not tied to one question.',
       },
       {
         id: 'grade-form-submit',
@@ -162,8 +222,9 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'advancement-verdicts',
-        title: 'Set verdicts',
-        description: 'Mark Advance / Hold / Reject on applicants you graded.',
+        title: 'Set color ratings',
+        description:
+          'Set five color ratings (Green → Red) on applicants you graded. Use the legend on this page for each level.',
       },
       {
         id: 'advancement-advance',
@@ -207,8 +268,9 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'advancement-verdicts',
-        title: 'Set verdicts',
-        description: 'Mark Advance / Hold / Reject on people you interviewed.',
+        title: 'Set color ratings',
+        description:
+          'Set five color ratings (Green → Red) on people you interviewed. Use the legend on this page for each level.',
       },
       {
         id: 'advancement-advance',
@@ -308,6 +370,11 @@ export const PAGE_TOURS: PageTourDefinition[] = [
         description: 'Fill notes and score fields for this interview.',
       },
       {
+        id: 'interview-phase',
+        title: 'Switch interview part',
+        description: 'Jump between Case and Behavioral at any time.',
+      },
+      {
         id: 'interview-submit',
         title: 'Submit scores',
         description: 'Save when scoring is complete.',
@@ -345,17 +412,7 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       {
         id: 'deliberations-sort',
         title: 'Sort board',
-        description: 'Rank cards by a score metric, or keep manual order.',
-      },
-      {
-        id: 'deliberations-save',
-        title: 'Save board',
-        description: 'Persist column moves before leaving.',
-      },
-      {
-        id: 'deliberations-finalize',
-        title: 'Complete selection',
-        description: 'Lock Accept as final offers for this team.',
+        description: 'Rank cards by score, or keep your manual order after dragging.',
       },
       {
         id: 'deliberations-compare',
@@ -364,18 +421,9 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'deliberations-board',
-        title: 'Move cards',
-        description: 'Drag candidates across columns to decide.',
-      },
-      {
-        id: 'deliberations-cap',
-        title: 'Set accept limit',
-        description: 'Adjust how many can land in Accept.',
-      },
-      {
-        id: 'deliberations-over-cap',
-        title: 'Go over limit',
-        description: 'Request extra Accept seats past the offer limit.',
+        title: 'Your personal board',
+        description:
+          'Drag candidates across columns. Your layout autosaves — the admin screen is official for final acceptances.',
       },
       {
         id: 'deliberations-card',
@@ -487,7 +535,7 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       {
         id: 'admin-phase',
         title: 'Control phases',
-        description: 'Open, advance, or close the global pipeline phase.',
+        description: 'Advance each team’s official phase and unlock exec access when they should start working.',
       },
       {
         id: 'admin-teams-overview',
@@ -541,18 +589,28 @@ export const PAGE_TOURS: PageTourDefinition[] = [
       },
       {
         id: 'import-map',
-        title: 'Tag questions',
+        title: 'Select questions',
         description: 'Choose which columns are scored for each team.',
       },
       {
-        id: 'import-graders',
-        title: 'Assign graders',
-        description: 'Distribute applications across users per team.',
+        id: 'import-criteria',
+        title: 'Edit criteria',
+        description: 'Adjust Fall 2026–prefilled criteria, weights, and anchors per team.',
       },
       {
-        id: 'import-confirm',
-        title: 'Confirm import',
-        description: 'Review the preview, then commit the import.',
+        id: 'import-preview',
+        title: 'Preview grader view',
+        description: 'Check a sample application against your drafted rubric.',
+      },
+      {
+        id: 'import-graders',
+        title: 'Pick users',
+        description: 'Choose who grades applications per team.',
+      },
+      {
+        id: 'import-assign',
+        title: 'Assign applications',
+        description: 'Import apps and randomly assign graders — only on this step.',
       },
     ],
   },
@@ -717,34 +775,14 @@ export const PAGE_TOURS: PageTourDefinition[] = [
     pattern: '/admin/coffee-chats',
     steps: [
       {
-        id: 'coffee-dates',
-        title: 'Set dates',
-        description: 'Configure coffee chat windows.',
+        id: 'coffee-import',
+        title: 'Upload responses',
+        description: 'Import the Google Form responses sheet and map columns.',
       },
       {
-        id: 'coffee-save',
-        title: 'Save settings',
-        description: 'Persist date changes.',
-      },
-    ],
-  },
-  {
-    pattern: '/coffee-chats',
-    steps: [
-      {
-        id: 'coffee-signup',
-        title: 'Fill chat form',
-        description: 'Enter date, applicant, and notes for the coffee chat.',
-      },
-      {
-        id: 'coffee-submit',
-        title: 'Submit chat',
-        description: 'Save the coffee chat entry.',
-      },
-      {
-        id: 'coffee-schedule',
-        title: 'View schedule',
-        description: 'See your booked and submitted chats.',
+        id: 'coffee-import-confirm',
+        title: 'Confirm matches',
+        description: 'Review UMA member and applicant matches, then import.',
       },
     ],
   },

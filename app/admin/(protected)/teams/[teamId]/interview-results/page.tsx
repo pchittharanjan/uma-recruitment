@@ -6,7 +6,7 @@ import PageLoading from '@/components/page-loading';
 import StatusBanner from '@/components/status-banner';
 import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Card } from '@/components/ui/card';
-import LoadingButton from '@/components/loading-button';
+import { Button } from '@/components/ui/button';
 import StageBadge from '@/components/stage-badge';
 import type { InterviewResultsData } from '@/lib/interview-results';
 import type { RoundStatus } from '@/lib/db';
@@ -116,9 +116,18 @@ export default function TeamInterviewResultsPage({
         title={resultsTitle(stage)}
         description={`${ranked.length} ranked · ${results.progress.completed} of ${results.progress.total} interview scores submitted`}
         actions={
-          <a href={`/api/admin/teams/${teamId}/interview-results/export?stage=${stage}`} download>
-            <LoadingButton variant="secondary">Export CSV</LoadingButton>
-          </a>
+          <Button
+            variant="ghost"
+            nativeButton={false}
+            render={
+              <a
+                href={`/api/admin/teams/${teamId}/interview-results/export?stage=${stage}`}
+                download
+              />
+            }
+          >
+            Export CSV
+          </Button>
         }
       />
 

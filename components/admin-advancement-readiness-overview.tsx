@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { teamDotClass, teamLinkClass } from '@/lib/team-colors';
+import { getTeamPipelineProfile } from '@/lib/team-pipeline-profile';
+import { ADMIN_PHASE_SLUGS } from '@/lib/stages';
 
 interface TeamReadinessRow {
   teamId: number;
@@ -121,7 +123,13 @@ function TeamOutcomePanel({
   const [reverting, setReverting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const advancedLabel =
-    fromStage === 'application' ? 'First Round Interview' : 'Final Round Interview';
+    fromStage === 'application'
+      ? getTeamPipelineProfile(team.teamName).skipFinalRoundPhase
+        ? 'Interview'
+        : 'First Round Interview'
+      : getTeamPipelineProfile(team.teamName).skipFinalRoundPhase
+        ? 'Deliberations'
+        : 'Final Round Interview';
 
   const handleRevert = async () => {
     setReverting(true);
@@ -272,7 +280,7 @@ export function AdminAdvancementReadinessOverview({
             {/*
               Balanced proportional columns across the full card — no flexible
               last column that leaves a dead zone beside Director list.
-              Parts ≈ team 1.2 / scoring 1 / recommendations 1.2 / exec 1.2 / director 1
+              Parts ≈ team 1.2 / scoring 1 / ratings 1.2 / exec 1.2 / director 1
             */}
             <colgroup>
               <col style={{ width: '3%' }} />
@@ -292,10 +300,10 @@ export function AdminAdvancementReadinessOverview({
                   Scoring
                 </TableHead>
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
-                  Recommendations
+                  Color ratings
                 </TableHead>
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
-                  Recommendors
+                  Graders
                 </TableHead>
                 <TableHead className="text-xs font-medium tracking-wide text-muted-foreground">
                   Director list
@@ -394,11 +402,19 @@ export function AdminAdvancementReadinessOverview({
                         )}
                       </TableCell>
                       <TableCell>
-                        <StageBadge
-                          label={submissionLabel(team.status.submission.status)}
-                          color={submissionColor(team.status.submission.status)}
-                          size="compact"
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StageBadge
+                            label={submissionLabel(team.status.submission.status)}
+                            color={submissionColor(team.status.submission.status)}
+                            size="compact"
+                          />
+                          <Link
+                            href={`/admin/teams/${team.teamId}?view=${ADMIN_PHASE_SLUGS[fromStage] ?? fromStage}`}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Manage
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                     {expanded && (

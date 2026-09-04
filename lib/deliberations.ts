@@ -5,6 +5,12 @@ import { resolveApplicantEmail } from '@/lib/candidates';
 import { getDb, getTeamById } from '@/lib/db';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
 import {
+  primaryScoredQuestions,
+  resolveGradingRubric,
+  splitScoreRows,
+} from '@/lib/grading-model';
+import { getRoundSettings } from '@/lib/rounds';
+import {
   deliberationsSortScore,
   deliberationsPendingStages,
   getTeamPipelineProfile,
@@ -58,6 +64,8 @@ async function loadStageAverages(
           JOIN scores s ON s.assignment_id = a.id
           WHERE a.stage = ?
             AND a.status = 'completed'
+            AND s.score IS NOT NULL
+            AND s.field_name NOT LIKE 'note::%'
             AND a.application_id IN (${placeholders})
           GROUP BY a.application_id`,
     args: [stage, ...applicationIds],
@@ -100,19 +108,26 @@ async function loadAllStageReviews(
   const assignmentIds = assignmentsResult.rows.map((row) => row.assignment_id as number);
   const placeholders = assignmentIds.map(() => '?').join(',');
   const scoresResult = await db.execute({
-    sql: `SELECT assignment_id, field_name, score
+    sql: `SELECT assignment_id, field_name, score, note
           FROM scores
           WHERE assignment_id IN (${placeholders})`,
     args: assignmentIds,
   });
 
-  const scoresByAssignment = new Map<number, Record<string, number>>();
+  const rowsByAssignment = new Map<number, typeof scoresResult.rows>();
   for (const row of scoresResult.rows) {
     const assignmentId = row.assignment_id as number;
-    const score = row.score as number | null;
-    if (score == null) continue;
-    if (!scoresByAssignment.has(assignmentId)) scoresByAssignment.set(assignmentId, {});
-    scoresByAssignment.get(assignmentId)![row.field_name as string] = score;
+    const bucket = rowsByAssignment.get(assignmentId) ?? [];
+    bucket.push(row);
+    rowsByAssignment.set(assignmentId, bucket);
+  }
+
+  const scoresByAssignment = new Map<number, Record<string, number>>();
+  const notesByAssignment = new Map<number, Record<string, string>>();
+  for (const [assignmentId, rows] of rowsByAssignment) {
+    const split = splitScoreRows(rows);
+    scoresByAssignment.set(assignmentId, split.scores);
+    notesByAssignment.set(assignmentId, split.notes);
   }
 
   for (const row of assignmentsResult.rows) {
@@ -132,6 +147,7 @@ async function loadAllStageReviews(
       scores,
       average,
       comment: (row.comment as string | null) ?? null,
+      notes: notesByAssignment.get(assignmentId) ?? {},
     });
   }
 
@@ -169,6 +185,41 @@ export async function saveDeliberationsBoardLayout(
             updated_at = unixepoch(),
             updated_by = excluded.updated_by`,
     args: [teamId, roundId, layoutJson, updatedBy],
+  });
+  return layout;
+}
+
+export async function getDeliberationsPersonalBoardLayout(
+  teamId: number,
+  roundId: number,
+  userId: number,
+): Promise<DeliberationsBoardLayout | null> {
+  const db = getDb();
+  const result = await db.execute({
+    sql: `SELECT layout_json
+          FROM deliberation_personal_boards
+          WHERE team_id = ? AND round_id = ? AND user_id = ?`,
+    args: [teamId, roundId, userId],
+  });
+  if (result.rows.length === 0) return null;
+  return parseDeliberationsBoardLayout(result.rows[0]!.layout_json);
+}
+
+export async function saveDeliberationsPersonalBoardLayout(
+  teamId: number,
+  roundId: number,
+  userId: number,
+  layout: DeliberationsBoardLayout,
+): Promise<DeliberationsBoardLayout> {
+  const db = getDb();
+  const layoutJson = JSON.stringify(layout);
+  await db.execute({
+    sql: `INSERT INTO deliberation_personal_boards (team_id, round_id, user_id, layout_json, updated_at)
+          VALUES (?, ?, ?, ?, unixepoch())
+          ON CONFLICT(team_id, round_id, user_id) DO UPDATE SET
+            layout_json = excluded.layout_json,
+            updated_at = unixepoch()`,
+    args: [teamId, roundId, userId, layoutJson],
   });
   return layout;
 }
@@ -389,6 +440,19 @@ export async function commitDeliberationsFinalSelection(
   };
 }
 
+function relabelQuestionNotes(
+  notes: Record<string, string>,
+  labels: Map<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(notes)) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    out[labels.get(key) ?? key] = trimmed;
+  }
+  return out;
+}
+
 /** Unified candidate view for deliberations — the allowed merge point. */
 export async function buildDeliberationsCandidateDetail(
   teamId: number,
@@ -431,7 +495,7 @@ export async function buildDeliberationsCandidateDetail(
     fields = {};
   }
 
-  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, reviewsByStage, flagsResult] =
+  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, reviewsByStage, flagsResult, settings] =
     await Promise.all([
       loadStageAverages([applicationId], 'application'),
       loadStageAverages([applicationId], 'first_round'),
@@ -445,7 +509,16 @@ export async function buildDeliberationsCandidateDetail(
               ORDER BY f.created_at DESC`,
         args: [applicationId],
       }),
+      getRoundSettings(roundId),
     ]);
+
+  const questionLabels = new Map<string, string>();
+  if (settings) {
+    const rubric = resolveGradingRubric(settings, teamName);
+    for (const question of primaryScoredQuestions(rubric.applicationQuestions)) {
+      questionLabels.set(question.id, question.label);
+    }
+  }
 
   const flags: DeliberationsFlag[] = flagsResult.rows.map((flagRow) => ({
     color: flagRow.color as 'red' | 'green',
@@ -467,7 +540,10 @@ export async function buildDeliberationsCandidateDetail(
       firstRound: firstRoundAvgs.get(applicationId) ?? null,
       finalRound: finalRoundAvgs.get(applicationId) ?? null,
     },
-    applicationReviews: reviewsByStage.application,
+    applicationReviews: reviewsByStage.application.map((review) => ({
+      ...review,
+      notes: relabelQuestionNotes(review.notes ?? {}, questionLabels),
+    })),
     firstRoundReviews: reviewsByStage.first_round,
     finalRoundReviews: reviewsByStage.final_round,
     flags,

@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import type { AdvancementFromStage } from '@/lib/advancement-submissions-types';
 import { getDb, getTeamById, getTeams } from '@/lib/db';
+import { getTeamPipelineProfile } from '@/lib/team-pipeline-profile';
 
 /** Stages that have an admin-configured advancement limit. */
 export type AdvancementCapStage = AdvancementFromStage | 'deliberations';
@@ -234,17 +235,27 @@ export async function upsertTeamAdvancementCaps(
   const team = await getTeamById(teamId);
   if (!team) throw new Error('Team not found.');
 
+  const usesFirstRoundCap = !getTeamPipelineProfile(team.name).skipFinalRoundPhase;
+
   const applicationCap =
     caps.applicationCap !== undefined ? parseCap(caps.applicationCap) : undefined;
-  const firstRoundCap =
-    caps.firstRoundCap !== undefined ? parseCap(caps.firstRoundCap) : undefined;
+  const firstRoundCap = !usesFirstRoundCap
+    ? null
+    : caps.firstRoundCap !== undefined
+      ? parseCap(caps.firstRoundCap)
+      : undefined;
   const deliberationsCap =
     caps.deliberationsCap !== undefined ? parseCap(caps.deliberationsCap) : undefined;
 
   if (caps.applicationCap !== undefined && caps.applicationCap !== null && applicationCap === null) {
     throw new Error('Application advancement limit must be a positive whole number.');
   }
-  if (caps.firstRoundCap !== undefined && caps.firstRoundCap !== null && firstRoundCap === null) {
+  if (
+    usesFirstRoundCap &&
+    caps.firstRoundCap !== undefined &&
+    caps.firstRoundCap !== null &&
+    firstRoundCap === null
+  ) {
     throw new Error('First round advancement limit must be a positive whole number.');
   }
   if (
@@ -269,8 +280,9 @@ export async function upsertTeamAdvancementCaps(
       : existing.rows.length > 0
         ? parseCap(existing.rows[0].application_cap)
         : null;
-  const nextFirstRoundCap =
-    firstRoundCap !== undefined
+  const nextFirstRoundCap = !usesFirstRoundCap
+    ? null
+    : firstRoundCap !== undefined
       ? firstRoundCap
       : existing.rows.length > 0
         ? parseCap(existing.rows[0].first_round_cap)
@@ -290,7 +302,11 @@ export async function upsertTeamAdvancementCaps(
     existing.rows.length > 0 ? parseExtra(existing.rows[0].deliberations_over_cap_extra) : 0;
 
   const nextApplicationExtra = caps.clearApplicationOverCapExtra ? 0 : existingAppExtra;
-  const nextFirstRoundExtra = caps.clearFirstRoundOverCapExtra ? 0 : existingFrExtra;
+  const nextFirstRoundExtra = !usesFirstRoundCap
+    ? 0
+    : caps.clearFirstRoundOverCapExtra
+      ? 0
+      : existingFrExtra;
   const nextDeliberationsExtra = caps.clearDeliberationsOverCapExtra ? 0 : existingDelibsExtra;
 
   if (existing.rows.length === 0) {

@@ -64,6 +64,56 @@ function validatePartialScores(
   return null;
 }
 
+async function buildInterviewSubmitResponse(
+  userId: number,
+  teamId: number,
+  stage: AssignmentStage,
+  roundId: number,
+  userRole: string,
+): Promise<{
+  nextApplicationId: number | null;
+  isDirector: boolean;
+  advancementHref: string | null;
+}> {
+  const db = getDb();
+  const next = await db.execute({
+    sql: `SELECT app.id as application_id
+          FROM assignments a
+          JOIN applications app ON app.id = a.application_id
+          LEFT JOIN interview_slots islot ON islot.application_id = app.id AND islot.stage = a.stage
+          WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?
+            AND a.status = 'pending'
+          ORDER BY islot.scheduled_at ASC, app.row_index ASC
+          LIMIT 1`,
+    args: [userId, teamId, stage],
+  });
+
+  const nextApplicationId =
+    next.rows.length > 0 ? (next.rows[0].application_id as number) : null;
+  const queueComplete = nextApplicationId == null;
+
+  let scoringEditLock = { locked: false };
+  if (stage === 'first_round') {
+    scoringEditLock = await getGradingEditLock(teamId, roundId, 'first_round');
+  }
+
+  const isDirector =
+    queueComplete &&
+    stage === 'first_round' &&
+    userRole === 'exec' &&
+    (await isTeamDirector(userId, teamId));
+  const advancementHref =
+    queueComplete && stage === 'first_round' && userRole === 'exec' && !scoringEditLock.locked
+      ? `/team/${teamId}/advancement/first-round`
+      : null;
+
+  return {
+    nextApplicationId,
+    isDirector: Boolean(isDirector),
+    advancementHref,
+  };
+}
+
 async function saveInterviewScore(
   assignmentId: number,
   userId: number,
@@ -316,7 +366,18 @@ export async function POST(
         );
       }
 
-      return NextResponse.json({ success: true });
+      const submitResult = await buildInterviewSubmitResponse(
+        user.id,
+        teamId,
+        stage,
+        assignment.roundId,
+        user.role,
+      );
+
+      return NextResponse.json({
+        success: true,
+        ...submitResult,
+      });
     }
 
     const scores = body.scores as Record<string, number>;
@@ -338,31 +399,17 @@ export async function POST(
       comment,
     );
 
-    const db = getDb();
-    const next = await db.execute({
-      sql: `SELECT app.id as application_id
-            FROM assignments a
-            JOIN applications app ON app.id = a.application_id
-            LEFT JOIN interview_slots islot ON islot.application_id = app.id AND islot.stage = a.stage
-            WHERE a.user_id = ? AND app.team_id = ? AND a.stage = ?
-              AND a.status = 'pending'
-            ORDER BY islot.scheduled_at ASC, app.row_index ASC
-            LIMIT 1`,
-      args: [user.id, teamId, stage],
-    });
-
-    const nextApplicationId =
-      next.rows.length > 0 ? (next.rows[0].application_id as number) : null;
-    const isDirector =
-      nextApplicationId == null &&
-      stage === 'first_round' &&
-      user.role === 'exec' &&
-      (await isTeamDirector(user.id, teamId));
+    const submitResult = await buildInterviewSubmitResponse(
+      user.id,
+      teamId,
+      stage,
+      assignment.roundId,
+      user.role,
+    );
 
     return NextResponse.json({
       success: true,
-      nextApplicationId,
-      isDirector: Boolean(isDirector),
+      ...submitResult,
     });
   } catch (e) {
     console.error(e);

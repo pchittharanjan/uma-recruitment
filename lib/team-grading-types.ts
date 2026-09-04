@@ -19,6 +19,8 @@ export type TeamGradingData = {
   progress: { completed: number; total: number };
   gradingEditLock: GradingEditLock;
   isDirector: boolean;
+  isAdminGrader: boolean;
+  isAdHocExec: boolean;
   nextStep: GradingNextStep | null;
 };
 

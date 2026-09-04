@@ -22,29 +22,62 @@ export default async function ImportLayout({ children }: { children: React.React
       if (canAdvanceToApplication) {
         return (
           <ImportBlocked
-            message="Import is only available once teams are in the Application phase. Advance each team from the Dashboard pipeline controls."
+            message="Import is only available once teams are in the Application phase."
             ctaLabel="Open Dashboard"
             ctaHref="/admin/dashboard#pipeline-controls"
-          />
+          >
+            <ol className="space-y-2 text-left text-sm leading-relaxed text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">1.</span> Open the Dashboard and
+                advance each team to Application.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">2.</span> Return here to import your
+                CSV.
+              </li>
+            </ol>
+          </ImportBlocked>
         );
       }
 
       if (!pipeline.status) {
         return (
           <ImportBlocked
-            message="No recruiting cycle yet. Set coffee chat dates on the Dashboard (or Coffee Chats) to start teams, then move to Application."
+            message="No recruiting cycle yet."
             ctaLabel="Go to Dashboard"
-            ctaHref="/admin/dashboard"
-          />
+            ctaHref="/admin/dashboard#pipeline-controls"
+          >
+            <ol className="space-y-2 text-left text-sm leading-relaxed text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">1.</span> Open the Dashboard and
+                advance each team to Application.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">2.</span> Return here to import your
+                CSV.
+              </li>
+            </ol>
+          </ImportBlocked>
         );
       }
 
       return (
         <ImportBlocked
-          message={`Import is only available in the Application phase. Teams are currently in ${phaseLabel(pipeline.status)}. Use the Dashboard phase controls if you need to change stages.`}
+          message={`Import is only available in the Application phase. Teams are currently in ${phaseLabel(pipeline.status)}.`}
           ctaLabel="Go to Dashboard"
           ctaHref="/admin/dashboard#pipeline-controls"
-        />
+        >
+          <ol className="space-y-2 text-left text-sm leading-relaxed text-muted-foreground">
+            <li>
+              <span className="font-medium text-foreground">1.</span> Use Dashboard phase controls
+              to move teams back to Application if needed.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">2.</span> Return here to import your
+              CSV.
+            </li>
+          </ol>
+        </ImportBlocked>
       );
     }
     return children;

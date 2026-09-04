@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getDb, getTeamById } from '@/lib/db';
+import type { Row } from '@libsql/client';
 import { getActiveRoundForTeam, getRoundSettings } from '@/lib/rounds';
 import {
   DEFAULT_GRADERS_PER_APPLICATION,
@@ -37,10 +38,20 @@ export interface AssignmentReviewGrader {
   assignments: AssignmentReviewEntry[];
 }
 
+export interface AssignmentCoverage {
+  applicationCount: number;
+  totalAssignments: number;
+  /** How many applications have 0, 1, 2, 3, or 4+ graders at application stage. */
+  byGraderCount: { zero: number; one: number; two: number; three: number; fourPlus: number };
+  /** True when every application has exactly `gradersPerApplication` distinct graders. */
+  exact: boolean;
+}
+
 export interface AssignmentReviewState {
   team: { id: number; name: string };
   round: { id: number; label: string; status: string };
   gradersPerApplication: number;
+  coverage: AssignmentCoverage;
   load: LoadSummary | null;
   graders: AssignmentReviewGrader[];
 }
@@ -59,38 +70,95 @@ interface PoolUser {
   email: string;
 }
 
-async function listTeamGradingPool(
-  teamId: number,
-  roundId: number,
-): Promise<PoolUser[]> {
-  const db = getDb();
-  const execRoles = EXEC_ROLE_SQL_VALUES.map(() => '?').join(', ');
-  const result = await db.execute({
-    sql: `SELECT DISTINCT u.id, u.name, u.email
-          FROM users u
-          JOIN access_grants ag ON ag.user_id = u.id AND ag.revoked_at IS NULL
-          WHERE ag.team_id = ?
-            AND (ag.round_id IS NULL OR ag.round_id = ?)
-            AND u.role IN (${execRoles}, 'ad_hoc_exec')
-            AND (
-              u.role IN (${execRoles})
-              OR ag.stage IS NULL
-              OR ag.stage = 'application'
-            )
-          ORDER BY u.name COLLATE NOCASE ASC`,
-    args: [teamId, roundId, ...EXEC_ROLE_SQL_VALUES, ...EXEC_ROLE_SQL_VALUES],
-  });
-  return result.rows.map((row) => ({
+function mapPoolRows(rows: Row[]): PoolUser[] {
+  return rows.map((row) => ({
     id: row.id as number,
     name: (row.name as string) || '',
     email: (row.email as string) || '',
   }));
 }
 
+async function listTeamGradingPool(
+  teamId: number,
+  roundId: number,
+): Promise<PoolUser[]> {
+  const db = getDb();
+  const execRoles = EXEC_ROLE_SQL_VALUES.map(() => '?').join(', ');
+  const [execResult, adminResult] = await Promise.all([
+    db.execute({
+      sql: `SELECT DISTINCT u.id, u.name, u.email
+            FROM users u
+            JOIN access_grants ag ON ag.user_id = u.id AND ag.revoked_at IS NULL
+            WHERE ag.team_id = ?
+              AND (ag.round_id IS NULL OR ag.round_id = ?)
+              AND u.role IN (${execRoles}, 'ad_hoc_exec')
+              AND (
+                u.role IN (${execRoles})
+                OR ag.stage IS NULL
+                OR ag.stage = 'application'
+              )
+            ORDER BY u.name COLLATE NOCASE ASC`,
+      args: [teamId, roundId, ...EXEC_ROLE_SQL_VALUES, ...EXEC_ROLE_SQL_VALUES],
+    }),
+    // Admins have implicit all-team access and can take leftover assignments.
+    db.execute({
+      sql: `SELECT id, name, email
+            FROM users
+            WHERE role = 'admin'
+            ORDER BY name COLLATE NOCASE ASC`,
+    }),
+  ]);
+
+  const byId = new Map<number, PoolUser>();
+  for (const user of [
+    ...mapPoolRows(execResult.rows),
+    ...mapPoolRows(adminResult.rows),
+  ]) {
+    byId.set(user.id, user);
+  }
+  return [...byId.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
+}
+
+function emptyCoverage(): AssignmentCoverage {
+  return {
+    applicationCount: 0,
+    totalAssignments: 0,
+    byGraderCount: { zero: 0, one: 0, two: 0, three: 0, fourPlus: 0 },
+    exact: true,
+  };
+}
+
+function coverageFromCounts(
+  graderCounts: number[],
+  gradersPerApplication: number,
+): AssignmentCoverage {
+  const byGraderCount = { zero: 0, one: 0, two: 0, three: 0, fourPlus: 0 };
+  let totalAssignments = 0;
+  let exact = true;
+  for (const n of graderCounts) {
+    totalAssignments += n;
+    if (n !== gradersPerApplication) exact = false;
+    if (n <= 0) byGraderCount.zero += 1;
+    else if (n === 1) byGraderCount.one += 1;
+    else if (n === 2) byGraderCount.two += 1;
+    else if (n === 3) byGraderCount.three += 1;
+    else byGraderCount.fourPlus += 1;
+  }
+  return {
+    applicationCount: graderCounts.length,
+    totalAssignments,
+    byGraderCount,
+    exact,
+  };
+}
+
 async function loadLiveAssignments(teamId: number): Promise<{
   team: { id: number; name: string };
   round: { id: number; label: string; status: string };
   gradersPerApplication: number;
+  coverage: AssignmentCoverage;
   rows: LoadedAssignment[];
   pool: PoolUser[];
 }> {
@@ -105,8 +173,10 @@ async function loadLiveAssignments(teamId: number): Promise<{
   }
 
   const settings = await getRoundSettings(round.id);
+  const gradersPerApplication =
+    settings?.graders_per_application ?? DEFAULT_GRADERS_PER_APPLICATION;
   const db = getDb();
-  const [result, pool] = await Promise.all([
+  const [result, coverageResult, pool] = await Promise.all([
     db.execute({
       sql: `SELECT a.id AS assignment_id,
                  a.user_id,
@@ -127,6 +197,16 @@ async function loadLiveAssignments(teamId: number): Promise<{
           ORDER BY u.name ASC, app.row_index ASC`,
       args: [teamId, round.id],
     }),
+    db.execute({
+      sql: `SELECT app.id AS application_id,
+                   COUNT(a.id) AS grader_count
+            FROM applications app
+            LEFT JOIN assignments a
+              ON a.application_id = app.id AND a.stage = 'application'
+            WHERE app.team_id = ? AND app.round_id = ?
+            GROUP BY app.id`,
+      args: [teamId, round.id],
+    }),
     listTeamGradingPool(teamId, round.id),
   ]);
 
@@ -143,11 +223,16 @@ async function loadLiveAssignments(teamId: number): Promise<{
     graderEmail: (row.grader_email as string) || '',
   }));
 
+  const coverage = coverageFromCounts(
+    coverageResult.rows.map((row) => Number(row.grader_count)),
+    gradersPerApplication,
+  );
+
   return {
     team: { id: team.id, name: team.name },
     round: { id: round.id, label: round.label, status: round.status },
-    gradersPerApplication:
-      settings?.graders_per_application ?? DEFAULT_GRADERS_PER_APPLICATION,
+    gradersPerApplication,
+    coverage,
     rows,
     pool,
   };
@@ -157,6 +242,7 @@ function toReviewState(loaded: {
   team: { id: number; name: string };
   round: { id: number; label: string; status: string };
   gradersPerApplication: number;
+  coverage: AssignmentCoverage;
   rows: LoadedAssignment[];
   pool: PoolUser[];
 }): AssignmentReviewState {
@@ -215,6 +301,7 @@ function toReviewState(loaded: {
     team: loaded.team,
     round: loaded.round,
     gradersPerApplication: loaded.gradersPerApplication,
+    coverage: loaded.coverage ?? emptyCoverage(),
     load: loadSummary(assignedCounts),
     graders,
   };

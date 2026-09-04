@@ -1,0 +1,2891 @@
+{
+  "Strategy": {
+    "components": [
+      {
+        "id": "application",
+        "label": "APPLICATION",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "app-q1",
+            "label": "App Q1. Why UMA (max 200 words)",
+            "weight": 0.15,
+            "criteria": [
+              {
+                "id": "motivation-uma-understanding",
+                "name": "Motivation & UMA Understanding",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic enthusiasm with no real UMA-specific knowledge \u2014 could be describing any club."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but motivation & UMA understanding is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate motivation & UMA understanding \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong motivation & UMA understanding, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A personal, specific reason that also shows accurate knowledge of what UMA actually does."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "goal-clarity",
+                "name": "Goal Clarity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague aspiration \u2014 \"I hope to grow and learn a lot.\""
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but goal clarity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate goal clarity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong goal clarity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A specific, concrete outcome they're after (a skill, an experience, a kind of work)."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "growth-potential",
+                "name": "Growth Potential",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No indication of willingness/ability to learn."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but growth potential is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate growth potential \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong growth potential, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear evidence they'll learn fast and contribute beyond basics."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "communication",
+                "name": "Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Rambling or padded to hit the word count."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concise, well-organized, easy to follow."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)"
+          },
+          {
+            "id": "app-q2",
+            "label": "App Q2. Interest/quals for Strategy Team (max 150 words)",
+            "weight": 0.2,
+            "criteria": [
+              {
+                "id": "passion",
+                "name": "Passion",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real enthusiasm conveyed."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but passion is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate passion \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong passion, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuine, specific enthusiasm for marketing and this team."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "team-fit",
+                "name": "Team Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Little connection drawn to this team's actual work."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but team fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate team fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong team fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly understands what this team does day-to-day."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "effort-qualifications",
+                "name": "Effort/Qualifications",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No relevant experience, skills, or initiative mentioned."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but effort/qualifications is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate effort/qualifications \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong effort/qualifications, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete relevant experience, skills, or initiative."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ],
+            "csvField": "1) Please explain your interest or qualifications for the UMA Strategy Team. (Max 150 words)"
+          },
+          {
+            "id": "app-q3",
+            "label": "App Q3. Favorite brand impact (max 100 words)",
+            "weight": 0.2,
+            "criteria": [
+              {
+                "id": "consumer-insight",
+                "name": "Consumer Insight",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Describes what the brand did but not why it worked on them."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but consumer insight is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate consumer insight \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong consumer insight, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly explains why the brand's action influenced their behavior."
+                  }
+                ],
+                "weightPct": 30.0
+              },
+              {
+                "id": "marketing-understanding",
+                "name": "Marketing Understanding",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No identifiable marketing strategy/principle named."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but marketing understanding is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate marketing understanding \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong marketing understanding, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Correctly identifies the strategy or principle at play."
+                  }
+                ],
+                "weightPct": 30.0
+              },
+              {
+                "id": "personal-connection",
+                "name": "Personal Connection",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Feels generic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but personal connection is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate personal connection \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong personal connection, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuine, specific link to their interest in marketing."
+                  }
+                ],
+                "weightPct": 30.0
+              },
+              {
+                "id": "communication",
+                "name": "Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Unclear or disorganized."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, concise, and engaging."
+                  }
+                ],
+                "weightPct": 10.0
+              }
+            ],
+            "csvField": "2) Pick a favorite brand and talk about something they did that impacted you as a consumer (either positively or negatively), and explain why it has made you interested in marketing. (Max 100 words)"
+          },
+          {
+            "id": "app-q4",
+            "label": "App Q4. Case: Duolingo campaign (max 300 words)",
+            "weight": 0.45,
+            "criteria": [
+              {
+                "id": "creativity-innovation",
+                "name": "Creativity/Innovation",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic, already-common ideas."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but creativity/innovation is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate creativity/innovation \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong creativity/innovation, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Original, compelling ideas beyond Duolingo's existing playbook."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "strategic-thinking",
+                "name": "Strategic Thinking",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Tactics with no link to an objective."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but strategic thinking is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate strategic thinking \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong strategic thinking, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear throughline from objective to strategy to tactics."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "target-audience-understanding",
+                "name": "Target Audience Understanding",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Could apply to any demographic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but target audience understanding is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate target audience understanding \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong target audience understanding, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Strong grasp of college student routines and campus culture."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "feasibility-execution",
+                "name": "Feasibility/Execution",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague or unrealistic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but feasibility/execution is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate feasibility/execution \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong feasibility/execution, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Realistic, actionable, clear path to implementation."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "3) Case Question: Duolingo, a language-learning platform that leverages gamification and streak mechanics to make education engaging, is looking to deepen brand affinity and daily usage among college students. The company is seeking innovative and impactful strategies that fit naturally into student routines and campus culture. Previous growth has come from marketing Duolingo\u2019s bite-sized daily lessons, social leaderboard competition, and viral, unhinged social media presence. \nYour task is to develop a comprehensive marketing campaign for Duolingo focusing on increasing brand awareness and daily app engagement among college students. (Max 300 words)"
+          }
+        ]
+      },
+      {
+        "id": "1st-interview",
+        "label": "1ST INTERVIEW",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "supreme-case-all-four-questions-graded",
+            "label": "Supreme Case \u2014 all four questions graded per UMA's answer key",
+            "weight": 0.6,
+            "criteria": [
+              {
+                "id": "q1-market-sizing",
+                "name": "Q1. Market Sizing",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No structure at all, just a guessed number; ignores the channel breakdown; confuses total apparel market size with the premium/hype niche."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts a structure but shakily \u2014 doesn't segment by channel, or lands on an implausible number without sanity-checking it."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Clear top-down/bottom-up structure stated aloud, segments by the four channels as prompted, lands on a sanity-checked, defensible range (roughly $1-5B)."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid structure plus partial bonus \u2014 a real anchor data point or explicit channel ranking by price sensitivity \u2014 but doesn't fully separate Supreme's addressable slice from the whole category."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Distinguishes total spend from Supreme's addressable/incremental slice, flags resale as a transfer market unprompted, uses a real anchor data point, and explicitly ranks channels by price sensitivity with a stated reason."
+                  }
+                ]
+              },
+              {
+                "id": "q2-gen-z-trends-campaign-tie",
+                "name": "Q2. Gen Z Trends & Campaign Tie",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic ideas with no real mechanism or tie to Supreme's scarcity/growth tension \u2014 e.g. \"do a TikTok campaign.\""
+                  },
+                  {
+                    "score": 2,
+                    "description": "Names some Gen Z trends but the campaign tie is vague or generic (e.g. just \"campus ambassador program\" with no specifics)."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Covers most core trends (status via scarcity/access, community/subculture affiliation, authenticity, resale/investment mindset, campus social currency) and ties them to a solid campaign idea like a campus-exclusive drop."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid trend coverage plus a named, reasonably specific mechanism \u2014 approaching bonus territory."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A named, specific mechanism (a real campus takeover tour, a verified-purchase community app, a student-designer contest that actually ships) plus meaningful engagement with the Gen Z data referenced in the prompt."
+                  }
+                ]
+              },
+              {
+                "id": "q3-challenges-opportunities",
+                "name": "Q3. Challenges & Opportunities",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Doesn't identify either side clearly, or ignores the scarcity/dilution tension entirely."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Names some challenges or opportunities but generically, without connecting them to Supreme's specific situation (the two acquisitions, drop fatigue already in the prompt)."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Covers real challenges (dilution, drop fatigue, counterfeits, acquisition instability) and real opportunities (a fresh cohort with no fatigue, campus's inherent scarcity, resale-driven loyalty)."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid coverage plus a concrete proposal for how to expand without diluting scarcity."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A concrete anti-dilution mechanism (geographic/quantity caps baked into the program itself), ties the acquisition instability point to a specific recommendation, and treats counterfeit risk as a creative opportunity (authentication tech) as well as a threat."
+                  }
+                ]
+              },
+              {
+                "id": "q4-recommendation-summary",
+                "name": "Q4. Recommendation & Summary",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Lists several disconnected ideas with no prioritization or clear #1 recommendation."
+                  },
+                  {
+                    "score": 2,
+                    "description": "States a recommendation, but it doesn't clearly reference the scarcity/growth tension or thread the earlier analysis together."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Converges on one (at most two) primary recommendation, explicitly threads the scarcity/growth tension, and briefly references the market size and Gen Z insight from earlier answers."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid convergence plus a distinctive name or framing for the idea."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A memorable, nameable big idea (a real program/campaign name) plus an explicit proposed success metric \u2014 resale price stability, repeat purchase rate, waitlist/demand ratio."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "group-process",
+            "label": "Group Process",
+            "weight": 0.4,
+            "criteria": [
+              {
+                "id": "collaboration-contribution",
+                "name": "Collaboration & Contribution",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Passive in discussion; ideas mostly come from others."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but collaboration & contribution is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate collaboration & contribution \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong collaboration & contribution, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Actively contributes ideas and builds constructively on teammates'."
+                  }
+                ]
+              },
+              {
+                "id": "presentation-communication",
+                "name": "Presentation & Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Unclear or disorganized during the group presentation."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but presentation & communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate presentation & communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong presentation & communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, confident, and organized contribution to the group's pitch."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "social-fit",
+        "label": "SOCIAL FIT",
+        "weightPct": 10,
+        "questions": [
+          {
+            "id": "social-fit-assessed-across-coffee-chat",
+            "label": "Social Fit \u2014 assessed across Coffee Chats and/or Social Round, whichever occurred",
+            "weight": 1.0,
+            "criteria": [
+              {
+                "id": "approachability-warmth",
+                "name": "Approachability & Warmth",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Standoffish or awkward in casual settings; hard to talk to."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but approachability & warmth is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate approachability & warmth \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong approachability & warmth, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuinely warm and easy to talk to, puts others at ease."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "genuine-engagement",
+                "name": "Genuine Engagement",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Going through the motions; little real interest in others or in UMA."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but genuine engagement is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate genuine engagement \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong genuine engagement, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Real curiosity about others and about UMA, not just performing enthusiasm."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "culture-fit",
+                "name": "Culture Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Hard to picture them meshing with the team's day-to-day dynamic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but culture fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate culture fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong culture fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly seems like someone who'd add to the team's culture and vibe."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "final-interview",
+        "label": "FINAL INTERVIEW",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "heytea-case-all-three-questions-graded",
+            "label": "HeyTea Case \u2014 all three questions graded per UMA's answer key",
+            "weight": 0.45,
+            "criteria": [
+              {
+                "id": "q1-campaign-math-roi-reasoning",
+                "name": "Q1. Campaign Math & ROI Reasoning",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real math shown, or a conversion rate with no reasoning behind it."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Picks a conversion rate and does the arithmetic, but doesn't sanity-check whether the campaign actually pays for itself, or draws the wrong conclusion from their own numbers."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Picks a plausible conversion rate (well under 1% is realistic), shows the arithmetic through to a revenue number, and correctly recognizes that direct-response payback rarely works cleanly for an awareness campaign at that price point."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid math plus a partial move toward LTV reasoning \u2014 mentions repeat visits matter but doesn't fully build the case."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Reaches the \"aha\": brings in repeat-visit/LTV as the real payback lens, explicitly separates brand/awareness value from direct conversion value, and sensitivity-checks their own assumption (\"if conversion were 2x higher/lower...\")."
+                  }
+                ]
+              },
+              {
+                "id": "q2-retention-without-discounting",
+                "name": "Q2. Retention Without Discounting",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Suggests only one-off ideas, or leans on discounting despite the brand's premium positioning."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Names a loyalty or community idea but it's generic, or accidentally still discount-flavored."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Proposes non-discount retention mechanics \u2014 stamp cards/exclusive unlocks, seasonal limited drops, community events, membership perks \u2014 that fit HeyTea's premium positioning."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid retention ideas plus a stated retention metric to track, without fully avoiding discount-flavored framing."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Explicitly avoids discount-flavored language even in loyalty mechanics, proposes a concrete retention metric (e.g. 30-day repeat visit rate), and names a real comparable brand mechanic as an analogy."
+                  }
+                ]
+              },
+              {
+                "id": "q3-in-store-vs-delivery",
+                "name": "Q3. In-Store vs. Delivery",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Doesn't engage with the delivery-preference tension at all."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Names an in-store-exclusive idea but doesn't explain why it would actually pull someone away from delivery."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Proposes in-store-exclusive items, Instagrammable experiences, or loyalty perks tied to physical visits, and notes the sensory/experiential parts of the drink that degrade in delivery."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid tactics plus recognition that HeyTea may not want to fully fight delivery \u2014 some segmentation between in-store hype and everyday delivery demand."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Recognizes the segmentation tension explicitly, and reuses the Gen Z status/community insight from the Supreme case (an in-store visit as social content) \u2014 real pattern transfer across cases."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "individual-behavioral-fit",
+            "label": "Individual Behavioral & Fit",
+            "weight": 0.4,
+            "criteria": [
+              {
+                "id": "trend-awareness-marketing-strategy-that-captured-your-attention",
+                "name": "Trend Awareness (\"marketing strategy that captured your attention\")",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Picks something outdated or vague (\"Nike's marketing is good\"), or can't explain why it worked beyond \"I saw it a lot.\""
+                  },
+                  {
+                    "score": 2,
+                    "description": "Names something specific and recent but the explanation of why it worked is thin."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Names something specific and recent, and explains the actual mechanism of why it worked."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid answer plus a partial connection to a broader trend."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Connects it to a broader trend (attention economy, community-driven marketing, nostalgia) and generalizes a lesson from it \u2014 the same analytical instinct the case questions are testing."
+                  }
+                ]
+              },
+              {
+                "id": "motivation-fit-what-motivates-you-beyond-your-professional-goals",
+                "name": "Motivation & Fit (\"what motivates you beyond your professional goals\")",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Purely resume-driven \u2014 \"looks good on my resume\" \u2014 with no personal connection to UMA."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Somewhat genuine but generic \u2014 could be said about any club."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Genuine, specific answer beyond resume-building \u2014 real community, specific people or culture at UMA, specific project types."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Solid answer that's clearly genuine, just short of a concrete callback."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Ties back to something concrete from the social round the day before \u2014 real evidence of engagement, not a canned answer."
+                  }
+                ]
+              },
+              {
+                "id": "persuasion-influence",
+                "name": "Persuasion & Influence",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real example, or one where they didn't actually persuade anyone \u2014 the example doesn't match the question asked."
+                  },
+                  {
+                    "score": 2,
+                    "description": "A real attempt to persuade someone, but the story reveals little about what specifically they did or why it worked."
+                  },
+                  {
+                    "score": 3,
+                    "description": "A genuine example with a clear, specific tactic they used to shift someone's view \u2014 competent but unremarkable."
+                  },
+                  {
+                    "score": 4,
+                    "description": "A genuine example plus real insight into why the tactic worked, pointing at a transferable persuasion skill rather than a one-off."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A unique, substantive experience where the specific approach and the lesson they took from it show real, transferable judgment about persuading people \u2014 not a rehearsed talking point."
+                  }
+                ]
+              },
+              {
+                "id": "initiative-process-improvement",
+                "name": "Initiative & Process Improvement",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real example, or one where they didn't actually identify or act on anything themselves \u2014 the example doesn't match the question asked."
+                  },
+                  {
+                    "score": 2,
+                    "description": "A real attempt at improving something, but the story reveals little about what they actually noticed or changed."
+                  },
+                  {
+                    "score": 3,
+                    "description": "A genuine example where they clearly identify a gap and describe concrete steps they personally took \u2014 competent but unremarkable."
+                  },
+                  {
+                    "score": 4,
+                    "description": "A genuine example plus real insight into why the change mattered, pointing at a transferable instinct for spotting and fixing problems."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A unique, substantive experience showing genuine initiative and a transferable lesson about improving a process or system \u2014 not a rehearsed talking point."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "communication-self-presentation",
+            "label": "Communication & Self-Presentation",
+            "weight": 0.15,
+            "criteria": [
+              {
+                "id": "communication-incl-tell-me-about-yourself",
+                "name": "Communication (incl. \"tell me about yourself\")",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Rambling, a generic resume readout with no tailoring to UMA specifically."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Reasonably clear but not obviously tailored to why they want UMA."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Clear and concise, at least somewhat tailored to why they want UMA rather than a generic resume readout."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Clear, concise, and well-tailored across most of the interview."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, concise, and well-tailored to UMA across the entire interview, including a sharp \"tell me about yourself\" that isn't just a resume readout."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "csvFieldMap": {
+      "app-q1": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)",
+      "app-q2": "1) Please explain your interest or qualifications for the UMA Strategy Team. (Max 150 words)",
+      "app-q3": "2) Pick a favorite brand and talk about something they did that impacted you as a consumer (either positively or negatively), and explain why it has made you interested in marketing. (Max 100 words)",
+      "app-q4": "3) Case Question: Duolingo, a language-learning platform that leverages gamification and streak mechanics to make education engaging, is looking to deepen brand affinity and daily usage among college students. The company is seeking innovative and impactful strategies that fit naturally into student routines and campus culture. Previous growth has come from marketing Duolingo\u2019s bite-sized daily lessons, social leaderboard competition, and viral, unhinged social media presence. \nYour task is to develop a comprehensive marketing campaign for Duolingo focusing on increasing brand awareness and daily app engagement among college students. (Max 300 words)"
+    }
+  },
+  "Events": {
+    "components": [
+      {
+        "id": "application",
+        "label": "APPLICATION",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "app-q1",
+            "label": "App Q1. Why UMA (max 200 words)",
+            "weight": 0.15,
+            "criteria": [
+              {
+                "id": "motivation-uma-understanding",
+                "name": "Motivation & UMA Understanding",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic enthusiasm with no real UMA-specific knowledge \u2014 could be describing any club."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but motivation & UMA understanding is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate motivation & UMA understanding \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong motivation & UMA understanding, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A personal, specific reason that also shows accurate knowledge of what UMA actually does."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "goal-clarity",
+                "name": "Goal Clarity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague aspiration \u2014 \"I hope to grow and learn a lot.\""
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but goal clarity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate goal clarity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong goal clarity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A specific, concrete outcome they're after (a skill, an experience, a kind of work)."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "growth-potential",
+                "name": "Growth Potential",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No indication of willingness/ability to learn."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but growth potential is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate growth potential \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong growth potential, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear evidence they'll learn fast and contribute beyond basics."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "communication",
+                "name": "Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Rambling or padded to hit the word count."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concise, well-organized, easy to follow."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)"
+          },
+          {
+            "id": "app-q2",
+            "label": "App Q2. Interest/quals for Events Team (max 150 words)",
+            "weight": 0.2,
+            "criteria": [
+              {
+                "id": "passion",
+                "name": "Passion",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real enthusiasm conveyed."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but passion is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate passion \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong passion, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuine, specific enthusiasm for marketing and this team."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "team-fit",
+                "name": "Team Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Little connection drawn to this team's actual work."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but team fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate team fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong team fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly understands what this team does day-to-day."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "effort-qualifications",
+                "name": "Effort/Qualifications",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No relevant experience, skills, or initiative mentioned."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but effort/qualifications is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate effort/qualifications \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong effort/qualifications, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete relevant experience, skills, or initiative."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ],
+            "csvField": "1) Please explain your interest or qualifications for the UMA Events Team. (Max 150 words)"
+          },
+          {
+            "id": "app-q3",
+            "label": "App Q3. Dream event + visual (max 100 words)",
+            "weight": 0.2,
+            "criteria": [
+              {
+                "id": "effort-customization",
+                "name": "Effort/Customization",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Looks like a generic/recycled template."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but effort/customization is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate effort/customization \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong effort/customization, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Visibly customized and built for this event."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "visual-creativity",
+                "name": "Visual Creativity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Plain, uninspired."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but visual creativity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate visual creativity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong visual creativity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Aesthetically thought-through."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "organization-clarity",
+                "name": "Organization & Clarity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Cluttered layout, leaves the grader unsure what the event is."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but organization & clarity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate organization & clarity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong organization & clarity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Easy to scan, explains the event with no ambiguity."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "excitement-draw",
+                "name": "Excitement/Draw",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Wouldn't make anyone want to attend."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but excitement/draw is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate excitement/draw \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong excitement/draw, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuinely makes the event sound worth going to."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "2A) If you could host any event with an unlimited budget, what would it be? (Max 100 words)",
+            "csvFields": [
+              "2A) If you could host any event with an unlimited budget, what would it be? (Max 100 words)",
+              "2B) Then, create a visual to promote the event (flyer, social media post, video trailer, etc.) and attach it as a PNG, PDF, etc. Make sure the file is viewable by everyone."
+            ]
+          },
+          {
+            "id": "app-q4",
+            "label": "App Q4. Case: campus activation, travel-gear cleaner (max 300 words)",
+            "weight": 0.45,
+            "criteria": [
+              {
+                "id": "creative-concept",
+                "name": "Creative Concept",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic tabling, no distinct hook."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but creative concept is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate creative concept \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong creative concept, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Original, memorable concept tailored to this product."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "concept-logic-completeness",
+                "name": "Concept Logic & Completeness",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Pieces don't logically fit, or prompt parts skipped."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but concept logic & completeness is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate concept logic & completeness \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong concept logic & completeness, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Every part addressed; pieces logically fit for testing Gen Z."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "hook-strength",
+                "name": "Hook Strength",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No specific reason a stranger would stop."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but hook strength is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate hook strength \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong hook strength, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete, credible reason cold students would engage."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "metrics-rationale",
+                "name": "Metrics & Rationale",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague success language, no real measurement."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but metrics & rationale is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate metrics & rationale \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong metrics & rationale, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete, trackable metrics with clear rationale."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "3) Case Question: You're a consultant for an early-stage startup that makes a cleaning product for travel gear (suitcases, backpacks, and carry-ons) designed to remove stains and keep the travel gear looking new. The brand has zero existing awareness among college students and no established audience to build from. Their goal is to test whether Gen Z is a viable audience and generate initial brand awareness through an on-campus activation. \nDescribe/Explain:\n1) Event Concept: Include location, target audience, activities, what students would experience, why you chose this concept, and what personal experience or unmet need(s) shaped the idea.\n2) Promotion: How you'd get students who've never heard of the brand to actually stop and engage with a product they didn't know they needed.\n3) Evaluation: How you'd measure whether this test successfully proved student interest. (Max 300 words)"
+          }
+        ]
+      },
+      {
+        "id": "1st-interview",
+        "label": "1ST INTERVIEW",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "case-analysis-skincare-activation",
+            "label": "Case Analysis (Skincare Activation)",
+            "weight": 0.7,
+            "criteria": [
+              {
+                "id": "audience-research-quality",
+                "name": "Audience Research Quality",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Research plan is generic or skipped entirely."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but audience research quality is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate audience research quality \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong audience research quality, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific, well-reasoned research questions/methods for understanding Berkeley students."
+                  }
+                ]
+              },
+              {
+                "id": "campaign-concept-ambassador-integration",
+                "name": "Campaign Concept & Ambassador Integration",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Product promotion and ambassador recruitment feel disconnected."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but campaign concept & ambassador integration is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate campaign concept & ambassador integration \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong campaign concept & ambassador integration, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concept clearly ties product promotion and ambassador recruitment together."
+                  }
+                ]
+              },
+              {
+                "id": "success-metrics",
+                "name": "Success Metrics",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague success language, no real measurement plan."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but success metrics is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate success metrics \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong success metrics, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete, distinct metrics for both product awareness and ambassador recruitment."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "group-process",
+            "label": "Group Process",
+            "weight": 0.3,
+            "criteria": [
+              {
+                "id": "collaboration-contribution",
+                "name": "Collaboration / Contribution",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Passive in discussion; ideas mostly come from others."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but collaboration / contribution is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate collaboration / contribution \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong collaboration / contribution, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Actively contributes ideas and builds constructively on teammates'."
+                  }
+                ]
+              },
+              {
+                "id": "presentation-communication",
+                "name": "Presentation & Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Unclear or disorganized during the group presentation."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but presentation & communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate presentation & communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong presentation & communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, confident, and organized contribution to the group's pitch."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "social-fit",
+        "label": "SOCIAL FIT",
+        "weightPct": 10,
+        "questions": [
+          {
+            "id": "social-fit-assessed-across-coffee-chat",
+            "label": "Social Fit \u2014 assessed across Coffee Chats and/or Social Round, whichever occurred",
+            "weight": 1.0,
+            "criteria": [
+              {
+                "id": "approachability-warmth",
+                "name": "Approachability & Warmth",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Standoffish or awkward in casual settings; hard to talk to."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but approachability & warmth is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate approachability & warmth \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong approachability & warmth, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuinely warm and easy to talk to, puts others at ease."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "genuine-engagement",
+                "name": "Genuine Engagement",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Going through the motions; little real interest in others or in UMA."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but genuine engagement is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate genuine engagement \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong genuine engagement, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Real curiosity about others and about UMA, not just performing enthusiasm."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "culture-fit",
+                "name": "Culture Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Hard to picture them meshing with the team's day-to-day dynamic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but culture fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate culture fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong culture fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly seems like someone who'd add to the team's culture and vibe."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "final-interview",
+        "label": "FINAL INTERVIEW",
+        "weightPct": 30,
+        "questions": [
+          {
+            "id": "behavioral-fit",
+            "label": "Behavioral & Fit",
+            "weight": 0.3,
+            "criteria": [
+              {
+                "id": "introduction-communication",
+                "name": "Introduction & Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Hard to follow; skips basics or runs over time without a clear intro."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but introduction & communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate introduction & communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong introduction & communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, concise self-intro covering name, major, hobbies, and interest in Events."
+                  }
+                ]
+              },
+              {
+                "id": "event-marketing-instinct",
+                "name": "Event Marketing Instinct",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Struggles to explain what made an event effective."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but event marketing instinct is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate event marketing instinct \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong event marketing instinct, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly identifies specific factors that drove an event's success."
+                  }
+                ]
+              },
+              {
+                "id": "motivation-fit",
+                "name": "Motivation / Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague about where they'd fit in the UMA/Events picture."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but motivation / fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate motivation / fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong motivation / fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific, thought-through sense of their fit within Events."
+                  }
+                ]
+              },
+              {
+                "id": "learning-agility",
+                "name": "Learning Agility",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Story doesn't show real adaptation or new-skill acquisition."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but learning agility is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate learning agility \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong learning agility, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear example of quickly learning something new to complete a task."
+                  }
+                ]
+              },
+              {
+                "id": "expertise-teaching",
+                "name": "Expertise & Teaching",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Can't articulate an area of expertise or teach it clearly."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but expertise & teaching is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate expertise & teaching \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong expertise & teaching, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly explains something they know well in an engaging, structured way."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "warm-up-case-boba-launch",
+            "label": "Warm-Up Case (Boba Launch)",
+            "weight": 0.15,
+            "criteria": [
+              {
+                "id": "placement-creativity-reasoning",
+                "name": "Placement Creativity & Reasoning",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic location with little justification."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but placement creativity & reasoning is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate placement creativity & reasoning \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong placement creativity & reasoning, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific, well-reasoned high-traffic placement with a clear excitement/curiosity angle."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "reset-case",
+            "label": "RESET Case",
+            "weight": 0.4,
+            "criteria": [
+              {
+                "id": "research-instinct",
+                "name": "Research Instinct",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Names sources/competitors with little relevance to Gen Z resale behavior."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but research instinct is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate research instinct \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong research instinct, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Names specific, relevant sources and explains what insight they'd pull from each."
+                  }
+                ]
+              },
+              {
+                "id": "authenticity-strategy",
+                "name": "Authenticity Strategy",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Suggestions still read as a sustainability marketing gimmick."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but authenticity strategy is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate authenticity strategy \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong authenticity strategy, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete features/strategies that would feel authentic, not performative, to Gen Z."
+                  }
+                ]
+              },
+              {
+                "id": "campus-activation-design",
+                "name": "Campus Activation Design",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic pop-up with no real word-of-mouth mechanism."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but campus activation design is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate campus activation design \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong campus activation design, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific partner and experience clearly designed to spark word-of-mouth and app engagement."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "communication",
+            "label": "Communication",
+            "weight": 0.15,
+            "criteria": [
+              {
+                "id": "overall-communication",
+                "name": "Overall Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Hard to follow, rambling, or runs out of time disorganized."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but overall communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate overall communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong overall communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, concise, and well-paced across the whole interview."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "csvFieldMap": {
+      "app-q1": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)",
+      "app-q2": "1) Please explain your interest or qualifications for the UMA Events Team. (Max 150 words)",
+      "app-q3": "2A) If you could host any event with an unlimited budget, what would it be? (Max 100 words)",
+      "app-q3-visual": "2B) Then, create a visual to promote the event (flyer, social media post, video trailer, etc.) and attach it as a PNG, PDF, etc. Make sure the file is viewable by everyone.",
+      "app-q4": "3) Case Question: You're a consultant for an early-stage startup that makes a cleaning product for travel gear (suitcases, backpacks, and carry-ons) designed to remove stains and keep the travel gear looking new. The brand has zero existing awareness among college students and no established audience to build from. Their goal is to test whether Gen Z is a viable audience and generate initial brand awareness through an on-campus activation. \nDescribe/Explain:\n1) Event Concept: Include location, target audience, activities, what students would experience, why you chose this concept, and what personal experience or unmet need(s) shaped the idea.\n2) Promotion: How you'd get students who've never heard of the brand to actually stop and engage with a product they didn't know they needed.\n3) Evaluation: How you'd measure whether this test successfully proved student interest. (Max 300 words)"
+    }
+  },
+  "Design": {
+    "components": [
+      {
+        "id": "application",
+        "label": "APPLICATION",
+        "weightPct": 55,
+        "questions": [
+          {
+            "id": "app-q1",
+            "label": "App Q1. Why UMA (max 200 words)",
+            "weight": 0.12,
+            "criteria": [
+              {
+                "id": "motivation-uma-understanding",
+                "name": "Motivation & UMA Understanding",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic enthusiasm with no real UMA-specific knowledge \u2014 could be describing any club."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but motivation & UMA understanding is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate motivation & UMA understanding \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong motivation & UMA understanding, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A personal, specific reason that also shows accurate knowledge of what UMA actually does."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "goal-clarity",
+                "name": "Goal Clarity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague aspiration \u2014 \"I hope to grow and learn a lot.\""
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but goal clarity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate goal clarity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong goal clarity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "A specific, concrete outcome they're after (a skill, an experience, a kind of work)."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "growth-potential",
+                "name": "Growth Potential",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No indication of willingness/ability to learn."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but growth potential is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate growth potential \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong growth potential, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear evidence they'll learn fast and contribute beyond basics."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "communication",
+                "name": "Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Rambling or padded to hit the word count."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concise, well-organized, easy to follow."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)"
+          },
+          {
+            "id": "app-q2",
+            "label": "App Q2. Interest/quals for Design Team (max 150 words)",
+            "weight": 0.12,
+            "criteria": [
+              {
+                "id": "passion",
+                "name": "Passion",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No real enthusiasm conveyed."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but passion is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate passion \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong passion, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuine, specific enthusiasm for marketing and this team."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "team-fit",
+                "name": "Team Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Little connection drawn to this team's actual work."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but team fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate team fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong team fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly understands what this team does day-to-day."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "effort-qualifications",
+                "name": "Effort/Qualifications",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "No relevant experience, skills, or initiative mentioned."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but effort/qualifications is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate effort/qualifications \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong effort/qualifications, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concrete relevant experience, skills, or initiative."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ],
+            "csvField": "1) Please explain your interest or qualifications for the UMA Design Team. (Max 150 words)"
+          },
+          {
+            "id": "app-q3",
+            "label": "App Q3. Invent a holiday (max 100 words)",
+            "weight": 0.12,
+            "criteria": [
+              {
+                "id": "originality",
+                "name": "Originality",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Derivative of an existing holiday."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but originality is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate originality \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong originality, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuinely inventive premise."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "creativity-fun-factor",
+                "name": "Creativity/Fun Factor",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Flat, unimaginative execution."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but creativity/fun factor is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate creativity/fun factor \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong creativity/fun factor, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Playful, memorable, fun to read."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "clarity-communication",
+                "name": "Clarity & Communication",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Unclear what's being celebrated."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but clarity & communication is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate clarity & communication \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong clarity & communication, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, easy to picture."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ],
+            "csvField": "2) You're tasked with creating a new holiday. What are we celebrating? (Max 100 words)"
+          },
+          {
+            "id": "app-q4",
+            "label": "App Q4. Case: weather-delivery poster/site + logo (max 300 words write-up)",
+            "weight": 0.24,
+            "criteria": [
+              {
+                "id": "concept-originality",
+                "name": "Concept Originality",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic, templated concept."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but concept originality is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate concept originality \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong concept originality, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Distinct, original creative direction."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "craft-type-color-composition",
+                "name": "Craft (type/color/composition)",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Weak choices, feels unfinished."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but craft is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate craft \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong craft, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Strong, intentional font/color/imagery."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "narrative-persuasiveness",
+                "name": "Narrative & Persuasiveness",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Doesn't clearly sell the product."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but narrative & persuasiveness is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate narrative & persuasiveness \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong narrative & persuasiveness, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Compelling narrative that sells it."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "process-rationale",
+                "name": "Process Rationale",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Write-up doesn't explain decisions."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but process rationale is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate process rationale \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong process rationale, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly explains the thinking behind decisions."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "3) Case Question: This company (name ideas may include but are not limited to: WeatherDrop, SkySupply, Cloudly) is an on-demand weather delivery service that lets customers customize and schedule the perfect weather for any occasion. From sunshine and snow to thunderstorms and fog, users can order atmospheric conditions straight to their location. \n1) Create a poster or website landing page for a fictional weather delivery company. \n2) Create a simple logo and include this logo on your website or poster. \nConsider font, color, and imagery in your deliverable and create a compelling narrative that clearly sells the product to target audiences. \n(We recommend using Figma for website designs and Adobe products such as Illustrator or Photoshop for posters, but feel free to use whichever medium you feel most comfortable with.) \n3) Please share a link to your design along with a document explaining your design process and decisions as a Google Drive link. Make sure to share it with us! (Max 300 words)"
+          },
+          {
+            "id": "portfolio-3-5-pieces-of-past-work",
+            "label": "Portfolio (3-5 pieces of past work)",
+            "weight": 0.4,
+            "criteria": [
+              {
+                "id": "design-quality-craft",
+                "name": "Design Quality/Craft",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Inconsistent or weak execution."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but design quality/craft is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate design quality/craft \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong design quality/craft, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Consistently strong, polished execution."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "creativity-originality",
+                "name": "Creativity/Originality",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Derivative or template-driven."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but creativity/originality is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate creativity/originality \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong creativity/originality, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Distinct creative point of view."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "range-versatility",
+                "name": "Range/Versatility",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "All pieces look the same."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but range/versatility is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate range/versatility \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong range/versatility, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Range across formats/styles, still cohesive."
+                  }
+                ],
+                "weightPct": 25.0
+              },
+              {
+                "id": "professionalism-presentation",
+                "name": "Professionalism/Presentation",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Poorly presented, hard to view."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but professionalism/presentation is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate professionalism/presentation \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong professionalism/presentation, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Cleanly presented, easy to review."
+                  }
+                ],
+                "weightPct": 25.0
+              }
+            ],
+            "csvField": "Please add a link to your portfolio/website OR a Google Drive link with 3-5 pieces of your past creative work!"
+          }
+        ]
+      },
+      {
+        "id": "1st-interview",
+        "label": "1ST INTERVIEW",
+        "weightPct": 35,
+        "questions": [
+          {
+            "id": "behavioral",
+            "label": "Behavioral",
+            "weight": 0.25,
+            "criteria": [
+              {
+                "id": "design-background-self-awareness",
+                "name": "Design Background & Self-Awareness",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague about background or growth areas."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but design background & self-awareness is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate design background & self-awareness \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong design background & self-awareness, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific background, and a clear, honest sense of what they're working to strengthen."
+                  }
+                ]
+              },
+              {
+                "id": "motivation-fit",
+                "name": "Motivation / Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Generic reasons for wanting to join UMA Design."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but motivation / fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate motivation / fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong motivation / fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific, genuine reasons tied to what UMA Design actually does."
+                  }
+                ]
+              },
+              {
+                "id": "portfolio-depth-reflection",
+                "name": "Portfolio Depth & Reflection",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Can't explain why the piece matters or what they'd change."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but portfolio depth & reflection is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate portfolio depth & reflection \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong portfolio depth & reflection, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear pride, specific reasoning, and honest reflection on what they'd change now."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "design-thinking",
+            "label": "Design Thinking",
+            "weight": 0.3,
+            "criteria": [
+              {
+                "id": "process-rigor",
+                "name": "Process Rigor",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Can't describe a clear process from concept to completion."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but process rigor is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate process rigor \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong process rigor, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clear, logical step-by-step process from concept to completion."
+                  }
+                ]
+              },
+              {
+                "id": "problem-solving",
+                "name": "Problem-Solving",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Challenge story has no clear resolution or lesson."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but problem-solving is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate problem-solving \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong problem-solving, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Specific challenge, clear resolution, and a takeaway."
+                  }
+                ]
+              },
+              {
+                "id": "improv-on-the-spot-thinking",
+                "name": "Improv / On-the-Spot Thinking",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Struggles to generate a redesign idea under time pressure."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but improv / on-the-spot thinking is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate improv / on-the-spot thinking \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong improv / on-the-spot thinking, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Generates a clear, reasoned redesign idea quickly and explains the why."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "short-design-casing-bart",
+            "label": "Short Design Casing (BART)",
+            "weight": 0.45,
+            "criteria": [
+              {
+                "id": "precision",
+                "name": "Precision",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Vague or generic critique, doesn't name a specific feature/issue."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but precision is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate precision \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong precision, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Precisely and succinctly identifies a standout feature and improvement area."
+                  }
+                ]
+              },
+              {
+                "id": "creativity",
+                "name": "Creativity",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Design challenge sketch is generic or doesn't address a real pain point."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but creativity is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate creativity \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong creativity, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Concept captures attention and creatively addresses a specific rider pain point."
+                  }
+                ]
+              },
+              {
+                "id": "efficiency",
+                "name": "Efficiency",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Doesn't produce a coherent concept within the time limit."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but efficiency is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate efficiency \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong efficiency, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Effectively uses the 5 minutes to create a coherent, presentable concept."
+                  }
+                ]
+              },
+              {
+                "id": "communication-under-time-constraint",
+                "name": "Communication Under Time Constraint",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Can't clearly explain the concept in the 1-minute window."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but communication under time constraint is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate communication under time constraint \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong communication under time constraint, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly explains the problem, solution, and rider benefit within the time limit."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "social-fit",
+        "label": "SOCIAL FIT",
+        "weightPct": 10,
+        "questions": [
+          {
+            "id": "social-fit-assessed-across-coffee-chat",
+            "label": "Social Fit \u2014 assessed across Coffee Chats and/or Social Round, whichever occurred",
+            "weight": 1.0,
+            "criteria": [
+              {
+                "id": "approachability-warmth",
+                "name": "Approachability & Warmth",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Standoffish or awkward in casual settings; hard to talk to."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but approachability & warmth is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate approachability & warmth \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong approachability & warmth, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Genuinely warm and easy to talk to, puts others at ease."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "genuine-engagement",
+                "name": "Genuine Engagement",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Going through the motions; little real interest in others or in UMA."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but genuine engagement is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate genuine engagement \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong genuine engagement, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Real curiosity about others and about UMA, not just performing enthusiasm."
+                  }
+                ],
+                "weightPct": 33.3
+              },
+              {
+                "id": "culture-fit",
+                "name": "Culture Fit",
+                "anchors": [
+                  {
+                    "score": 1,
+                    "description": "Hard to picture them meshing with the team's day-to-day dynamic."
+                  },
+                  {
+                    "score": 2,
+                    "description": "Attempts it, but culture fit is thin, generic, or inconsistent."
+                  },
+                  {
+                    "score": 3,
+                    "description": "Adequate culture fit \u2014 present and workable, but not distinctive."
+                  },
+                  {
+                    "score": 4,
+                    "description": "Strong culture fit, just short of the top mark."
+                  },
+                  {
+                    "score": 5,
+                    "description": "Clearly seems like someone who'd add to the team's culture and vibe."
+                  }
+                ],
+                "weightPct": 33.3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "csvFieldMap": {
+      "app-q1": "Why UMA & What do you hope to gain from being a part of UMA? (Max 200 words)",
+      "app-q2": "1) Please explain your interest or qualifications for the UMA Design Team. (Max 150 words)",
+      "app-q3": "2) You're tasked with creating a new holiday. What are we celebrating? (Max 100 words)",
+      "app-q4": "3) Case Question: This company (name ideas may include but are not limited to: WeatherDrop, SkySupply, Cloudly) is an on-demand weather delivery service that lets customers customize and schedule the perfect weather for any occasion. From sunshine and snow to thunderstorms and fog, users can order atmospheric conditions straight to their location. \n1) Create a poster or website landing page for a fictional weather delivery company. \n2) Create a simple logo and include this logo on your website or poster. \nConsider font, color, and imagery in your deliverable and create a compelling narrative that clearly sells the product to target audiences. \n(We recommend using Figma for website designs and Adobe products such as Illustrator or Photoshop for posters, but feel free to use whichever medium you feel most comfortable with.) \n3) Please share a link to your design along with a document explaining your design process and decisions as a Google Drive link. Make sure to share it with us! (Max 300 words)",
+      "portfolio": "Please add a link to your portfolio/website OR a Google Drive link with 3-5 pieces of your past creative work!"
+    }
+  }
+}

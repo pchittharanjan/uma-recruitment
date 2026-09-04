@@ -23,6 +23,9 @@ export async function PATCH(
     await initDb();
     const user = await resolveCoffeeChatUser(req);
     if (!user) return unauthorized();
+    if (user.role !== 'admin') {
+      return forbidden('Coffee chat notes are imported by admins from the Google Form sheet.');
+    }
     const closed = await assertPipelineWritable(user);
     if (closed) return closed;
 

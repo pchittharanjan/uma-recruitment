@@ -22,15 +22,24 @@ export function normalizeHeader(header: string): string {
   return header.trim().toLowerCase();
 }
 
+function teamApplyHeaderPattern(team: TeamName): RegExp {
+  return new RegExp(`are you applying to ${team.toLowerCase()}`, 'i');
+}
+
 export function isTeamHeader(header: string): boolean {
   const n = normalizeHeader(header);
-  return TEAM_NAMES.some((team) => normalizeHeader(team) === n);
+  if (TEAM_NAMES.some((team) => normalizeHeader(team) === n)) return true;
+  return TEAM_NAMES.some((team) => teamApplyHeaderPattern(team).test(header));
+}
+
+export function teamHeaderForTeam(headers: string[], team: TeamName): string | undefined {
+  const exact = headers.find((h) => normalizeHeader(h) === normalizeHeader(team));
+  if (exact) return exact;
+  return headers.find((h) => teamApplyHeaderPattern(team).test(h));
 }
 
 export function getTeamHeaders(headers: string[]): TeamName[] {
-  return TEAM_NAMES.filter((team) =>
-    headers.some((h) => normalizeHeader(h) === normalizeHeader(team)),
-  );
+  return TEAM_NAMES.filter((team) => teamHeaderForTeam(headers, team) != null);
 }
 
 export function detectTeamSplitMode(headers: string[]): TeamSplitMode | null {
@@ -84,7 +93,7 @@ export function getTeamsForRow(
   if (config.mode === 'named_columns') {
     const teams: TeamName[] = [];
     for (const team of TEAM_NAMES) {
-      const header = headers.find((h) => normalizeHeader(h) === normalizeHeader(team));
+      const header = teamHeaderForTeam(headers, team);
       if (header && isTruthyValue(row[header] ?? '')) {
         teams.push(team);
       }

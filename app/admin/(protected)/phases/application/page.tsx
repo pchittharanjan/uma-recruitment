@@ -109,6 +109,9 @@ export default function ApplicationPhasePage() {
 
   if (loading) return <PageLoading />;
   const hasAnyApplications = teams.some((team) => team.applicationCount > 0);
+  const designHasApplications = teams.some(
+    (team) => team.name === 'Design' && team.applicationCount > 0,
+  );
 
   return (
     <PageContainer>
@@ -141,16 +144,18 @@ export default function ApplicationPhasePage() {
 
       {error && <StatusBanner type="error" message={error} />}
 
-      <StatusBanner
-        type="info"
-        message="Design teams: classify link columns (Google Drive, Figma, portfolio) as portfolio fields at import so graders can review work during application grading without seeing names or email."
-      />
+      {designHasApplications && (
+        <StatusBanner
+          type="info"
+          message="Classify link columns (Google Drive, Figma, portfolio) as portfolio fields at import so Design graders can review work without seeing names or email."
+        />
+      )}
 
       {!graderUnlocked && (
         <StatusBanner
           type="info"
           message="Application grading is locked for graders. Unlock it from the dashboard when you're ready."
-          actionLabel="Click to unlock each phase"
+          actionLabel="Unlock grading on dashboard"
           actionHref="/admin/dashboard#pipeline-controls"
         />
       )}

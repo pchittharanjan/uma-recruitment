@@ -309,6 +309,10 @@ export async function deleteUser(input: DeleteUserInput): Promise<void> {
         args: [input.userId],
       },
       {
+        sql: 'DELETE FROM deliberation_personal_boards WHERE user_id = ?',
+        args: [input.userId],
+      },
+      {
         sql: 'UPDATE users SET invited_by = NULL WHERE invited_by = ?',
         args: [input.userId],
       },

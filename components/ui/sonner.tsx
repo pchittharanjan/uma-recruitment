@@ -1,15 +1,21 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
+/**
+ * Global toast theme.
+ *
+ * The app is light-only (`color-scheme: light`, no ThemeProvider). Pinning
+ * Sonner to `theme="light"` prevents OS dark mode from applying Sonner's
+ * hardcoded light description/close-button colors onto our cream popover
+ * toasts. `!important` utilities beat Sonner's `[data-description]` /
+ * `[data-close-button]` attribute CSS so every variant stays readable.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="light"
       className="toaster group font-sans"
       icons={{
         success: <CircleCheckIcon className="size-4 text-success" />,
@@ -42,14 +48,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             "group toast !rounded-xl !border !border-border !bg-popover !font-sans !text-popover-foreground",
-          title: "font-heading text-sm font-medium leading-snug",
-          description: "text-sm text-muted-foreground",
+          title:
+            "font-heading !text-sm font-medium leading-snug !text-popover-foreground",
+          // Beat Sonner's hardcoded [data-description] color (#3f3f3f / #e8e8e8).
+          description: "!text-sm !leading-snug !text-muted-foreground",
           closeButton:
-            "!rounded-md !border !border-border !bg-background/80 !text-muted-foreground transition-colors hover:!bg-muted/50 hover:!text-foreground",
-          success: "!border-success/25 !bg-popover",
-          error: "!border-destructive/25 !bg-popover",
-          warning: "!border-primary/25 !bg-popover",
-          info: "!border-border !bg-popover",
+            "!rounded-md !border !border-border !bg-background !text-foreground opacity-100 transition-colors hover:!bg-muted hover:!text-foreground",
+          success: "!border-success/25 !bg-popover !text-popover-foreground",
+          error: "!border-destructive/25 !bg-popover !text-popover-foreground",
+          warning: "!border-primary/25 !bg-popover !text-popover-foreground",
+          info: "!border-border !bg-popover !text-popover-foreground",
+          loading: "!bg-popover !text-popover-foreground",
+          default: "!bg-popover !text-popover-foreground",
           actionButton:
             "rounded-lg bg-primary font-heading text-sm text-primary-foreground hover:bg-primary-hover",
           cancelButton:

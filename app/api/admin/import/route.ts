@@ -10,6 +10,7 @@ import {
 } from '@/lib/import-unified';
 import { getGlobalPipelineState } from '@/lib/pipeline-phase';
 import type { TeamName } from '@/lib/db';
+import type { TeamGradingModel } from '@/lib/grading-model-types';
 import type { TeamSplitConfig } from '@/lib/team-split';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'CSV import is only available during Application phase. Move the global phase to Application, then import.',
+            'CSV import is only available during Application phase. Advance each team to Application on the dashboard, then import.',
         },
         { status: 400 },
       );
@@ -107,6 +108,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let gradingModelByTeam: Partial<Record<TeamName, TeamGradingModel>> | undefined;
+    const gradingModelByTeamRaw = formData.get('gradingModelByTeam') as string | null;
+    if (gradingModelByTeamRaw) {
+      try {
+        gradingModelByTeam = JSON.parse(gradingModelByTeamRaw) as Partial<
+          Record<TeamName, TeamGradingModel>
+        >;
+      } catch {
+        gradingModelByTeam = undefined;
+      }
+    }
+
     const spreadsheetBuffer = await csvFile.arrayBuffer();
     let spreadsheet;
     try {
@@ -144,6 +157,7 @@ export async function POST(req: NextRequest) {
             spreadsheet,
             scoreFieldsByTeam,
             portfolioFieldsByTeam,
+            gradingModelByTeam,
             contextFields,
             customScoreFields,
             teamSplitConfig,

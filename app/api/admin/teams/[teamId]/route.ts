@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTeamById, initDb } from '@/lib/db';
 import { requireAuth, unauthorized, notFound } from '@/lib/auth';
 import { getActiveRoundForTeam } from '@/lib/rounds';
-import { buildTeamDashboard } from '@/lib/team-dashboard';
+import { buildTeamDashboard, listGraderAssignments } from '@/lib/team-dashboard';
 import {
   getTeamInterviewRoundStats,
   type InterviewSlotStage,
@@ -16,7 +16,8 @@ export async function GET(
 ) {
   try {
     await initDb();
-    if (!(await requireAuth(req, { roles: ['admin'] }))) return unauthorized();
+    const admin = await requireAuth(req, { roles: ['admin'] });
+    if (!admin) return unauthorized();
 
     const { teamId: teamIdRaw } = await params;
     const teamId = Number.parseInt(teamIdRaw, 10);
@@ -28,12 +29,24 @@ export async function GET(
     if (!team) return notFound('Team not found');
 
     const round = await getActiveRoundForTeam(teamId);
+    const myAssignments = round
+      ? await listGraderAssignments(admin.id, teamId, 'application')
+      : [];
+    const myGrading =
+      myAssignments.length > 0
+        ? {
+            total: myAssignments.length,
+            completed: myAssignments.filter((a) => a.status === 'completed').length,
+          }
+        : null;
+
     if (!round) {
       return NextResponse.json({
         team,
         round: null,
         dashboard: null,
         interviewStats: null,
+        myGrading,
       });
     }
 
@@ -55,6 +68,7 @@ export async function GET(
         round,
         dashboard: null,
         interviewStats,
+        myGrading,
       });
     }
 
@@ -66,6 +80,7 @@ export async function GET(
         round,
         dashboard,
         interviewStats: null,
+        myGrading,
       });
     }
 
@@ -74,6 +89,7 @@ export async function GET(
       round,
       dashboard: null,
       interviewStats: null,
+      myGrading,
     });
   } catch (e) {
     console.error('GET /api/admin/teams/[teamId] failed:', e);

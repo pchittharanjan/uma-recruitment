@@ -23,6 +23,10 @@ import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { Button } from '@/components/ui/button';
 import StatusBanner from '@/components/status-banner';
 import { InterviewNotesAndScoringForm } from '@/components/interview-question-eval';
+import {
+  InterviewPhaseToggle,
+  type InterviewScoringPhase,
+} from '@/components/interview-phase-toggle';
 import { DocumentSaveStatusLine } from '@/components/document-save-status';
 import { InterviewElapsedTimer } from '@/components/interview-elapsed-timer';
 import {
@@ -35,9 +39,14 @@ import {
 import { useAutosaveStatus } from '@/hooks/use-autosave-status';
 import { useElapsedTimer } from '@/hooks/use-elapsed-timer';
 import { type InterviewGuide } from '@/lib/interview-guide';
+import {
+  interviewPhaseScoreFields,
+  isPhasedCaseAndBehavioralInterview,
+} from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
 import { formatInterviewProgressLabel } from '@/lib/interview-sessions';
+import { interviewCompleteGuidance, interviewCompleteToast } from '@/lib/next-step-guidance';
 import { cn } from '@/lib/utils';
 
 interface GroupMember {
@@ -63,6 +72,7 @@ interface CandidateDraft {
 interface InterviewScoreData {
   applicationId: number;
   assignmentId: number;
+  assignmentStatus?: string;
   rowIndex: number;
   candidateName: string;
   stage: AssignmentStage;
@@ -148,6 +158,7 @@ function NotesAndEvaluationForm({
   draft,
   locked,
   compact,
+  phase,
   onNoteChange,
   onScoreChange,
   onCommentChange,
@@ -156,6 +167,7 @@ function NotesAndEvaluationForm({
   draft: CandidateDraft;
   locked: boolean;
   compact?: boolean;
+  phase?: 'case' | 'behavioral';
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
@@ -168,6 +180,7 @@ function NotesAndEvaluationForm({
       comment={draft.comment}
       disabled={locked}
       compact={compact}
+      phase={phase}
       onNoteChange={onNoteChange}
       onScoreChange={onScoreChange}
       onCommentChange={onCommentChange}
@@ -185,6 +198,7 @@ export default function TeamInterviewScorePage({
   const [draft, setDraft] = useState<CandidateDraft>(emptyDraft());
   const [drafts, setDrafts] = useState<Record<number, CandidateDraft>>({});
   const [activeTab, setActiveTab] = useState(applicationId);
+  const [interviewPhase, setInterviewPhase] = useState<InterviewScoringPhase>('case');
   const [caseOpen, setCaseOpen] = useInterviewCaseOpen();
   const { fullscreen, exit: exitFullscreen, toggle: toggleFullscreen } =
     useInterviewWorkspaceFullscreen();
@@ -199,6 +213,7 @@ export default function TeamInterviewScorePage({
     setData(null);
     setDraft(emptyDraft());
     setDrafts({});
+    setInterviewPhase('case');
     setError('');
     setSubmitError('');
     fetch(`/api/team/interviews/${applicationId}?teamId=${teamId}&stage=${stage}`)
@@ -232,8 +247,16 @@ export default function TeamInterviewScorePage({
   }, [teamId, stage, applicationId]);
 
   const isGroupInterview = (data?.groupEntries?.length ?? 0) > 1;
+  const isPhasedInterview =
+    !isGroupInterview && isPhasedCaseAndBehavioralInterview(data?.interviewGuide ?? null);
   const scoreFieldList = data ? allScoreFields(data) : [];
-  const casePdfUrl = data?.interviewGuide?.casePdfUrl;
+  const casePdfUrl =
+    isPhasedInterview && interviewPhase === 'behavioral'
+      ? undefined
+      : data?.interviewGuide?.casePdfUrl;
+  const activePhaseFields = isPhasedInterview
+    ? interviewPhaseScoreFields(data?.interviewGuide ?? null, interviewPhase)
+    : scoreFieldList;
 
   const groupCompletion = useMemo(() => {
     if (!data?.groupEntries) return { completed: 0, total: 0 };
@@ -245,6 +268,24 @@ export default function TeamInterviewScorePage({
   }, [data?.groupEntries, drafts, scoreFieldList]);
 
   const scoringLocked = data?.scoringEditLock?.locked ?? false;
+
+  const assignmentPending = useMemo(() => {
+    if (!data) return false;
+    if (isGroupInterview && data.groupEntries) {
+      return data.groupEntries.some((entry) => !entry.isComplete);
+    }
+    return data.assignmentStatus !== 'completed';
+  }, [data, isGroupInterview]);
+
+  const hasDraftScores = useMemo(() => {
+    if (isGroupInterview && data?.groupEntries) {
+      return data.groupEntries.some((entry) => {
+        const entryDraft = drafts[entry.applicationId] ?? emptyDraft();
+        return scoreFieldList.some((field) => entryDraft.scores[field] !== undefined);
+      });
+    }
+    return scoreFieldList.some((field) => draft.scores[field] !== undefined);
+  }, [isGroupInterview, data?.groupEntries, drafts, draft.scores, scoreFieldList]);
 
   const saveSnapshot = useMemo(() => {
     if (isGroupInterview && data?.groupEntries) {
@@ -295,13 +336,56 @@ export default function TeamInterviewScorePage({
     persist: persistDraft,
   });
 
+  const showAutosaveBanner =
+    !scoringLocked && assignmentPending && hasDraftScores && saveStatus === 'saved';
+
+  const switchInterviewPhase = (next: InterviewScoringPhase) => {
+    if (next === interviewPhase) return;
+    setSubmitError('');
+    setInterviewPhase(next);
+    setCaseOpen(next === 'case');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateAfterSubmit = (json: {
+    nextApplicationId?: number | null;
+    advancementHref?: string | null;
+    isDirector?: boolean;
+  }) => {
+    if (json.nextApplicationId) {
+      toast.success('Interview score submitted');
+      router.push(`/team/${teamId}/interviews/${stage}/${json.nextApplicationId}`);
+      return;
+    }
+    if (json.advancementHref) {
+      const copy = interviewCompleteGuidance(Boolean(json.isDirector));
+      toast.success(copy.title);
+      router.push(json.advancementHref);
+      return;
+    }
+    toast.success(
+      stage === 'first_round'
+        ? interviewCompleteToast(Boolean(json.isDirector))
+        : stage === 'final_round'
+          ? 'All final interviews scored — wait for Admin to advance the team.'
+          : 'All interviews scored',
+    );
+    router.push(`/team/${teamId}/interviews/${stage}`);
+  };
+
   const handleSingleSubmit = async () => {
     if (!data) return;
     const missing = scoreFieldList.filter((f) => draft.scores[f] === undefined);
     if (missing.length > 0) {
-      const message = 'Please score all questions before submitting.';
+      const message = 'Please score all case and behavioral criteria before submitting.';
       setSubmitError(message);
       toast.error(message);
+      if (isPhasedInterview) {
+        const caseMissing = interviewPhaseScoreFields(data.interviewGuide, 'case').some(
+          (f) => draft.scores[f] === undefined,
+        );
+        switchInterviewPhase(caseMissing ? 'case' : 'behavioral');
+      }
       return;
     }
     setSubmitting(true);
@@ -325,20 +409,7 @@ export default function TeamInterviewScorePage({
         toast.error(json.error ?? 'Failed to submit score');
         return;
       }
-      toast.success(
-        json.nextApplicationId
-          ? 'Interview score submitted'
-          : stage === 'first_round'
-            ? json.isDirector
-              ? 'All interviews scored. Next: color recommendations, then meet with your PMs'
-              : 'All interviews scored. Next: color recommendations'
-            : 'All interviews scored',
-      );
-      if (json.nextApplicationId) {
-        router.push(`/team/${teamId}/interviews/${stage}/${json.nextApplicationId}`);
-      } else {
-        router.push(`/team/${teamId}/interviews/${stage}`);
-      }
+      navigateAfterSubmit(json);
     } catch {
       setSubmitError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
@@ -385,8 +456,10 @@ export default function TeamInterviewScorePage({
         toast.error(json.error ?? 'Failed to submit scores');
         return;
       }
-      toast.success('Group interview scores submitted');
-      router.push(`/team/${teamId}/interviews/${stage}`);
+      toast.success(
+        json.nextApplicationId ? 'Group interview scores submitted' : 'Group interview session submitted',
+      );
+      navigateAfterSubmit(json);
     } catch {
       setSubmitError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
@@ -418,6 +491,16 @@ export default function TeamInterviewScorePage({
   }
 
   const lockMessage = data.scoringEditLock?.message ?? '';
+  const autosaveBanner = showAutosaveBanner ? (
+    <StatusBanner
+      type="warning"
+      message={
+        isGroupInterview
+          ? 'Auto-saved is not submitted — click Submit all in this session to finish.'
+          : 'Auto-saved is not submitted — click Submit interview to finish.'
+      }
+    />
+  ) : null;
   const pdfTitle =
     data.interviewGuide?.caseStudy?.title?.trim() ||
     (stage === 'first_round' ? 'Group case' : 'Case');
@@ -463,7 +546,19 @@ export default function TeamInterviewScorePage({
                 <span className="font-heading text-base font-medium tracking-tight">
                   {data.candidateName}
                 </span>
-                {data.interviewProgress ? (
+                {isPhasedInterview ? (
+                  <div className="mt-1 flex flex-col items-center gap-1.5">
+                    <InterviewPhaseToggle
+                      value={interviewPhase}
+                      onValueChange={switchInterviewPhase}
+                    />
+                    {data.interviewProgress ? (
+                      <p className="text-sm text-muted-foreground">
+                        {formatInterviewProgressLabel(data.interviewProgress)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : data.interviewProgress ? (
                   <p className="text-sm text-muted-foreground">
                     {formatInterviewProgressLabel(data.interviewProgress)}
                   </p>
@@ -519,8 +614,9 @@ export default function TeamInterviewScorePage({
   );
 
   const groupInterviewHeaderContent =
-    isGroupInterview && data.groupEntries && ((scoringLocked && lockMessage) || data.slot?.logisticsNote) ? (
+    isGroupInterview && data.groupEntries && ((scoringLocked && lockMessage) || data.slot?.logisticsNote || showAutosaveBanner) ? (
       <div className="shrink-0 space-y-1.5">
+        {autosaveBanner}
         {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
         {data.slot?.logisticsNote && (
           <p className="text-sm text-muted-foreground">
@@ -606,6 +702,7 @@ export default function TeamInterviewScorePage({
     </div>
   ) : (
     <div data-tour="interview-scores" className="uma-stack-page">
+      {autosaveBanner}
       {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
       {data.slot && (
         <p className="text-sm text-muted-foreground">
@@ -615,13 +712,20 @@ export default function TeamInterviewScorePage({
         </p>
       )}
       <InterviewNotesPanelHeader
-        title="Notes & Evaluation"
-        intro={data.interviewGuide?.intro}
+        title={
+          isPhasedInterview
+            ? interviewPhase === 'case'
+              ? 'Case — notes & evaluation'
+              : 'Behavioral — notes & evaluation'
+            : 'Notes & Evaluation'
+        }
+        intro={isPhasedInterview && interviewPhase === 'behavioral' ? undefined : data.interviewGuide?.intro}
       />
       <NotesAndEvaluationForm
         guide={data.interviewGuide ?? null}
         draft={draft}
         locked={scoringLocked}
+        phase={isPhasedInterview ? interviewPhase : undefined}
         onNoteChange={(field, value) =>
           setDraft((prev) => ({ ...prev, notes: { ...prev.notes, [field]: value } }))
         }
@@ -666,12 +770,42 @@ export default function TeamInterviewScorePage({
         loading={submitting}
         disabled={scoringLocked}
       >
-        {scoringLocked ? 'Editing locked' : 'Submit all →'}
+        {scoringLocked ? 'Editing locked' : 'Submit all in this session'}
       </LoadingButton>
     </div>
   );
 
-  const singleFooter = (
+  const singleFooter = isPhasedInterview ? (
+    <div
+      data-tour="interview-submit"
+      className={cn(
+        'flex items-center justify-between gap-4',
+        interviewPhase === 'case' && casePdfUrl
+          ? 'shrink-0 border-t border-border/25 bg-muted/35 px-6 py-3.5 sm:px-7 lg:px-8'
+          : 'pt-2',
+      )}
+    >
+      <InterviewPhaseToggle
+        value={interviewPhase}
+        onValueChange={switchInterviewPhase}
+      />
+      <div className="flex items-center gap-3">
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {activePhaseFields.filter((f) => draft.scores[f] !== undefined).length}/
+          {activePhaseFields.length} this part ·{' '}
+          {scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}/
+          {scoreFieldList.length} total
+        </span>
+        <LoadingButton
+          onClick={handleSingleSubmit}
+          loading={submitting}
+          disabled={scoringLocked}
+        >
+          {scoringLocked ? 'Editing locked' : 'Submit interview →'}
+        </LoadingButton>
+      </div>
+    </div>
+  ) : (
     <div data-tour="interview-submit">
       <GradingSubmitFooter
         variant={casePdfUrl ? 'embedded' : 'sticky'}

@@ -7,8 +7,10 @@ import {
   isAdvancementVerdict,
   isStrongAdvanceSignal,
   verdictLabel,
+  verdictMeaning,
   type AdvancementVerdict,
 } from '@/lib/advancement-verdict-types';
+import { verdictPickerAriaLabel } from '@/lib/advancement-rating-copy';
 
 export type { AdvancementVerdict };
 
@@ -52,6 +54,7 @@ const VERDICT_OPTIONS: Array<{
 const VERDICT_PICKER_OPTIONS = VERDICT_OPTIONS.map((option) => ({
   value: option.value,
   label: verdictLabel(option.value),
+  description: verdictMeaning(option.value),
   indicatorClassName: option.indicatorClassName,
 }));
 
@@ -210,7 +213,7 @@ export function PanelVerdictDots({
   if (all.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1" aria-label="Panel color signals">
+    <div className="flex flex-wrap gap-1" aria-label="Panel color ratings">
       {all.map((entry, index) => {
         const option = VERDICT_OPTIONS.find((o) => o.value === entry.verdict);
         return (
@@ -259,11 +262,11 @@ export function AdvancementVerdictSelector({
         value={value}
         onChange={onChange}
         options={VERDICT_PICKER_OPTIONS}
-        placeholder="Not set"
+        placeholder="Pick a rating"
         allowClear
-        clearLabel="Not set"
+        clearLabel="Clear rating"
         disabled={disabled}
-        aria-label={`Recommendation for ${applicantLabel}`}
+        aria-label={verdictPickerAriaLabel(applicantLabel)}
         className="w-max max-w-full min-w-0"
         triggerClassName="min-w-[9rem] w-max max-w-full"
         contentClassName="w-max min-w-[10rem]"

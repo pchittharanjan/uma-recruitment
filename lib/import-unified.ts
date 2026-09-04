@@ -6,7 +6,12 @@ import {
   type TeamName,
 } from '@/lib/db';
 import { assignGraders, DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
-import { extractCandidateFromFields } from '@/lib/candidates';
+import {
+  extractCandidateFromFields,
+  findDuplicateCandidateEmails,
+  formatDuplicateCandidateEmailError,
+  isApplicationsUniqueConstraintError,
+} from '@/lib/candidates';
 import { parseCsv, type ParsedCsv } from '@/lib/csv';
 import { isTestGraderEmail, type GraderInput } from '@/lib/grader-parse';
 import { seedDefaultUnlocksForRound } from '@/lib/stage-access';
@@ -26,6 +31,17 @@ import {
   type TeamSplitConfig,
   TEAM_NAMES,
 } from '@/lib/team-split';
+import {
+  buildFall2026RoundRubric,
+  FALL_2026_GRADER_INSTRUCTIONS,
+  findMatchingHeader,
+} from '@/lib/fall-2026-grading-model';
+import {
+  applicationCriterionKeys,
+  applicationCsvFields,
+  portfolioCsvField,
+} from '@/lib/grading-model';
+import type { TeamGradingModel } from '@/lib/grading-model-types';
 
 export interface UnifiedImportInput {
   roundLabel: string;
@@ -35,6 +51,12 @@ export interface UnifiedImportInput {
   spreadsheet?: ParsedCsv;
   scoreFieldsByTeam: Partial<Record<TeamName, string[]>>;
   portfolioFieldsByTeam?: Partial<Record<TeamName, string[]>>;
+  /**
+   * Optional per-team grading models from the import Criteria step.
+   * When present for a team, that model is persisted and used to derive
+   * score/custom/portfolio fields — Fall 2026 disk auto is not applied.
+   */
+  gradingModelByTeam?: Partial<Record<TeamName, TeamGradingModel>>;
   contextFields: string[];
   customScoreFields: string[];
   teamSplitConfig: TeamSplitConfig;
@@ -43,6 +65,49 @@ export interface UnifiedImportInput {
   gradersPerApplication?: number;
   invitedByUserId: number;
   onProgress?: (event: ImportProgressEvent) => void;
+}
+
+/** Derive round score/portfolio fields from a client-edited grading model. */
+function resolveFieldsFromGradingModel(
+  model: TeamGradingModel,
+  csvHeaders: string[],
+  clientScoreFields: string[],
+  clientPortfolioFields: string[],
+): {
+  scoreFields: string[];
+  customScoreFields: string[];
+  portfolioFields: string[];
+} {
+  const headerSet = new Set(csvHeaders);
+  const portfolioExpected = portfolioCsvField(model);
+  const portfolioMatched = portfolioExpected
+    ? findMatchingHeader(portfolioExpected, csvHeaders)
+    : undefined;
+
+  const modelScoreFields: string[] = [];
+  for (const expected of applicationCsvFields(model)) {
+    const matched = findMatchingHeader(expected, csvHeaders);
+    if (!matched) continue;
+    if (portfolioMatched && matched === portfolioMatched) continue;
+    if (!modelScoreFields.includes(matched)) modelScoreFields.push(matched);
+  }
+
+  // Prefer Questions-step selection ∩ model csv fields; fall back to model fields.
+  const intersected =
+    clientScoreFields.length > 0
+      ? clientScoreFields.filter((f) => modelScoreFields.includes(f))
+      : modelScoreFields;
+  const scoreFields = intersected.length > 0 ? intersected : modelScoreFields;
+
+  const portfolioFields = portfolioMatched
+    ? [portfolioMatched]
+    : clientPortfolioFields.filter((f) => headerSet.has(f));
+
+  return {
+    scoreFields,
+    customScoreFields: applicationCriterionKeys(model),
+    portfolioFields,
+  };
 }
 
 export type ImportProgressEvent =
@@ -108,7 +173,10 @@ async function resolveGraderUsers(
         invitedBy: invitedByUserId,
       });
     } else if (user) {
-      await ensureTeamAccessGrant(user.id, teamId, invitedByUserId);
+      // Admins have implicit all-team access — don't write access_grants rows for them.
+      if (user.role !== 'admin') {
+        await ensureTeamAccessGrant(user.id, teamId, invitedByUserId);
+      }
     }
     if (!user) {
       throw new Error(`No user found for ${email}. Add them under People first.`);
@@ -126,6 +194,7 @@ async function importRowsForTeam(params: {
   portfolioFields: string[];
   contextFields: string[];
   customScoreFields: string[];
+  gradingModel?: TeamGradingModel | null;
   rows: SplitRow[];
   graderUserIds: number[];
   graderInstructions?: string;
@@ -162,8 +231,9 @@ async function importRowsForTeam(params: {
   await db.execute({
     sql: `INSERT INTO round_settings (
             round_id, csv_headers, score_fields, custom_score_fields, grader_instructions,
-            context_fields, portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            context_fields, portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date,
+            grading_model
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(round_id) DO UPDATE SET
             csv_headers = excluded.csv_headers,
             score_fields = excluded.score_fields,
@@ -173,7 +243,8 @@ async function importRowsForTeam(params: {
             portfolio_fields = excluded.portfolio_fields,
             graders_per_application = excluded.graders_per_application,
             coffee_chat_start_date = excluded.coffee_chat_start_date,
-            application_due_date = excluded.application_due_date`,
+            application_due_date = excluded.application_due_date,
+            grading_model = excluded.grading_model`,
     args: [
       round.id,
       JSON.stringify(params.csvHeaders),
@@ -185,18 +256,29 @@ async function importRowsForTeam(params: {
       params.gradersPerApplication,
       orgDates.coffeeChatStartDate,
       orgDates.applicationDueDate,
+      params.gradingModel ? JSON.stringify(params.gradingModel) : null,
     ],
   });
 
   const appIds: number[] = [];
 
+  // Defense in depth — importUnifiedApplicationRound also pre-checks all teams.
+  const teamDupes = findDuplicateCandidateEmails(params.rows);
+  if (teamDupes.length > 0) {
+    throw new Error(
+      formatDuplicateCandidateEmailError(teamDupes, { teamName: params.team.name }),
+    );
+  }
+
   for (let i = 0; i < params.rows.length; i++) {
-    const { fields } = params.rows[i];
-    const { name, email } = extractCandidateFromFields(fields);
+    const { fields, sourceIndex } = params.rows[i];
+    const { name, email } = extractCandidateFromFields(fields, {
+      uniqueKey: sourceIndex + 1,
+    });
 
     let candidateId: number;
     const existingCandidate = await db.execute({
-      sql: 'SELECT id FROM candidates WHERE email = ?',
+      sql: 'SELECT id FROM candidates WHERE lower(email) = lower(?) LIMIT 1',
       args: [email],
     });
 
@@ -210,12 +292,33 @@ async function importRowsForTeam(params: {
       candidateId = Number(candidateResult.lastInsertRowid);
     }
 
-    const appResult = await db.execute({
-      sql: `INSERT INTO applications (candidate_id, round_id, team_id, fields, stage, row_index)
-            VALUES (?, ?, ?, ?, 'application', ?)`,
-      args: [candidateId, round.id, params.team.id, JSON.stringify(fields), i + 1],
+    const existingApp = await db.execute({
+      sql: `SELECT id FROM applications
+            WHERE candidate_id = ? AND round_id = ? AND team_id = ?
+            LIMIT 1`,
+      args: [candidateId, round.id, params.team.id],
     });
-    appIds.push(Number(appResult.lastInsertRowid));
+    if (existingApp.rows.length > 0) {
+      throw new Error(
+        `${params.team.name} already has an application for ${name} (${email}). Erase the partial import (or finalize/reset the round), then import again.`,
+      );
+    }
+
+    try {
+      const appResult = await db.execute({
+        sql: `INSERT INTO applications (candidate_id, round_id, team_id, fields, stage, row_index)
+              VALUES (?, ?, ?, ?, 'application', ?)`,
+        args: [candidateId, round.id, params.team.id, JSON.stringify(fields), i + 1],
+      });
+      appIds.push(Number(appResult.lastInsertRowid));
+    } catch (err) {
+      if (isApplicationsUniqueConstraintError(err)) {
+        throw new Error(
+          `${params.team.name} already has an application for ${name} (${email}). Erase the partial import (or finalize/reset the round), then import again.`,
+        );
+      }
+      throw err;
+    }
     params.onApplicationProgress?.(i + 1, params.rows.length);
   }
 
@@ -291,6 +394,20 @@ export async function importUnifiedApplicationRound(
     throw new Error('No applications matched any team. Check your team column mapping.');
   }
 
+  // Fail fast across all teams before creating rounds / inserting anyone.
+  const duplicateMessages: string[] = [];
+  for (const teamName of teamsWithApps) {
+    const duplicates = findDuplicateCandidateEmails(byTeam[teamName]);
+    if (duplicates.length > 0) {
+      duplicateMessages.push(
+        formatDuplicateCandidateEmailError(duplicates, { teamName }),
+      );
+    }
+  }
+  if (duplicateMessages.length > 0) {
+    throw new Error(duplicateMessages.join(' '));
+  }
+
   for (const teamName of teamsWithApps) {
     const graders = input.gradersByTeam[teamName] ?? [];
     if (graders.length < gradersPerApplication) {
@@ -302,7 +419,19 @@ export async function importUnifiedApplicationRound(
     const teamScoreFields = (input.scoreFieldsByTeam[teamName] ?? []).filter((f) =>
       parsed.headers.includes(f),
     );
-    if (teamScoreFields.length === 0) {
+    const clientModel = input.gradingModelByTeam?.[teamName];
+    if (clientModel) {
+      const modelFields = applicationCsvFields(clientModel).filter((f) =>
+        parsed.headers.includes(f),
+      );
+      const intersected =
+        teamScoreFields.length > 0
+          ? teamScoreFields.filter((f) => modelFields.includes(f))
+          : modelFields;
+      if ((intersected.length > 0 ? intersected : modelFields).length === 0) {
+        throw new Error(`${teamName} needs at least one scored question selected.`);
+      }
+    } else if (teamScoreFields.length === 0) {
       throw new Error(`${teamName} needs at least one scored question selected.`);
     }
   }
@@ -342,22 +471,56 @@ export async function importUnifiedApplicationRound(
     const teamScoreFields = (input.scoreFieldsByTeam[teamName] ?? []).filter((f) =>
       parsed.headers.includes(f),
     );
-
     const teamPortfolioFields = (input.portfolioFieldsByTeam?.[teamName] ?? []).filter((f) =>
       parsed.headers.includes(f),
     );
+
+    const clientModel = input.gradingModelByTeam?.[teamName];
+    let resolvedScoreFields: string[];
+    let resolvedCustomFields: string[];
+    let resolvedPortfolioFields: string[];
+    let resolvedInstructions: string | undefined;
+    let resolvedGradingModel: TeamGradingModel | null;
+
+    if (clientModel) {
+      const derived = resolveFieldsFromGradingModel(
+        clientModel,
+        parsed.headers,
+        teamScoreFields,
+        teamPortfolioFields,
+      );
+      resolvedScoreFields = derived.scoreFields;
+      resolvedCustomFields = derived.customScoreFields;
+      resolvedPortfolioFields = derived.portfolioFields;
+      resolvedGradingModel = clientModel;
+      resolvedInstructions =
+        input.graderInstructions?.trim() || FALL_2026_GRADER_INSTRUCTIONS;
+    } else {
+      const fall2026 = buildFall2026RoundRubric(teamName, parsed.headers);
+      resolvedScoreFields = fall2026?.scoreFields.length
+        ? fall2026.scoreFields.filter((f) => parsed.headers.includes(f))
+        : teamScoreFields;
+      resolvedCustomFields = fall2026?.customScoreFields ?? customScoreFields;
+      resolvedPortfolioFields = fall2026?.portfolioFields.length
+        ? fall2026.portfolioFields.filter((f) => parsed.headers.includes(f))
+        : teamPortfolioFields;
+      resolvedGradingModel = fall2026?.gradingModel ?? null;
+      resolvedInstructions =
+        fall2026?.graderInstructions ?? input.graderInstructions;
+    }
 
     const result = await importRowsForTeam({
       team,
       roundLabel,
       csvHeaders: parsed.headers,
-      scoreFields: teamScoreFields,
-      portfolioFields: teamPortfolioFields,
+      scoreFields: resolvedScoreFields,
+      portfolioFields: resolvedPortfolioFields,
       contextFields: input.contextFields.filter((h) => parsed.headers.includes(h)),
-      customScoreFields,
+      customScoreFields: resolvedCustomFields,
+      gradingModel: resolvedGradingModel,
       rows: byTeam[teamName],
       graderUserIds,
-      graderInstructions: input.graderInstructions,
+      graderInstructions: resolvedInstructions,
       gradersPerApplication,
       invitedByUserId: input.invitedByUserId,
       existingRoundId: existingRound?.id,

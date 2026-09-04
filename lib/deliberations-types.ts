@@ -44,6 +44,7 @@ export interface DeliberationsScoreEntry {
   scores: Record<string, number>;
   average: number | null;
   comment: string | null;
+  notes?: Record<string, string>;
 }
 
 export interface DeliberationsFlag {

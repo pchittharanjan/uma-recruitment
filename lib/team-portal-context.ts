@@ -56,14 +56,14 @@ export const getTeamPortalUser = cache(async function getTeamPortalUser(
   const sessionUser = await getSessionUser();
   if (!sessionUser) return null;
 
+  const allowedRoles = options?.roles ?? (['exec', 'ad_hoc_exec'] as UserRole[]);
   const impersonateTarget = await getImpersonateTarget();
   if (impersonateTarget) {
     if (sessionUser.role !== 'admin') return null;
-    if (options?.roles && !options.roles.includes(impersonateTarget.role)) return null;
+    if (!allowedRoles.includes(impersonateTarget.role)) return null;
     return impersonateTarget;
   }
 
-  if (sessionUser.role !== 'exec' && sessionUser.role !== 'ad_hoc_exec') return null;
-  if (options?.roles && !options.roles.includes(sessionUser.role)) return null;
+  if (!allowedRoles.includes(sessionUser.role)) return null;
   return sessionUser;
 });

@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { forwardRef } from 'react';
+import { forwardRef, type ComponentProps } from 'react';
 
 type ContainerSize = 'default' | 'narrow' | 'wide' | 'full';
 
@@ -78,16 +78,15 @@ export function PageContent({
 export function PagePanel({
   children,
   className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+  ...props
+}: ComponentProps<'div'>) {
   return (
     <div
       className={cn(
         'uma-inset-surface uma-pane-pad rounded-xl',
         className,
       )}
+      {...props}
     >
       {children}
     </div>

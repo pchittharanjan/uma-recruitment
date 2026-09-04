@@ -16,11 +16,11 @@ export type TeamPipelineProfile = {
   teamName: TeamName;
   /** Interview stages this team uses */
   interviewStages: TeamInterviewStage[];
-  /** After first-round advancement, candidates go here (Design → deliberations) */
+  /** After first-round advancement, candidates go here */
   postFirstRoundStage: PostFirstRoundStage;
   /** Stages that feed the deliberations board */
   deliberationsPoolStages: DeliberationsPoolStage[];
-  /** Round status after first_round phase ends (Design skips final_round status) */
+  /** When true, hide final_round in nav and jump first_round → deliberations */
   skipFinalRoundPhase: boolean;
   /** When advancing past interview, auto-unlock deliberations for this team */
   autoUnlockDeliberations: boolean;
@@ -64,7 +64,7 @@ export function isKnownTeamName(name: string): name is TeamName {
   return name in PROFILES;
 }
 
-/** Pipeline phases visible in nav for this team (Design hides Final Round). */
+/** Pipeline phases visible in nav for this team. */
 export function pipelinePhasesForTeam(teamName: string) {
   const profile = getTeamPipelineProfile(teamName);
   return PIPELINE_PHASES.filter(
@@ -72,7 +72,7 @@ export function pipelinePhasesForTeam(teamName: string) {
   );
 }
 
-/** Display label for a pipeline phase — Design uses "Interview" for first_round. */
+/** Display label for a pipeline phase. */
 export function phaseLabelForTeam(status: RoundStatus, teamName: string): string {
   const profile = getTeamPipelineProfile(teamName);
   if (profile.skipFinalRoundPhase && status === 'first_round') {
@@ -81,7 +81,7 @@ export function phaseLabelForTeam(status: RoundStatus, teamName: string): string
   return phaseLabel(status);
 }
 
-/** Next round status for a team (Design skips final_round). */
+/** Next round status for a team (respects skipFinalRoundPhase when set). */
 export function nextPipelineStatusForTeam(
   current: RoundStatus,
   teamName: string,
@@ -93,7 +93,7 @@ export function nextPipelineStatusForTeam(
   return nextRoundStatus(current);
 }
 
-/** Previous round status for a team (Design skips final_round). */
+/** Previous round status for a team (respects skipFinalRoundPhase when set). */
 export function previousPipelineStatusForTeam(
   current: RoundStatus,
   teamName: string,
@@ -139,7 +139,7 @@ export function teamUsesInterviewStage(teamName: string, stage: TeamInterviewSta
   return getTeamPipelineProfile(teamName).interviewStages.includes(stage);
 }
 
-/** Sort deliberations candidates — Design prioritizes first-round average. */
+/** Sort deliberations candidates — prefer final-round average when the team uses it. */
 export function deliberationsSortScore(
   candidate: {
     finalRoundAverage: number | null;

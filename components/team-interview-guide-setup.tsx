@@ -38,6 +38,7 @@ import {
   type InterviewGuideStage,
   type InterviewRubric,
 } from '@/lib/interview-guide';
+import { teamUsesInterviewStage } from '@/lib/team-pipeline-profile';
 import { serializeInterviewGuidePayload } from '@/lib/interview-guide-serialize';
 import { markNavigationPending } from '@/components/navigation-progress';
 import { stashInterviewPreviewGuide } from '@/lib/interview-preview-storage';
@@ -116,7 +117,8 @@ const FORMAT_OPTIONS: { value: InterviewGuideFormat; label: string; description:
   {
     value: 'case_and_behavioral',
     label: 'Case + Questions/Behaviorals',
-    description: 'Case questions first (notes), then evaluation, then behavioral questions.',
+    description:
+      'Case packet and behavioral questions in one interview. Interviewers can switch between Case and Behavioral at any time.',
   },
 ];
 
@@ -836,6 +838,14 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
   }, [load]);
 
   useEffect(() => {
+    const name = meta?.team.name;
+    if (!name) return;
+    if (!teamUsesInterviewStage(name, stage)) {
+      setStage('first_round');
+    }
+  }, [meta?.team.name, stage]);
+
+  useEffect(() => {
     if (!hydratedRef.current || loading) return;
 
     const guide = guides[stage];
@@ -908,6 +918,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
   }
 
   const teamName = meta?.team.name ?? '';
+  const stagesForTeam = STAGES.filter((s) => !teamName || teamUsesInterviewStage(teamName, s));
 
   return (
     <div className="space-y-8">
@@ -929,7 +940,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <TabsList className="h-auto w-full max-w-xl">
-                {STAGES.map((s) => (
+                {stagesForTeam.map((s) => (
                   <TabsTrigger key={s} value={s} className="flex-1 px-4 py-2">
                     {interviewStageSetupCopy(teamName, s).label}
                   </TabsTrigger>
@@ -948,7 +959,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
               </div>
             </div>
 
-            {STAGES.map((s) => {
+            {stagesForTeam.map((s) => {
               const copy = interviewStageSetupCopy(teamName, s);
               const guide = guides[s];
               const formatMeta = FORMAT_OPTIONS.find((option) => option.value === guide.format);

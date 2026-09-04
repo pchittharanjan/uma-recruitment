@@ -132,15 +132,14 @@ export function PhaseSettingUpDialog({
             </div>
 
             <DialogDescription className="text-pretty w-full max-w-none space-y-3 text-left text-sm leading-relaxed">
-              <p>
-                We&apos;re still setting up{' '}
-                <span className="font-medium text-foreground">{phaseLabel}</span>. Please check
-                back later — we&apos;ll notify you here when it&apos;s ready to open.
-              </p>
-              <p>
-                In the meantime, you can review anything that&apos;s already open from earlier
-                phases.
-              </p>
+              <span className="block">
+                <span className="font-medium text-foreground">{phaseLabel}</span> isn&apos;t open
+                for your team yet — Admin is finishing setup (usually import and unlock).
+              </span>
+              <span className="block">
+                You&apos;ll see a welcome prompt here when it opens. Until then, use the sidebar
+                to check anything that&apos;s already open from earlier phases.
+              </span>
             </DialogDescription>
           </DialogHeader>
 

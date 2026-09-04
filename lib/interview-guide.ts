@@ -1,5 +1,6 @@
 import { rewriteLegacyInterviewIntro, strategyDefaultGuides } from '@/lib/strategy-interview';
 import { designDefaultGuides } from '@/lib/design-interview';
+import { eventsDefaultGuides } from '@/lib/events-interview';
 
 export type InterviewGuideFormat = 'questions' | 'case_study' | 'case_and_behavioral';
 export type InterviewGuideStage = 'first_round' | 'final_round';
@@ -27,8 +28,10 @@ export interface InterviewGuide {
     /** Case-packet questions. Interviewers take notes only — they do not score these. */
     discussionPoints?: string[];
   };
-  /** Scored evaluation for case interviews. Scale, criteria, and share of the score. */
+  /** Scored evaluation for the case portion (Part 1). */
   rubric?: InterviewRubric;
+  /** Scored evaluation for the behavioral portion (Part 2). When set, interviewers advance case → behavioral in order. */
+  behavioralRubric?: InterviewRubric;
 }
 
 export type InterviewGuidesRecord = Record<InterviewGuideStage, InterviewGuide | null>;
@@ -151,6 +154,9 @@ function normalizeGuide(raw: unknown): InterviewGuide | null {
   const intro = rewriteLegacyInterviewIntro(trimOptional(obj.intro));
   const casePdfUrl = normalizeCasePdfUrl(obj.casePdfUrl);
   const rubric = normalizeInterviewRubric(obj.rubric);
+  const behavioralRubric = normalizeInterviewRubric(
+    (obj as { behavioralRubric?: unknown }).behavioralRubric,
+  );
 
   if (obj.format === 'questions') {
     const questions = trimList(obj.questions);
@@ -173,6 +179,7 @@ function normalizeGuide(raw: unknown): InterviewGuide | null {
     caseStudy,
     questions,
     rubric,
+    behavioralRubric: behavioralRubric ?? undefined,
   });
 }
 
@@ -228,6 +235,17 @@ export function validateInterviewGuide(guide: InterviewGuide): string | null {
     }
     if (criteriaShareTotal(rubric.criteria) !== 100) {
       return 'Evaluation shares must add up to 100%.';
+    }
+    if (guide.format === 'case_and_behavioral') {
+      const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
+      if (behavioralRubric) {
+        if (behavioralRubric.criteria.length === 0) {
+          return 'Add at least one behavioral evaluation criterion.';
+        }
+        if (criteriaShareTotal(behavioralRubric.criteria) !== 100) {
+          return 'Behavioral evaluation shares must add up to 100%.';
+        }
+      }
     }
   }
 
@@ -309,11 +327,33 @@ export function interviewGuideForApi(
   };
 }
 
-/** Case-packet questions shown as notes-only prompts on the scoring screen. */
+/** Case-packet questions shown as notes-only prompts during Part 1. */
 export function interviewNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide) return [];
   if (guide.format !== 'case_study' && guide.format !== 'case_and_behavioral') return [];
   return (guide.caseStudy?.discussionPoints ?? []).map((p) => p.trim()).filter(Boolean);
+}
+
+/** Behavioral questions shown as notes-only prompts during Part 2. */
+export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
+  if (!guide || guide.format !== 'case_and_behavioral') return [];
+  return (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
+}
+
+/** True when case and behavioral are separate scored parts the interviewer can switch between. */
+export function isPhasedCaseAndBehavioralInterview(guide: InterviewGuide | null): boolean {
+  if (!guide || guide.format !== 'case_and_behavioral') return false;
+  const groups = interviewScoreFieldGroups(guide);
+  return groups.some((g) => g.key === 'case') && groups.some((g) => g.key === 'behavioral');
+}
+
+export function interviewPhaseScoreFields(
+  guide: InterviewGuide | null,
+  phase: 'case' | 'behavioral',
+): string[] {
+  const groups = interviewScoreFieldGroups(guide);
+  const key = phase === 'case' ? 'case' : 'behavioral';
+  return groups.find((g) => g.key === key)?.fields ?? [];
 }
 
 export function interviewScaleMax(guide: InterviewGuide | null): number {
@@ -410,6 +450,24 @@ export function interviewScoreFieldGroups(
     return [{ key: 'case', label: 'Evaluation', fields: caseFields, weights }];
   }
 
+  const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
+  if (behavioralRubric && behavioralRubric.criteria.length > 0) {
+    const behavioralFields = behavioralRubric.criteria.map((c) => c.name);
+    const behavioralWeights: Record<string, number> = {};
+    for (const criterion of behavioralRubric.criteria) {
+      behavioralWeights[criterion.name] = criterion.weight;
+    }
+    return [
+      { key: 'case', label: 'Part 1: Case evaluation', fields: caseFields, weights },
+      {
+        key: 'behavioral',
+        label: 'Part 2: Behavioral evaluation',
+        fields: behavioralFields,
+        weights: behavioralWeights,
+      },
+    ];
+  }
+
   const behavioralFields = uniquifyAgainst(
     caseFields,
     questionScoreFields(guide.questions, 'Behavioral assessment'),
@@ -475,7 +533,15 @@ export function applyTeamInterviewGuideDefaults(
     const defaults = designDefaultGuides();
     return {
       first_round: mergeGuideWithDefault(guides.first_round, defaults.first_round),
-      final_round: null,
+      final_round: mergeGuideWithDefault(guides.final_round, defaults.final_round),
+    };
+  }
+
+  if (teamName === 'Events') {
+    const defaults = eventsDefaultGuides();
+    return {
+      first_round: mergeGuideWithDefault(guides.first_round, defaults.first_round),
+      final_round: mergeGuideWithDefault(guides.final_round, defaults.final_round),
     };
   }
 
@@ -490,7 +556,7 @@ export function applyTeamInterviewGuideDefaults(
 }
 
 export function teamUsesCasePdf(teamName: string): boolean {
-  return teamName === 'Strategy';
+  return teamName === 'Strategy' || teamName === 'Events';
 }
 
 function mergeGuideWithDefault(
@@ -510,6 +576,10 @@ function mergeGuideWithDefault(
   const missingRubric =
     (fallback.format === 'case_study' || fallback.format === 'case_and_behavioral') &&
     !normalizeInterviewRubric(saved.rubric);
+  const missingBehavioralRubric =
+    fallback.format === 'case_and_behavioral' &&
+    !normalizeInterviewRubric(saved.behavioralRubric) &&
+    Boolean(normalizeInterviewRubric(fallback.behavioralRubric));
 
   if (missingCaseQuestions || missingBehavioral) {
     return {
@@ -519,6 +589,8 @@ function mergeGuideWithDefault(
         : rewriteLegacyInterviewIntro(saved.intro),
       casePdfUrl: saved.casePdfUrl ?? fallback.casePdfUrl,
       rubric: normalizeInterviewRubric(saved.rubric) ?? fallback.rubric,
+      behavioralRubric:
+        normalizeInterviewRubric(saved.behavioralRubric) ?? fallback.behavioralRubric,
     };
   }
 
@@ -528,6 +600,9 @@ function mergeGuideWithDefault(
   }
   if (missingRubric && fallback.rubric) {
     next = { ...next, rubric: fallback.rubric };
+  }
+  if (missingBehavioralRubric && fallback.behavioralRubric) {
+    next = { ...next, behavioralRubric: fallback.behavioralRubric };
   }
   if (fallback.intro && !saved.intro?.trim()) {
     next = { ...next, intro: fallback.intro };
@@ -546,8 +621,8 @@ export function interviewStageSetupCopy(
 ): { label: string; hint: string | null } {
   if (teamName === 'Design') {
     return stage === 'first_round'
-      ? { label: 'Interview', hint: 'Questions-only format, no case PDF.' }
-      : { label: 'Final Round (Individual)', hint: null };
+      ? { label: 'Interview', hint: 'Questions-only format, no case PDF. Design has one interview round.' }
+      : { label: 'Final Round (unused)', hint: 'Design skips Final Round.' };
   }
   if (stage === 'first_round') {
     return { label: 'First Round (Group)', hint: null };

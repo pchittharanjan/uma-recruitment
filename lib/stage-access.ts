@@ -10,7 +10,9 @@ import { userHasTeamAccess } from '@/lib/access';
 import { cachedPerRequest } from '@/lib/request-cache';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import {
+  assignmentStageLabel,
   isRoundAtOrPastStatus,
+  phaseLabel,
   type UnlockableStage,
   UNLOCKABLE_STAGES,
 } from '@/lib/stages';
@@ -133,43 +135,74 @@ export async function getInterviewOnlyScope(
   return resolveInterviewOnlyScope(user, teamId, round, grants);
 }
 
+function roundStatusForUnlockStage(stage: UnlockableStage) {
+  return stage === 'deliberations'
+    ? 'deliberations'
+    : stage === 'final_round'
+      ? 'final_round'
+      : stage === 'first_round'
+        ? 'first_round'
+        : 'application';
+}
+
+export async function getTeamStageAccessDenialReason(
+  user: User,
+  teamId: number,
+  stage: UnlockableStage,
+): Promise<string | null> {
+  if (user.role === 'admin') return null;
+
+  if (!(await userHasTeamAccess(user, teamId))) {
+    return "You don't have access to this team yet. Ask an Admin to add you under Users.";
+  }
+
+  const round = await getActiveRoundForTeam(teamId);
+  if (!round) {
+    return "This team hasn't started recruiting yet. Check back once Admin opens the cycle.";
+  }
+
+  if (round.status === 'closed') {
+    return user.role === 'exec' || user.role === 'ad_hoc_exec'
+      ? null
+      : 'This recruiting cycle is closed.';
+  }
+
+  const statusForStage = roundStatusForUnlockStage(stage);
+  if (!isRoundAtOrPastStatus(round.status, statusForStage)) {
+    return `Your team hasn't reached ${phaseLabel(statusForStage)} yet. You'll see it here when Admin opens that phase.`;
+  }
+
+  if (!(await isStageUnlocked(round.id, stage))) {
+    const stageName =
+      stage === 'application'
+        ? 'Application grading'
+        : stage === 'deliberations'
+          ? 'Deliberations'
+          : assignmentStageLabel(stage);
+    return `${stageName} isn't open yet — Admin is still setting up. Watch for a welcome prompt, or check the sidebar until this phase becomes clickable.`;
+  }
+
+  const granted = await getGrantedStagesForUser(user, teamId);
+  if (granted === 'all') {
+    if (stage === 'deliberations' && user.role !== 'exec' && user.role !== 'ad_hoc_exec') {
+      return "You don't have access to Deliberations for this team.";
+    }
+    return null;
+  }
+
+  if (granted.length === 0 || !granted.includes(stage)) {
+    return "You don't have access to this phase. Ask your director or Admin to grant access.";
+  }
+
+  return null;
+}
+
 export async function canUserAccessTeamStage(
   user: User,
   teamId: number,
   stage: UnlockableStage,
 ): Promise<boolean> {
-  if (user.role === 'admin') return true;
-
-  if (!(await userHasTeamAccess(user, teamId))) return false;
-
-  const round = await getActiveRoundForTeam(teamId);
-  if (!round) return false;
-
-  // Closed cycle = archive: anyone with team access can view every prior stage
-  // (writes stay blocked via assertPipelineWritable / edit locks).
-  if (round.status === 'closed') {
-    return user.role === 'exec' || user.role === 'ad_hoc_exec';
-  }
-
-  const statusForStage =
-    stage === 'deliberations'
-      ? 'deliberations'
-      : stage === 'final_round'
-        ? 'final_round'
-        : stage === 'first_round'
-          ? 'first_round'
-          : 'application';
-
-  if (!isRoundAtOrPastStatus(round.status, statusForStage)) return false;
-  if (!(await isStageUnlocked(round.id, stage))) return false;
-
-  const granted = await getGrantedStagesForUser(user, teamId);
-  if (granted === 'all') {
-    // Deliberations is view/play for all team-portal roles; only admin can save/advance (API + UI).
-    return user.role === 'exec' || user.role === 'ad_hoc_exec';
-  }
-  if (granted.length === 0) return false;
-  return granted.includes(stage);
+  return (await getTeamStageAccessDenialReason(user, teamId, stage)) === null;
 }
 
 /**

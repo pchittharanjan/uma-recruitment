@@ -18,7 +18,7 @@ export default async function AdminDashboardPage() {
     if (!user || user.role !== 'admin') redirect('/login');
 
     const [dashboardData, phasePayload] = await Promise.all([
-      buildAdminDashboardPayload(),
+      buildAdminDashboardPayload(user.id),
       buildAdminPhasePayload({ includeChecklist: true }),
     ]);
 

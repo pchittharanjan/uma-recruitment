@@ -5,6 +5,13 @@ import {
 } from '@/lib/blind';
 import { getDb, type AssignmentStage, type User } from '@/lib/db';
 import {
+  applicationCriterionKeys,
+  averageCriterionScoresAcrossGraders,
+  computeApplicationComponentPct,
+  isStoredNumericScore,
+  parseQuestionNotesKey,
+} from '@/lib/grading-model';
+import {
   getRoundSettings,
   type NormalizationFactor,
   type RoundSettings,
@@ -123,9 +130,13 @@ export async function buildTeamDashboard(
 
   const scoresByAssignment: Record<number, Record<string, number>> = {};
   for (const row of scoresResult.rows) {
+    const fieldName = row.field_name as string;
+    if (parseQuestionNotesKey(fieldName)) continue;
+    const score = row.score;
+    if (!isStoredNumericScore(score)) continue;
     const aid = row.assignment_id as number;
     if (!scoresByAssignment[aid]) scoresByAssignment[aid] = {};
-    scoresByAssignment[aid][row.field_name as string] = row.score as number;
+    scoresByAssignment[aid][fieldName] = score;
   }
 
   const appMap = new Map<number, TeamDashboardData['applications'][number]>();
@@ -236,7 +247,7 @@ export async function computeNormalizedRankings(
   const incompleteCount = incomplete.rows[0].count as number;
 
   const allScoresResult = await db.execute({
-    sql: `SELECT s.score, a.user_id, a.application_id
+    sql: `SELECT s.field_name, s.score, a.user_id, a.application_id, a.id as assignment_id
           FROM scores s
           JOIN assignments a ON a.id = s.assignment_id
           JOIN applications app ON app.id = a.application_id
@@ -244,23 +255,50 @@ export async function computeNormalizedRankings(
     args: [teamId, roundId],
   });
 
-  const allScoreValues = allScoresResult.rows.map((r) => r.score as number);
+  const gradingModel = settings.grading_model;
+  const expectedCriterionKeys = gradingModel ? applicationCriterionKeys(gradingModel) : null;
+
+  const allScoreValues = allScoresResult.rows
+    .filter((r) => isStoredNumericScore(r.score) && !parseQuestionNotesKey(r.field_name as string))
+    .map((r) => r.score as number);
   const globalMean =
     allScoreValues.length > 0
       ? allScoreValues.reduce((a, b) => a + b, 0) / allScoreValues.length
       : 3;
 
   const userScoreBuckets: Record<number, number[]> = {};
-  const scoresByApp = new Map<number, Array<{ score: number; userId: number }>>();
+  const scoresByAssignment = new Map<number, Record<string, number>>();
+  const assignmentMeta = new Map<number, { userId: number; applicationId: number }>();
+
   for (const row of allScoresResult.rows) {
     const uid = row.user_id as number;
     const appId = row.application_id as number;
-    const score = row.score as number;
+    const assignmentId = row.assignment_id as number;
+    const fieldName = row.field_name as string;
+    if (parseQuestionNotesKey(fieldName)) continue;
+    const score = row.score;
+    if (!isStoredNumericScore(score)) continue;
     if (!userScoreBuckets[uid]) userScoreBuckets[uid] = [];
     userScoreBuckets[uid].push(score);
-    const bucket = scoresByApp.get(appId) ?? [];
-    bucket.push({ score, userId: uid });
-    scoresByApp.set(appId, bucket);
+    assignmentMeta.set(assignmentId, { userId: uid, applicationId: appId });
+    const bucket = scoresByAssignment.get(assignmentId) ?? {};
+    bucket[fieldName] = score;
+    scoresByAssignment.set(assignmentId, bucket);
+  }
+
+  const scoresByApp = new Map<number, Array<{ score: number; userId: number }>>();
+  if (!gradingModel) {
+    for (const row of allScoresResult.rows) {
+      const uid = row.user_id as number;
+      const appId = row.application_id as number;
+      const fieldName = row.field_name as string;
+      if (parseQuestionNotesKey(fieldName)) continue;
+      const score = row.score;
+      if (!isStoredNumericScore(score)) continue;
+      const bucket = scoresByApp.get(appId) ?? [];
+      bucket.push({ score, userId: uid });
+      scoresByApp.set(appId, bucket);
+    }
   }
 
   const userMeans: Record<number, number> = {};
@@ -304,24 +342,61 @@ export async function computeNormalizedRankings(
 
   for (const appRow of appsResult.rows) {
     const appId = appRow.id as number;
-    const appScores = scoresByApp.get(appId) ?? [];
+    let average = 0;
+    let rawAverage = 0;
 
-    const rawScores = appScores.map((row) => row.score);
-    const adjustedScores = appScores.map((row) => {
-      const adjustment = globalMean - (userMeans[row.userId] ?? globalMean);
-      return Math.min(5, Math.max(1, row.score + adjustment));
-    });
+    if (gradingModel && expectedCriterionKeys) {
+      const appAssignments = [...assignmentMeta.entries()].filter(
+        ([, meta]) => meta.applicationId === appId,
+      );
+      const adjustedMaps: Array<Record<string, number>> = [];
+      const rawMaps: Array<Record<string, number>> = [];
 
-    // Mean of leniency-adjusted field scores (1–5); denominator = this app's actual score count
-    const average =
-      adjustedScores.length > 0
-        ? adjustedScores.reduce((a, b) => a + b, 0) / adjustedScores.length
-        : 0;
-    // Same rows, no leniency adjustment
-    const rawAverage =
-      rawScores.length > 0
-        ? rawScores.reduce((a, b) => a + b, 0) / rawScores.length
-        : 0;
+      for (const [assignmentId] of appAssignments) {
+        const rawMap = scoresByAssignment.get(assignmentId) ?? {};
+        const complete = expectedCriterionKeys.every((key) => isStoredNumericScore(rawMap[key]));
+        if (!complete) continue;
+        const meta = assignmentMeta.get(assignmentId)!;
+        const adjustment = globalMean - (userMeans[meta.userId] ?? globalMean);
+        const filteredRaw: Record<string, number> = {};
+        const adjustedMap: Record<string, number> = {};
+        for (const key of expectedCriterionKeys) {
+          const val = rawMap[key];
+          filteredRaw[key] = val;
+          adjustedMap[key] = Math.min(5, Math.max(1, val + adjustment));
+        }
+        adjustedMaps.push(adjustedMap);
+        rawMaps.push(filteredRaw);
+      }
+
+      const mergedAdjusted = averageCriterionScoresAcrossGraders(adjustedMaps);
+      const mergedRaw = averageCriterionScoresAcrossGraders(rawMaps);
+      const appPctAdjusted =
+        mergedAdjusted != null
+          ? computeApplicationComponentPct(mergedAdjusted, gradingModel)
+          : null;
+      const appPctRaw =
+        mergedRaw != null ? computeApplicationComponentPct(mergedRaw, gradingModel) : null;
+
+      // Keep downstream 1–5 scale: map 0–100 application % onto 1–5 for ranking display.
+      average = appPctAdjusted != null ? (appPctAdjusted / 100) * 5 : 0;
+      rawAverage = appPctRaw != null ? (appPctRaw / 100) * 5 : 0;
+    } else {
+      const appScores = scoresByApp.get(appId) ?? [];
+      const rawScores = appScores.map((row) => row.score);
+      const adjustedScores = appScores.map((row) => {
+        const adjustment = globalMean - (userMeans[row.userId] ?? globalMean);
+        return Math.min(5, Math.max(1, row.score + adjustment));
+      });
+      average =
+        adjustedScores.length > 0
+          ? adjustedScores.reduce((a, b) => a + b, 0) / adjustedScores.length
+          : 0;
+      rawAverage =
+        rawScores.length > 0
+          ? rawScores.reduce((a, b) => a + b, 0) / rawScores.length
+          : 0;
+    }
 
     scored.push({
       id: appId,
@@ -395,6 +470,8 @@ export async function finalizeTeamRound(
 }
 
 export function userSeesBlindApplications(user: User): boolean {
+  // Dedicated admin list/detail APIs stay named. Application grading forces
+  // blind separately so an admin can score without seeing names.
   return user.role === 'exec' || user.role === 'ad_hoc_exec';
 }
 
@@ -479,6 +556,30 @@ export async function listGraderAssignments(
     logisticsNote: (r.logistics_note as string | null) ?? null,
     groupKey: (r.group_key as string | null) ?? null,
   }));
+}
+
+export async function listUserApplicationGradingProgressByTeam(
+  userId: number,
+): Promise<Map<number, { total: number; completed: number }>> {
+  const db = getDb();
+  const result = await db.execute({
+    sql: `SELECT app.team_id AS team_id,
+                 COUNT(*) AS total,
+                 SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed
+          FROM assignments a
+          JOIN applications app ON app.id = a.application_id
+          WHERE a.user_id = ? AND a.stage = 'application'
+          GROUP BY app.team_id`,
+    args: [userId],
+  });
+  const map = new Map<number, { total: number; completed: number }>();
+  for (const row of result.rows) {
+    map.set(row.team_id as number, {
+      total: (row.total as number) ?? 0,
+      completed: (row.completed as number) ?? 0,
+    });
+  }
+  return map;
 }
 
 export function serializeApplicationFields(

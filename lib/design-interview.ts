@@ -39,11 +39,23 @@ export const DESIGN_WRAP_UP_QUESTIONS = [
   'What questions do you have for us about the team or the recruitment process?',
 ];
 
+export const DESIGN_FINAL_PORTFOLIO_QUESTIONS = [
+  'Pick one portfolio project and walk us through the problem, your role, constraints, and outcome.',
+  'What would you change about that project with another week and clearer success metrics?',
+  'Tell us about a disagreement with a stakeholder or teammate on a design decision. How did you resolve it?',
+];
+
+export const DESIGN_FINAL_SYSTEM_QUESTIONS = [
+  'Design a simple onboarding flow for a new UMA member joining the Design team. What are the first three screens or moments, and why?',
+  'How would you prioritize polish vs. shipping when the team has a fixed event deadline?',
+  'How do you document design decisions so someone else can continue the work?',
+];
+
 export function designDefaultGuides(): InterviewGuidesRecord {
   const firstRound: InterviewGuide = {
     format: 'questions',
     intro:
-      'Design interview: behavioral and design thinking (part 1), short BART critique and sketch challenge (part 2), then wrap up. No case PDF.',
+      'Design first-round interview: behavioral and design thinking (part 1), short BART critique and sketch challenge (part 2), then wrap up. No case PDF.',
     questions: [
       ...DESIGN_BEHAVIORAL_QUESTIONS,
       ...DESIGN_THINKING_QUESTIONS,
@@ -56,13 +68,17 @@ export function designDefaultGuides(): InterviewGuidesRecord {
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Precision', weight: 25 },
-        { name: 'Creativity', weight: 25 },
-        { name: 'Efficiency', weight: 25 },
-        { name: 'Communication', weight: 25 },
+        { name: 'Design Background & Self-Awareness', weight: 20 },
+        { name: 'Motivation / Fit', weight: 20 },
+        { name: 'Portfolio Depth & Reflection', weight: 20 },
+        { name: 'Process Rigor', weight: 15 },
+        { name: 'Problem-Solving', weight: 15 },
+        { name: 'Precision', weight: 10 },
       ],
     },
   };
 
+  // Design has a single interview round — final_round defaults are unused.
+  // Keep DESIGN_FINAL_* constants above for reference if a second round returns.
   return { first_round: firstRound, final_round: null };
 }

@@ -37,9 +37,15 @@ import {
   interviewScaleMax,
   interviewScoreFieldGroups,
   interviewStageSetupCopy,
+  isPhasedCaseAndBehavioralInterview,
   type InterviewGuide,
   type InterviewGuideStage,
 } from '@/lib/interview-guide';
+import {
+  InterviewPhaseToggle,
+  type InterviewScoringPhase,
+} from '@/components/interview-phase-toggle';
+
 interface PreviewCandidateDraft {
   scores: Record<string, number>;
   notes: Record<string, string>;
@@ -97,6 +103,7 @@ function NotesAndEvaluationForm({
   draft,
   disabled,
   compact,
+  phase,
   onNoteChange,
   onScoreChange,
   onCommentChange,
@@ -105,6 +112,7 @@ function NotesAndEvaluationForm({
   draft: PreviewCandidateDraft;
   disabled: boolean;
   compact?: boolean;
+  phase?: InterviewScoringPhase;
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
@@ -117,6 +125,7 @@ function NotesAndEvaluationForm({
       comment={draft.comment}
       disabled={disabled}
       compact={compact}
+      phase={phase}
       onNoteChange={onNoteChange}
       onScoreChange={onScoreChange}
       onCommentChange={onCommentChange}
@@ -161,7 +170,8 @@ export function InterviewScoringPreview({
   interactive?: boolean;
 }) {
   const scoreFieldList = allScoreFields(guide);
-  const casePdfUrl = guide.casePdfUrl;
+  const isPhasedInterview =
+    !showGroupSample && isPhasedCaseAndBehavioralInterview(guide);
   const stageCopy = interviewStageSetupCopy(teamName, stage);
   const scaleMax = interviewScaleMax(guide);
   const pdfTitle =
@@ -171,12 +181,16 @@ export function InterviewScoringPreview({
   const [draft, setDraft] = useState<PreviewCandidateDraft>(emptyDraft);
   const [drafts, setDrafts] = useState<Record<number, PreviewCandidateDraft>>(emptyDrafts);
   const [activeTab, setActiveTab] = useState(String(SAMPLE_APPLICANTS[0].id));
+  const [interviewPhase, setInterviewPhase] = useState<InterviewScoringPhase>('case');
   const [submitting, setSubmitting] = useState(false);
   const [caseOpen, setCaseOpen] = useInterviewCaseOpen();
   const { fullscreen, exit: exitFullscreen, toggle: toggleFullscreen } =
     useInterviewWorkspaceFullscreen();
   const { layout, updateLayout } = useGroupInterviewLayout();
   const elapsedTimer = useElapsedTimer();
+
+  const casePdfUrl =
+    isPhasedInterview && interviewPhase === 'behavioral' ? undefined : guide.casePdfUrl;
 
   const disabled = !interactive;
 
@@ -372,12 +386,22 @@ export function InterviewScoringPreview({
     </div>
   ) : (
     <div data-tour="interview-scores" className="uma-stack-page">
-      <InterviewNotesPanelHeader title="Notes & Evaluation" intro={guide.intro} />
+      <InterviewNotesPanelHeader
+        title={
+          isPhasedInterview
+            ? interviewPhase === 'case'
+              ? 'Case — notes & evaluation'
+              : 'Behavioral — notes & evaluation'
+            : 'Notes & Evaluation'
+        }
+        intro={isPhasedInterview && interviewPhase === 'behavioral' ? undefined : guide.intro}
+      />
       {interactive ? (
         <NotesAndEvaluationForm
           guide={guide}
           draft={draft}
           disabled={disabled}
+          phase={isPhasedInterview ? interviewPhase : undefined}
           onNoteChange={(field, value) =>
             setDraft((prev) => ({ ...prev, notes: { ...prev.notes, [field]: value } }))
           }
@@ -393,6 +417,7 @@ export function InterviewScoringPreview({
           scores={{}}
           comment=""
           disabled
+          phase={isPhasedInterview ? interviewPhase : undefined}
           onNoteChange={() => {}}
           onScoreChange={() => {}}
           onCommentChange={() => {}}
@@ -427,6 +452,17 @@ export function InterviewScoringPreview({
         <p className="mt-1 text-sm text-muted-foreground">
           {showGroupSample ? 'Sample Date & Time · Sample Room' : stageCopy.label}
         </p>
+        {isPhasedInterview ? (
+          <div className="mt-2">
+            <InterviewPhaseToggle
+              value={interviewPhase}
+              onValueChange={(next) => {
+                setInterviewPhase(next);
+                setCaseOpen(next === 'case');
+              }}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-3 pt-1">
         <PageTourHelpButton />

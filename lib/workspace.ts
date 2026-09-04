@@ -21,6 +21,10 @@ export interface WorkspaceDestination {
   href: string;
 }
 
+export type WorkspaceDestinationContext = {
+  teamNames?: Record<string, string>;
+};
+
 export function workspaceAreaFromPathname(pathname: string): WorkspaceArea {
   return pathname.startsWith('/admin') ? 'admin' : 'team';
 }
@@ -137,6 +141,7 @@ function adminTeamPageLabel(rest: string): string {
 
 function teamPortalPageLabel(rest: string): string {
   if (rest.startsWith('grade')) return 'Grading';
+  if (rest.startsWith('advancement/first-round')) return 'First Round Advancement';
   if (rest.startsWith('advancement')) return 'Advancement';
   if (rest.startsWith('deliberations')) return 'Deliberations';
   if (rest.startsWith('final-selection')) return 'Final Selection';
@@ -167,7 +172,7 @@ export function workspaceTitle(
   if (pathname === '/admin/applications') return 'Applications';
   if (pathname === '/admin/users') return 'Users';
   if (pathname === '/admin/users/new') return 'New User';
-  if (pathname === '/admin/coffee-chats' || pathname === '/coffee-chats') return 'Coffee Chats';
+  if (pathname === '/admin/coffee-chats') return 'Coffee Chats';
   if (pathname === '/admin/import') return 'Import';
   if (pathname === '/admin/communications') return 'Emails';
   if (pathname === '/admin/phases/application') return 'Application';
@@ -230,36 +235,115 @@ const ADMIN_WORKSPACE_DESTINATIONS: WorkspaceDestination[] = [
   { title: 'Final Selection', href: '/admin/final-selection' },
 ];
 
+function resolveTeamLabel(teamId: number | string, context: WorkspaceDestinationContext): string {
+  return context.teamNames?.[String(teamId)] ?? `Team ${teamId}`;
+}
+
+function adminTeamSubDestinations(
+  teamId: number,
+  context: WorkspaceDestinationContext,
+): WorkspaceDestination[] {
+  const label = resolveTeamLabel(teamId, context);
+  const base = `/admin/teams/${teamId}`;
+  return [
+    { title: `${label} · Overview`, href: base },
+    { title: `${label} · Assignments`, href: `${base}/assignments` },
+    { title: `${label} · Grading`, href: `${base}/grade` },
+    { title: `${label} · Interview Setup`, href: `${base}/interview-setup` },
+    { title: `${label} · First Round Schedule`, href: `${base}/schedule/first-round` },
+    { title: `${label} · Final Round Schedule`, href: `${base}/schedule/final-round` },
+    { title: `${label} · Interview Results`, href: `${base}/interview-results` },
+    { title: `${label} · Deliberations`, href: `${base}/deliberations` },
+    { title: `${label} · Emails`, href: `${base}/communications` },
+    { title: `${label} · Finalize`, href: `${base}/finalize` },
+  ];
+}
+
+function teamPortalSubDestinations(
+  teamId: number,
+  context: WorkspaceDestinationContext,
+): WorkspaceDestination[] {
+  const label = resolveTeamLabel(teamId, context);
+  const base = `/team/${teamId}`;
+  const destinations: WorkspaceDestination[] = [
+    { title: `${label} · Overview`, href: teamOverviewHref(teamId) },
+    { title: `${label} · Grading`, href: `${base}/grade` },
+    { title: `${label} · First Round Interview`, href: `${base}/interviews/first_round` },
+    { title: `${label} · Final Round Interview`, href: `${base}/interviews/final_round` },
+    { title: `${label} · Advancement`, href: `${base}/advancement` },
+    {
+      title: `${label} · First Round Advancement`,
+      href: `${base}/advancement/first-round`,
+    },
+    { title: `${label} · Deliberations`, href: `${base}/deliberations` },
+  ];
+  for (const phase of PIPELINE_PHASES) {
+    if (phase.status === 'closed') continue;
+    const href = teamPhaseHref(teamId, phase.status);
+    if (href) destinations.push({ title: `${label} · ${phase.label}`, href });
+  }
+  return destinations;
+}
+
+function destinationMatchesQuery(item: WorkspaceDestination, query: string): boolean {
+  const haystack = `${item.title} ${item.href}`.toLowerCase();
+  return haystack.includes(query);
+}
+
+/** Filter workspace destinations by a search query (title + path). */
+export function filterWorkspaceDestinations(
+  destinations: WorkspaceDestination[],
+  query: string,
+): WorkspaceDestination[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return destinations;
+  return destinations.filter((item) => destinationMatchesQuery(item, q));
+}
+
 /** Sidebar-style pages available for the workspace "+" menu (derived from current route). */
 export function workspaceDestinations(
   pathname: string,
   area?: WorkspaceArea,
+  context: WorkspaceDestinationContext = {},
 ): WorkspaceDestination[] {
   const resolvedArea = area ?? workspaceAreaFromPathname(pathname);
   if (resolvedArea === 'admin') {
-    return dedupeDestinations(ADMIN_WORKSPACE_DESTINATIONS);
-  }
-
-  const teamMatch = pathname.match(/^\/team\/(\d+)/);
-  if (teamMatch) {
-    const teamId = Number.parseInt(teamMatch[1], 10);
-    const destinations: WorkspaceDestination[] = [
-      { title: 'Dashboard', href: teamOverviewHref(teamId) },
-    ];
-    for (const phase of PIPELINE_PHASES) {
-      if (phase.status === 'closed') continue;
-      const href = teamPhaseHref(teamId, phase.status);
-      if (href) destinations.push({ title: phase.label, href });
+    const destinations = [...ADMIN_WORKSPACE_DESTINATIONS];
+    if (context.teamNames && Object.keys(context.teamNames).length > 0) {
+      for (const teamId of Object.keys(context.teamNames)) {
+        destinations.push(...adminTeamSubDestinations(Number.parseInt(teamId, 10), context));
+      }
+    } else {
+      const adminTeamMatch = pathname.match(/^\/admin\/teams\/(\d+)/);
+      if (adminTeamMatch) {
+        destinations.push(
+          ...adminTeamSubDestinations(Number.parseInt(adminTeamMatch[1]!, 10), context),
+        );
+      }
     }
     return dedupeDestinations(destinations);
   }
 
-  if (pathname === '/coffee-chats' || pathname.startsWith('/team')) {
-    return [
-      { title: 'Home', href: '/team' },
-      { title: 'Coffee Chats', href: '/coffee-chats' },
-    ];
+  const destinations: WorkspaceDestination[] = [
+    { title: 'Your Teams', href: '/team' },
+    { title: 'Coffee Chats', href: '/coffee-chats' },
+    { title: 'Final Selection', href: '/team/final-selection' },
+  ];
+
+  if (context.teamNames && Object.keys(context.teamNames).length > 0) {
+    for (const teamId of Object.keys(context.teamNames)) {
+      destinations.push(
+        ...teamPortalSubDestinations(Number.parseInt(teamId, 10), context),
+      );
+    }
+  } else {
+    const teamMatch = pathname.match(/^\/team\/(\d+)/);
+    if (teamMatch) {
+      destinations.push(
+        ...teamPortalSubDestinations(Number.parseInt(teamMatch[1]!, 10), context),
+      );
+    }
   }
 
-  return [{ title: 'Coffee Chats', href: '/coffee-chats' }];
+  return dedupeDestinations(destinations);
 }

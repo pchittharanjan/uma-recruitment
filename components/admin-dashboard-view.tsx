@@ -22,10 +22,44 @@ import StatusBanner from '@/components/status-banner';
 import { cachedJsonFetch, peekCachedJson } from '@/lib/client-fetch-cache';
 import { greetingForName } from '@/lib/greeting';
 import type { AdminDashboardPayload } from '@/lib/admin-workspace-data';
+import { useAdminPhase } from '@/components/admin-phase-provider';
 
 interface DashboardData {
   pipelineStatus: RoundStatus;
   teams: PhaseTeamSummary[];
+}
+
+function AdminGettingStartedBanner({
+  teams,
+  pipelineClosed,
+}: {
+  teams: PhaseTeamSummary[];
+  pipelineClosed: boolean;
+}) {
+  const totalApplications = teams.reduce((sum, team) => sum + (team.applicationCount ?? 0), 0);
+  const allPreApplication =
+    teams.length > 0 &&
+    teams.every(
+      (team) => !team.round || team.round.status === 'pre_application',
+    );
+  const showBanner = !pipelineClosed && teams.length > 0 && (allPreApplication || totalApplications === 0);
+
+  if (!showBanner) return null;
+
+  return (
+    <StatusBanner
+      dismissKey="admin-getting-started"
+      type="info"
+      title="Getting started:"
+      message="1. Add users · 2. Advance each team to Application · 3. Import CSV · 4. Unlock grading for execs"
+      actions={[
+        { label: 'Users', href: '/admin/users' },
+        { label: 'Advance', href: '#pipeline-controls' },
+        { label: 'Import', href: '/admin/import' },
+        { label: 'Unlock', href: '#pipeline-controls' },
+      ]}
+    />
+  );
 }
 
 function AdminDashboardContent({
@@ -39,6 +73,7 @@ function AdminDashboardContent({
   const searchParams = useSearchParams();
   const viewParam = searchParams.get('view') ?? '';
   const { user } = useShellUser();
+  const { phase } = useAdminPhase();
   const [data, setData] = useState<DashboardData>(() =>
     peekCachedJson<DashboardData>('/api/admin/dashboard') ?? initialData,
   );
@@ -84,20 +119,27 @@ function AdminDashboardContent({
 
   useEffect(() => {
     if (!data || typeof window === 'undefined') return;
-    const hash = window.location.hash;
-    if (hash !== '#interview-overview' && hash !== '#pipeline-controls') {
-      interviewOverviewScrolledRef.current = null;
-      return;
-    }
 
-    const scrollKey = `${viewParam}${hash}`;
-    if (interviewOverviewScrolledRef.current === scrollKey) return;
+    const scrollToHash = () => {
+      const hash = window.location.hash;
+      if (hash !== '#interview-overview' && hash !== '#pipeline-controls') {
+        interviewOverviewScrolledRef.current = null;
+        return;
+      }
 
-    const el = document.getElementById(hash.slice(1));
-    if (!el) return;
+      const scrollKey = `${viewParam}${hash}`;
+      if (interviewOverviewScrolledRef.current === scrollKey) return;
 
-    interviewOverviewScrolledRef.current = scrollKey;
-    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+      const el = document.getElementById(hash.slice(1));
+      if (!el) return;
+
+      interviewOverviewScrolledRef.current = scrollKey;
+      el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    };
+
+    scrollToHash();
+    window.addEventListener('hashchange', scrollToHash);
+    return () => window.removeEventListener('hashchange', scrollToHash);
   }, [data, viewParam]);
 
   const handleViewingChange = (status: RoundStatus) => {
@@ -141,7 +183,11 @@ function AdminDashboardContent({
           <RecruitmentCycleSettings />
         </div>
 
-        <div data-tour="admin-phase">
+        <div data-tour="admin-phase" className="space-y-4">
+          <AdminGettingStartedBanner
+            teams={data.teams}
+            pipelineClosed={phase?.pipelineClosed ?? false}
+          />
           <GlobalPhaseControls
             viewingStatus={viewingStatus}
             onViewingStatusChange={handleViewingChange}

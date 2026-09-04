@@ -1,5 +1,10 @@
+import type { AdvancementVerdict } from '@/lib/advancement-verdict-types';
+import { getTeamPipelineProfile } from '@/lib/team-pipeline-profile';
+
 export type AdvancementSubmissionStatus = 'submitted' | 'approved' | 'withdrawn';
 export type AdvancementFromStage = 'application' | 'first_round';
+
+export type { AdvancementVerdict };
 
 export interface AdvancementCandidate {
   applicationId: number;
@@ -57,14 +62,20 @@ export interface GradingEditLock {
   message: string;
 }
 
-export function advancementFromStageLabel(fromStage: AdvancementFromStage): string {
-  return fromStage === 'first_round'
-    ? 'First Round → Final Round'
-    : 'Application → First Round';
+export function advancementFromStageLabel(
+  fromStage: AdvancementFromStage,
+  teamName?: string,
+): string {
+  if (fromStage === 'application') {
+    return teamName && getTeamPipelineProfile(teamName).skipFinalRoundPhase
+      ? 'Application → Interview'
+      : 'Application → First Round';
+  }
+  if (teamName && getTeamPipelineProfile(teamName).skipFinalRoundPhase) {
+    return 'Interview → Deliberations';
+  }
+  return 'First Round → Final Round';
 }
-
-import type { AdvancementVerdict } from '@/lib/advancement-verdict-types';
-export type { AdvancementVerdict };
 
 export interface AdvancementPanelVerdict {
   name: string;

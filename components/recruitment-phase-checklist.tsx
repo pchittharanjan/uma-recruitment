@@ -82,9 +82,14 @@ function StepIndicator({ completed }: { completed: boolean }) {
 export function RecruitmentPhaseChecklist({
   title,
   steps,
+  previewOnly = false,
+  previewPhaseLabel,
 }: {
   title: string;
   steps: PhaseChecklistStep[];
+  /** True when browsing a phase no team has reached yet. */
+  previewOnly?: boolean;
+  previewPhaseLabel?: string;
 }) {
   const panelId = useId();
   const [openStepId, setOpenStepId] = useState<string | null>(
@@ -141,6 +146,8 @@ export function RecruitmentPhaseChecklist({
 
   if (steps.length === 0) return null;
 
+  const phaseName = previewPhaseLabel?.trim() || title.replace(/\s+checklist$/i, '');
+
   return (
     <Collapsible open={panelOpen} onOpenChange={handlePanelOpenChange}>
       <div className="overflow-hidden">
@@ -174,6 +181,14 @@ export function RecruitmentPhaseChecklist({
           id={panelId}
           className={cn('[overflow-anchor:none]', !hydrated && 'transition-none')}
         >
+          {previewOnly && (
+            <div
+              className="mx-2 mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm leading-relaxed text-foreground"
+              role="status"
+            >
+              Preview only — no teams are in {phaseName} yet. Advance teams above first.
+            </div>
+          )}
           <div className="space-y-1 pb-2 pt-2 [overflow-anchor:none]">
             {steps.map((step, index) => {
               const isOpen = openStepId === step.id;

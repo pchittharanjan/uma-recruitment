@@ -84,7 +84,11 @@ function resolvePhaseHref(
   if (status === 'pre_application') {
     for (const team of teams) {
       if (phaseAccessible('pre_application', team, orgPipelineStatus)) {
-        return { href: '/coffee-chats', teamName: team.name, isDirector: team.isDirector === true };
+        return {
+          href: teamOverviewHref(team.id),
+          teamName: team.name,
+          isDirector: team.isDirector === true,
+        };
       }
     }
     return null;
@@ -115,7 +119,7 @@ function resolveBrowseHref(
     if (statusIndex(phase.status) > currentIdx) continue;
     if (!phaseAccessible(phase.status, team, orgPipelineStatus)) continue;
 
-    if (phase.status === 'pre_application') return '/coffee-chats';
+    if (phase.status === 'pre_application') return teamOverviewHref(team.id);
     const href = teamPhaseHref(team.id, phase.status);
     if (href) return href;
   }

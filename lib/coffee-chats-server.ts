@@ -73,10 +73,19 @@ export function serializeUserCoffeeChat(chat: CoffeeChatWithMeta) {
   };
 }
 
-export function serializeAdminCoffeeChat(chat: CoffeeChatWithMeta) {
+export function serializeAdminCoffeeChat(
+  chat: CoffeeChatWithMeta,
+  applicantMatch?: {
+    status: 'matched' | 'unmatched';
+    candidateId: number | null;
+    candidateName: string | null;
+    detail: string;
+  },
+) {
   return {
     id: chat.id,
     chat_date: chat.chat_date,
+    submitter_id: chat.submitter_id,
     submitter_name: chat.submitter_name,
     applicant_name: chat.applicant_name,
     applicant_email: chat.applicant_email,
@@ -88,6 +97,12 @@ export function serializeAdminCoffeeChat(chat: CoffeeChatWithMeta) {
     other_comments: chat.other_comments,
     conflict_of_interest: chat.conflict_of_interest,
     editable: chat.editable,
+    applicant_match: applicantMatch ?? {
+      status: 'unmatched' as const,
+      candidateId: null,
+      candidateName: null,
+      detail: 'Not matched',
+    },
   };
 }
 

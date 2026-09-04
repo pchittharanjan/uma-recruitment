@@ -1,12 +1,14 @@
 'use client';
 
 import React, { use, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
+import { ApplicationQuestionRubricCard } from '@/components/application-question-rubric';
+import { PortfolioLinkPreview } from '@/components/portfolio-link-preview';
+import { ResponseText } from '@/components/response-text';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
@@ -15,13 +17,17 @@ import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
 import { RequiredAsterisk } from '@/components/ui/label';
 import {
-  invalidateGradeData,
+  invalidateTeamGradeData,
   loadGradeData,
   prefetchNextPendingGradeData,
   type GradeAppData,
 } from '@/lib/grading-client';
-import { gradingCompleteToast } from '@/lib/next-step-guidance';
+import { primaryScoredQuestions, questionsLinkedTo } from '@/lib/grading-model';
+import { gradingCompleteToast, FIVE_LEVEL_RATING_PHRASE } from '@/lib/next-step-guidance';
+import { gradingAppHref, gradingQueueHref } from '@/lib/grading-paths';
 import { cn } from '@/lib/utils';
+import { useOptionalShellUser } from '@/components/shell-user-provider';
+import type { TeamName } from '@/lib/db';
 
 export default function TeamGradingScorePage({
   params,
@@ -31,11 +37,18 @@ export default function TeamGradingScorePage({
   const { teamId, applicationId } = use(params);
   const [appData, setAppData] = useState<GradeAppData | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const router = useRouter();
+  const pathname = usePathname();
+  const audience = pathname.startsWith('/admin/') ? 'admin' : 'team';
+  const shell = useOptionalShellUser();
+  const teamName = shell?.teams.find((team) => String(team.id) === teamId)?.name as
+    | TeamName
+    | undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -43,11 +56,12 @@ export default function TeamGradingScorePage({
     setError('');
     setSubmitError('');
 
-    loadGradeData(teamId, applicationId)
+    loadGradeData(teamId, applicationId, teamName)
       .then((d) => {
         if (cancelled) return;
         setAppData(d);
         setScores(d.existingScores ?? {});
+        setNotes(d.existingNotes ?? {});
         setComment(d.existingComment ?? '');
         // Warm the cache for the next pending applicant so submit → next is instant.
         void prefetchNextPendingGradeData(teamId, d.applicationId);
@@ -59,17 +73,25 @@ export default function TeamGradingScorePage({
     return () => {
       cancelled = true;
     };
-  }, [teamId, applicationId]);
+  }, [teamId, applicationId, teamName]);
 
   const gradingLocked = appData?.gradingEditLock?.locked ?? false;
+  const scoredQuestions = appData
+    ? primaryScoredQuestions(appData.applicationQuestions ?? [])
+    : [];
+  const usesCriterionRubric = scoredQuestions.length > 0;
   const allScoredFields = appData
-    ? [...appData.scoreFields, ...(appData.customScoreFields ?? [])]
+    ? usesCriterionRubric
+      ? [...(appData.customScoreFields ?? [])]
+      : [...appData.scoreFields, ...(appData.customScoreFields ?? [])]
     : [];
   const activeField = allScoredFields.find((f) => scores[f] === undefined) ?? null;
 
   const handleSubmit = useCallback(async () => {
     if (!appData || submitting) return;
-    const allFields = [...appData.scoreFields, ...(appData.customScoreFields ?? [])];
+    const allFields = usesCriterionRubric
+      ? [...(appData.customScoreFields ?? [])]
+      : [...appData.scoreFields, ...(appData.customScoreFields ?? [])];
     const missing = allFields.filter((f) => scores[f] === undefined);
     if (missing.length > 0) {
       const message = 'Please score all fields before submitting.';
@@ -83,7 +105,7 @@ export default function TeamGradingScorePage({
       const res = await fetch(`/api/team/grading/${applicationId}/score?teamId=${teamId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scores, comment }),
+        body: JSON.stringify({ scores, notes, comment }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -91,14 +113,24 @@ export default function TeamGradingScorePage({
         toast.error(data.error ?? 'Failed to submit score');
         return;
       }
-      invalidateGradeData(teamId, applicationId);
+      // Drop prefetched payloads — they were fetched before this submit, so
+      // "X of Y done" would still show the old count. Warm the real next app.
+      invalidateTeamGradeData(teamId);
+      const nextAudience = data.isAdminGrader || audience === 'admin' ? 'admin' : 'team';
       if (data.nextApplicationId) {
         toast.success('Score submitted');
-        router.push(`/team/${teamId}/grade/${data.nextApplicationId}`);
+        await loadGradeData(teamId, data.nextApplicationId, teamName).catch(() => {});
+        router.push(gradingAppHref(teamId, data.nextApplicationId, nextAudience));
+      } else if (data.advancementHref && nextAudience === 'team') {
+        toast.success(
+          gradingCompleteToast(Boolean(data.isDirector), Boolean(data.isAdminGrader) || audience === 'admin'),
+        );
+        router.push(data.advancementHref);
       } else {
-        toast.success(gradingCompleteToast(Boolean(data.isDirector)));
-        // Grade list shows the role-aware “what’s next” prompt.
-        router.push(`/team/${teamId}/grade`);
+        toast.success(
+          gradingCompleteToast(Boolean(data.isDirector), Boolean(data.isAdminGrader) || audience === 'admin'),
+        );
+        router.push(gradingQueueHref(teamId, nextAudience));
       }
     } catch {
       setSubmitError('Network error. Please try again.');
@@ -106,7 +138,7 @@ export default function TeamGradingScorePage({
     } finally {
       setSubmitting(false);
     }
-  }, [appData, applicationId, comment, router, scores, submitting, teamId]);
+  }, [appData, applicationId, audience, comment, notes, router, scores, submitting, teamId, teamName, usesCriterionRubric]);
 
   const scoreField = useCallback(
     (field: string, n: number) => {
@@ -167,7 +199,7 @@ export default function TeamGradingScorePage({
         title="Couldn't load application"
         description={error}
         ctaLabel="Back"
-        onCtaClick={() => router.push(`/team/${teamId}`)}
+        onCtaClick={() => router.push(gradingQueueHref(teamId, audience))}
       />
     );
   }
@@ -176,29 +208,7 @@ export default function TeamGradingScorePage({
     return <PageLoading />;
   }
 
-  const renderWithLinks = (text: string) => {
-    const urlRegex = /https?:\/\/[^\s]+/g;
-    const parts: (string | React.ReactElement)[] = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = urlRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      parts.push(
-        <a
-          key={match.index}
-          href={match[0]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="break-all text-primary underline"
-        >
-          {match[0]}
-        </a>,
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts;
-  };
+  const renderWithLinks = (text: string) => <ResponseText text={text} />;
 
   const contextFields = appData.contextFields ?? [];
   const scoredCount = allScoredFields.filter((f) => scores[f] !== undefined).length;
@@ -222,7 +232,7 @@ export default function TeamGradingScorePage({
           >
             <button
               type="button"
-              onClick={() => router.push(`/team/${teamId}/grade`)}
+              onClick={() => router.push(gradingQueueHref(teamId, audience))}
               className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
             >
               ← Back
@@ -253,9 +263,11 @@ export default function TeamGradingScorePage({
             <StatusBanner
               type="info"
               message={
-                appData.isDirector
-                  ? 'Last application in your queue. After you submit, you’ll add color recommendations, then meet with your PMs.'
-                  : 'Last application in your queue. After you submit, you’ll add color recommendations on who should move forward.'
+                appData.isAdminGrader
+                  ? 'Last application in your queue. After you submit, you’ll return to the name-blind list.'
+                  : appData.isDirector
+                    ? `Last application in your queue. After you submit, set ${FIVE_LEVEL_RATING_PHRASE}, then meet with your PMs.`
+                    : `Last application in your queue. After you submit, set ${FIVE_LEVEL_RATING_PHRASE} on who should move forward.`
               }
             />
           )}
@@ -272,7 +284,10 @@ export default function TeamGradingScorePage({
           )}
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <section className="uma-stack-section" data-tour="grade-form-scores">
+            <section
+              className={cn('uma-stack-section', !appData.showPortfolioSection && 'lg:col-span-2')}
+              data-tour="grade-form-scores"
+            >
               <h2 className="uma-section-label">Written responses</h2>
 
               {contextFields.length > 0 && (
@@ -283,24 +298,14 @@ export default function TeamGradingScorePage({
                   <div className="space-y-3">
                     {contextFields.map((field) => {
                       const val = appData.fields[field] || '-';
-                      const isUrl = val.startsWith('http://') || val.startsWith('https://');
                       return (
                         <div key={field} className="flex min-w-0 gap-3">
                           <span className="w-28 shrink-0 text-sm font-medium text-muted-foreground">
                             {field}
                           </span>
-                          {isUrl ? (
-                            <a
-                              href={val}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="min-w-0 break-all text-sm text-primary underline"
-                            >
-                              {val}
-                            </a>
-                          ) : (
-                            <span className="min-w-0 break-words text-sm">{val}</span>
-                          )}
+                          <span className="min-w-0 break-words text-sm">
+                            <ResponseText text={val} />
+                          </span>
                         </div>
                       );
                     })}
@@ -308,6 +313,30 @@ export default function TeamGradingScorePage({
                 </Card>
               )}
 
+              {usesCriterionRubric ? (
+                scoredQuestions.map((question) => (
+                  <Card key={question.id} className="p-4 sm:p-5">
+                    <ApplicationQuestionRubricCard
+                      question={question}
+                      linkedQuestions={questionsLinkedTo(
+                        appData.applicationQuestions,
+                        question.id,
+                      )}
+                      scores={scores}
+                      notes={notes[question.id] ?? ''}
+                      activeField={activeField}
+                      disabled={gradingLocked}
+                      onScore={scoreField}
+                      onNotesChange={(value) =>
+                        setNotes((prev) => ({ ...prev, [question.id]: value }))
+                      }
+                      renderResponse={renderWithLinks}
+                      fields={appData.fields}
+                    />
+                  </Card>
+                ))
+              ) : (
+                <>
               {appData.scoreFields.map((field) => (
                 <Card
                   key={field}
@@ -328,16 +357,34 @@ export default function TeamGradingScorePage({
                       <span className="italic text-muted-foreground">No response</span>
                     )}
                   </p>
-                  <div className="pt-4">
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      Score (1–5)
-                      <RequiredAsterisk className="ml-0.5" />
-                    </p>
-                    <ScoreSelector
-                      value={scores[field] ?? null}
-                      onChange={(n) => scoreField(field, n)}
-                      disabled={gradingLocked}
-                    />
+                  <div className="grid grid-cols-1 items-stretch gap-4 pt-4 sm:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
+                    <div className="order-2 sm:order-1">
+                      <p className="mb-2 text-sm text-muted-foreground">
+                        Score (1–5)
+                        <RequiredAsterisk className="ml-0.5" />
+                      </p>
+                      <ScoreSelector
+                        value={scores[field] ?? null}
+                        onChange={(n) => scoreField(field, n)}
+                        disabled={gradingLocked}
+                      />
+                    </div>
+                    <div className="order-1 flex min-h-[7.5rem] min-w-0 flex-col sm:order-2">
+                      <label htmlFor={`notes-${field}`} className="mb-2 uma-section-label">
+                        Notes
+                      </label>
+                      <textarea
+                        id={`notes-${field}`}
+                        value={notes[field] ?? ''}
+                        onChange={(e) =>
+                          setNotes((prev) => ({ ...prev, [field]: e.target.value }))
+                        }
+                        placeholder="Notes for this question…"
+                        rows={3}
+                        disabled={gradingLocked}
+                        className="field-textarea min-h-[7.5rem] w-full flex-1 resize-y disabled:opacity-60"
+                      />
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -355,21 +402,42 @@ export default function TeamGradingScorePage({
                     {field}
                     <RequiredAsterisk className="ml-0.5" />
                   </p>
-                  <div className="pt-4">
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      Score (1–5)
-                      <RequiredAsterisk className="ml-0.5" />
-                    </p>
-                    <ScoreSelector
-                      value={scores[field] ?? null}
-                      onChange={(n) => scoreField(field, n)}
-                      disabled={gradingLocked}
-                    />
+                  <div className="grid grid-cols-1 items-stretch gap-4 pt-4 sm:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
+                    <div className="order-2 sm:order-1">
+                      <p className="mb-2 text-sm text-muted-foreground">
+                        Score (1–5)
+                        <RequiredAsterisk className="ml-0.5" />
+                      </p>
+                      <ScoreSelector
+                        value={scores[field] ?? null}
+                        onChange={(n) => scoreField(field, n)}
+                        disabled={gradingLocked}
+                      />
+                    </div>
+                    <div className="order-1 flex min-h-[7.5rem] min-w-0 flex-col sm:order-2">
+                      <label htmlFor={`notes-custom-${field}`} className="mb-2 uma-section-label">
+                        Notes
+                      </label>
+                      <textarea
+                        id={`notes-custom-${field}`}
+                        value={notes[field] ?? ''}
+                        onChange={(e) =>
+                          setNotes((prev) => ({ ...prev, [field]: e.target.value }))
+                        }
+                        placeholder="Notes for this question…"
+                        rows={3}
+                        disabled={gradingLocked}
+                        className="field-textarea min-h-[7.5rem] w-full flex-1 resize-y disabled:opacity-60"
+                      />
+                    </div>
                   </div>
                 </Card>
               ))}
+                </>
+              )}
             </section>
 
+            {appData.showPortfolioSection ? (
             <section className="uma-stack-section" data-tour="grade-form-portfolio">
               <h2 className="uma-section-label">Portfolio &amp; supplementary</h2>
               <Card className="p-4 sm:p-5">
@@ -378,37 +446,36 @@ export default function TeamGradingScorePage({
                     No portfolio links for this applicant.
                   </p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-5">
                     {Object.entries(appData.portfolioFields ?? {}).map(([field, val]) => (
                       <div key={field} className="flex flex-col gap-1.5">
                         <p className="text-xs font-medium text-muted-foreground">{field}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-fit"
-                          nativeButton={false}
-                          render={
-                            <a href={val} target="_blank" rel="noopener noreferrer">
-                              {applicantDisplayId(appData.rowIndex)} - Portfolio
-                            </a>
-                          }
-                        />
+                        {val.startsWith('http://') || val.startsWith('https://') ? (
+                          <PortfolioLinkPreview
+                            url={val}
+                            openLabel={`${applicantDisplayId(appData.rowIndex)} - Portfolio`}
+                            blind
+                          />
+                        ) : (
+                          <p className="text-sm">{val}</p>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </Card>
             </section>
+            ) : null}
           </div>
 
           <Card className="p-4 sm:p-5" data-tour="grade-form-comments">
             <p className="mb-2 uma-section-label">
-              Comments
+              Overall comments
             </p>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Any comments or flags for this application"
+              placeholder="Anything else for this application (not tied to one question)"
               rows={3}
               disabled={gradingLocked}
               className="field-textarea resize-none disabled:opacity-60"

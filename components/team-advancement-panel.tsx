@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDownIcon, ChevronRightIcon, InfoIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
 import PageLoading from '@/components/page-loading';
@@ -10,7 +10,7 @@ import StatusBanner from '@/components/status-banner';
 import { AdvancementActivityLog } from '@/components/advancement-activity-log';
 import { PageContainer, PageHeader, PageSection, TitleCount } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { AdvancementRankColGroup } from '@/components/advancement-rank-table-columns';
 import { AvgScoreCell, AvgScoreHeader } from '@/components/avg-score-header';
 import {
@@ -20,8 +20,8 @@ import {
   panelGreenCount,
   VERDICT_ACCENT_HEX,
   verdictRowClass,
-  type AdvancementVerdict,
 } from '@/components/advancement-verdict-selector';
+import type { AdvancementVerdict } from '@/lib/advancement-verdict-types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -39,22 +39,21 @@ import type {
   AdvancementPanelVerdict,
 } from '@/lib/advancement-submissions-types';
 import { resolveAdvancementSelectionMax, resolveAdvancementSelectionMin, advancementPageDescription } from '@/lib/advancement-cap-helpers';
-import { pendingWorkLabel, workActionVerb } from '@/lib/stages';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { pendingWorkLabel } from '@/lib/stages';
 import { cn } from '@/lib/utils';
 import { ApplicationAdvancementDetailPanel, prefetchAdvancementDetail } from '@/components/application-advancement-detail-panel';
 import { useOptionalShellUser } from '@/components/shell-user-provider';
 import {
+  advancementRequiredStepIntro,
+  advancementIncompleteReminder,
+} from '@/lib/advancement-rating-copy';
+import {
   advancementStepGuide,
   recommendationsCompleteMessage,
 } from '@/lib/next-step-guidance';
-import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
+import { invalidateClientFetchCache } from '@/lib/client-fetch-cache';
+import { AdvancementRatingGuide } from '@/components/advancement-rating-guide';
 
 interface RankedApplicant {
   applicationId: number;
@@ -69,11 +68,13 @@ interface RankedApplicant {
 
 interface AdvancementData {
   teamId: number;
+  teamName?: string | null;
   fromStage: AdvancementFromStage;
   advancementCap: number | null;
   overCapExtra?: number;
   selectionMin?: number | null;
   selectionMax?: number | null;
+  allowUncappedFirstRound?: boolean;
   round: { id: number; label: string; status: string };
   preview: {
     applications: RankedApplicant[];
@@ -133,14 +134,14 @@ const PANEL_CONFIG: Record<
   }
 > = {
   application: {
-    title: 'Advance to First Round Interview',
+    title: 'Rate who should advance',
     description: '',
     readOnlyMessage: 'The Application phase is complete. This advancement list is read-only.',
     pendingLabel: pendingWorkLabel('application'),
     blindDescription: null,
   },
   first_round: {
-    title: 'Advance to Final Round Interview',
+    title: 'Rate who should advance',
     description: '',
     readOnlyMessage:
       'The First Round Interview phase is complete. This advancement list is read-only.',
@@ -450,7 +451,8 @@ export function TeamAdvancementPanel({
 
   const advancementCap = data?.advancementCap ?? null;
   const overCapExtra = Math.max(0, Number(data?.overCapExtra) || 0);
-  const usesFinalSelection = advancementCap !== null;
+  const allowUncappedFirstRound = Boolean(data?.allowUncappedFirstRound);
+  const usesFinalSelection = advancementCap !== null || allowUncappedFirstRound;
   const panelGreenCountTotal = panelGreenIds.size;
   const finalCount = finalSelection.size;
   const previousSubmittedCount =
@@ -462,6 +464,7 @@ export function TeamAdvancementPanel({
           cap: advancementCap,
           totalRanked: data.preview.totalApplications,
           overCapExtra,
+          allowUncapped: allowUncappedFirstRound,
         })
       : null);
   const selectionMax =
@@ -472,6 +475,7 @@ export function TeamAdvancementPanel({
           totalRanked: data.preview.totalApplications,
           overCapExtra,
           previousSubmittedCount,
+          allowUncapped: allowUncappedFirstRound,
         })
       : null);
   const minAdvanceCount = selectionMin ?? 0;
@@ -612,7 +616,7 @@ export function TeamAdvancementPanel({
   const isReadOnly = Boolean(data?.readOnly);
   const canSubmitList = Boolean(data?.canSubmit ?? data?.currentUser?.isDirector);
   const canSubmitAdvancement =
-    canSubmitList && advancementCap !== null;
+    canSubmitList && (advancementCap !== null || allowUncappedFirstRound);
   const canMarkVerdicts = Boolean(data && !isApproved && !isReadOnly);
   const showFinalAdvanceColumn =
     usesFinalSelection && canSubmitAdvancement && (canMarkVerdicts || isPending);
@@ -778,13 +782,28 @@ export function TeamAdvancementPanel({
           data.preview.totalApplications,
           advancementCap,
           overCapExtra,
+          data.teamName ?? teamName ?? undefined,
         )}
       />
 
       {isReadOnly && <StatusBanner type="info" message={config.readOnlyMessage} />}
 
+      {canSubmitList &&
+        advancementCap === null &&
+        !allowUncappedFirstRound &&
+        !isPending &&
+        !isApproved && (
+        <StatusBanner
+          type="warning"
+          message="Advancement limit not set. Ask an Admin to configure caps on Advancements before you can submit — that page is admin-only."
+        />
+      )}
+
       {canMarkVerdicts && !isPending && !isApproved && (
-        <StatusBanner type="info" message={advancementStepGuide(canSubmitList)} />
+        <AdvancementRatingGuide
+          intro={advancementRequiredStepIntro(canSubmitList)}
+          steps={advancementStepGuide(canSubmitList)}
+        />
       )}
 
       {!canSubmitList && canMarkVerdicts && myRecommendationsComplete && (
@@ -804,22 +823,23 @@ export function TeamAdvancementPanel({
       {usesFinalSelection && !canSubmitList && !canMarkVerdicts && isFirstRound && (
         <StatusBanner
           type="info"
-          message="Set color signals only for applicants you interviewed."
+          message="Interviewers set five color ratings (Green → Red) on their own interviewees."
         />
       )}
 
       {data.preview.incompleteCount > 0 && canMarkVerdicts && (
         <StatusBanner
           type="warning"
-          message={`${data.preview.incompleteCount} ${
+          message={advancementIncompleteReminder(
+            data.preview.incompleteCount,
             data.preview.incompleteCount === 1
               ? data.fromStage === 'application'
                 ? 'application'
                 : 'interview'
               : data.fromStage === 'application'
                 ? 'applications'
-                : 'interviews'
-          } remaining. Finish ${workActionVerb(data.fromStage)}ing before Directors can submit the advancement list.`}
+                : 'interviews',
+          )}
         />
       )}
 
@@ -876,6 +896,13 @@ export function TeamAdvancementPanel({
       )}
 
       <PageSection>
+        {canSubmitAdvancement && canSubmitList && canMarkVerdicts && (
+          <StatusBanner
+            type="info"
+            message="Panel color ratings are advisory. Your Advance selections are what Admin receives."
+          />
+        )}
+
         {canSubmitAdvancement && (
           <div className="space-y-3">
             <p className="uma-section-label">
@@ -883,25 +910,6 @@ export function TeamAdvancementPanel({
             </p>
             <Card>
               <CardHeader className="gap-2">
-                {canSubmitAdvancement && usesFinalSelection && canMarkVerdicts && (
-                  <CardAction>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label="How final selection works"
-                        >
-                          <InfoIcon className="size-4" />
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          Panel color signals are advisory. Your Advance selections are what Admin
-                          receives.
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardAction>
-                )}
                 {canSubmitAdvancement ? (
                   usesFinalSelection ? (
                     <CardDescription>
@@ -913,13 +921,13 @@ export function TeamAdvancementPanel({
                       {overCapExtra > 0 && advancementCap !== null
                         ? `, over the usual limit of ${advancementCap} (+${overCapExtra} extra)`
                         : ''}
-                      . Panel color signals are advisory.
+                      .
                     </CardDescription>
                   ) : (
                     <CardDescription>
                       {isPending
-                        ? `${selectedCount} Green · update while Admin review is pending.`
-                        : `Submit sends all Green signals (${selectedCount} marked).`}
+                        ? `${selectedCount} Green-rated · update while Admin review is pending.`
+                        : `Submit advances everyone you rated Green (${selectedCount} marked).`}
                     </CardDescription>
                   )
                 ) : (
@@ -1072,7 +1080,7 @@ export function TeamAdvancementPanel({
                           <span className="font-medium tabular-nums text-foreground">
                             {myColorCount}
                           </span>{' '}
-                          signals set
+                          ratings set
                         </p>
                       </>
                     )}
@@ -1173,7 +1181,7 @@ export function TeamAdvancementPanel({
                             <TableHead className="px-2" />
                             {showDecisionColumn && (
                               <TableHead className="px-3" data-tour="advancement-verdicts">
-                                Recommendation
+                                Your rating
                               </TableHead>
                             )}
                             <TableHead className="px-3">Rank</TableHead>
@@ -1331,7 +1339,7 @@ export function TeamAdvancementPanel({
                   <TableRow>
                     {showDecisionColumn && (
                       <TableHead className="px-3" data-tour="advancement-verdicts">
-                        {usesFinalSelection ? 'Recommendation' : 'Decision'}
+                        {usesFinalSelection ? 'Your rating' : 'Rating'}
                       </TableHead>
                     )}
                     <TableHead className="px-3">Rank</TableHead>

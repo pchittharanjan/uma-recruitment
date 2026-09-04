@@ -11,9 +11,11 @@ import StageBadge from '@/components/stage-badge';
 import PageLoading from '@/components/page-loading';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { phaseLabel, parseAdminPhaseSlug } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
+import { gradingQueueHref } from '@/lib/grading-paths';
 import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communications-stages';
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { isAdminPhasePreview } from '@/lib/admin-phase-preview';
@@ -25,7 +27,14 @@ import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/prog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { cachedJsonFetch, peekCachedJson, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
-import { UploadIcon } from 'lucide-react';
+import { ChevronDownIcon, UploadIcon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { getTeamPipelineProfile } from '@/lib/team-pipeline-profile';
 
 const panelFallback = (
   <div className="space-y-3 py-4" role="status" aria-label="Loading">
@@ -38,6 +47,13 @@ const AdminAdvancementReadinessPanel = dynamic(
   () =>
     import('@/components/admin-advancement-readiness-panel').then(
       (mod) => mod.AdminAdvancementReadinessPanel,
+    ),
+  { loading: () => panelFallback },
+);
+const AdminTeamAdvancementPanel = dynamic(
+  () =>
+    import('@/components/admin-team-advancement-panel').then(
+      (mod) => mod.AdminTeamAdvancementPanel,
     ),
   { loading: () => panelFallback },
 );
@@ -94,6 +110,7 @@ interface TeamDashboardResponse {
   team: { id: number; name: string };
   round: { id: number; label: string; status: RoundStatus } | null;
   interviewStats?: TeamInterviewRoundStats | null;
+  myGrading?: { total: number; completed: number } | null;
   dashboard: {
     progress: { total: number; completed: number };
     graders: GraderProgress[];
@@ -102,6 +119,57 @@ interface TeamDashboardResponse {
     csvHeaders: string[];
     status: string;
   } | null;
+}
+
+const ADMIN_TEAM_TABS = ['progress', 'grading', 'applications'] as const;
+type AdminTeamTab = (typeof ADMIN_TEAM_TABS)[number];
+
+function parseAdminTeamTab(value: string | null): AdminTeamTab {
+  if (value === 'grading' || value === 'applications' || value === 'progress') return value;
+  return 'progress';
+}
+
+/** Accept both `first-round` slugs and `first_round` stage ids from inbound links. */
+function parseTeamAdminView(value: string | null): RoundStatus | null {
+  if (!value) return null;
+  return parseAdminPhaseSlug(value) ?? parseAdminPhaseSlug(value.replaceAll('_', '-'));
+}
+
+function isAppHubTabParam(value: string | null): boolean {
+  return value === 'grading' || value === 'applications' || value === 'progress';
+}
+
+type TeamNavItemId =
+  | 'assignments'
+  | 'grade'
+  | 'emails'
+  | 'interviewSetup'
+  | 'firstRoundSchedule'
+  | 'finalRoundSchedule'
+  | 'interviewResults'
+  | 'deliberations'
+  | 'export';
+
+/** Phase-relevant toolbar actions; everything else goes under More. */
+function primaryTeamNavIds(
+  adminView: RoundStatus,
+  opts: { skipFinalRound: boolean },
+): TeamNavItemId[] {
+  if (adminView === 'application' || adminView === 'closed') {
+    return ['assignments', 'grade', 'emails'];
+  }
+  if (adminView === 'first_round') {
+    return ['interviewSetup', 'firstRoundSchedule', 'interviewResults', 'emails'];
+  }
+  if (adminView === 'final_round') {
+    return opts.skipFinalRound
+      ? ['interviewSetup', 'firstRoundSchedule', 'interviewResults', 'emails']
+      : ['interviewSetup', 'finalRoundSchedule', 'interviewResults', 'emails'];
+  }
+  if (adminView === 'deliberations') {
+    return ['deliberations', 'emails', 'export'];
+  }
+  return ['emails'];
 }
 
 export default function TeamDashboardPage({ params }: { params: Promise<{ teamId: string }> }) {
@@ -119,6 +187,34 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const [simulateMessage, setSimulateMessage] = useState('');
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [savingNote, setSavingNote] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTeamTab>(() =>
+    parseAdminTeamTab(searchParams.get('tab')),
+  );
+
+  useEffect(() => {
+    setActiveTab(parseAdminTeamTab(searchParams.get('tab')));
+  }, [searchParams]);
+
+  const syncTabToUrl = useCallback(
+    (tab: AdminTeamTab) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === 'progress') {
+        params.delete('tab');
+      } else {
+        params.set('tab', tab);
+      }
+      const qs = params.toString();
+      const href = `/admin/teams/${teamId}${qs ? `?${qs}` : ''}`;
+      router.replace(href, { scroll: false });
+    },
+    [router, searchParams, teamId],
+  );
+
+  const handleTabChange = (value: string) => {
+    const tab = parseAdminTeamTab(value);
+    setActiveTab(tab);
+    syncTabToUrl(tab);
+  };
 
   const fetchData = useCallback(async () => {
     if (!peekCachedJson(`/api/admin/teams/${teamId}`)) setLoading(true);
@@ -261,7 +357,12 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   const roundStatus = data.round.status;
   const viewParam = searchParams.get('view');
-  const adminView = parseAdminPhaseSlug(viewParam ?? '') ?? roundStatus;
+  const tabParam = searchParams.get('tab');
+  const parsedView = parseTeamAdminView(viewParam);
+  // Deep links like `?tab=grading` (Review Rubric) should open the application hub even
+  // when the live pipeline has moved on — unless an explicit phase view is set.
+  const adminView =
+    parsedView ?? (isAppHubTabParam(tabParam) && !viewParam ? 'application' : roundStatus);
   const isApplicationPhase = roundStatus === 'application';
   const isClosed = roundStatus === 'closed';
   const isDeliberationsLive = roundStatus === 'deliberations';
@@ -321,6 +422,105 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       ? `${phaseLabel(adminView)} · ${dashboard.applications.length} applications`
       : `${phaseLabel(adminView)}${phasePreview ? ' · Preview' : ''}`;
 
+  const pipelineProfile = getTeamPipelineProfile(data.team.name);
+  const skipFinalRound = pipelineProfile.skipFinalRoundPhase;
+  const gradeLabel =
+    data.myGrading && data.myGrading.total > 0
+      ? data.myGrading.completed >= data.myGrading.total
+        ? 'Review my scores (name-blind)'
+        : `Grade my applications (${data.myGrading.total - data.myGrading.completed} left)`
+      : 'Grade name-blind';
+  const gradeIsActiveCta = Boolean(data.myGrading && data.myGrading.total > 0);
+  const emailsHref = communicationsHref(
+    outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
+    Number(teamId),
+  );
+  const exportHref = `/api/admin/teams/${teamId}/export`;
+
+  type TeamNavItem = {
+    id: TeamNavItemId;
+    label: string;
+    href: string;
+    download?: boolean;
+    emphasize?: boolean;
+  };
+
+  const allNavItems: TeamNavItem[] = [
+    {
+      id: 'assignments',
+      label: 'Review assignments',
+      href: `/admin/teams/${teamId}/assignments`,
+    },
+    {
+      id: 'grade',
+      label: gradeLabel,
+      href: gradingQueueHref(teamId, 'admin'),
+      emphasize: gradeIsActiveCta,
+    },
+    { id: 'emails', label: 'Emails', href: emailsHref },
+    {
+      id: 'interviewSetup',
+      label: 'Interview Setup',
+      href: `/admin/teams/${teamId}/interview-setup`,
+    },
+    {
+      id: 'firstRoundSchedule',
+      label: 'First Round Schedule',
+      href: `/admin/teams/${teamId}/schedule/first-round`,
+    },
+    ...(skipFinalRound
+      ? []
+      : [
+          {
+            id: 'finalRoundSchedule' as const,
+            label: 'Final Round Schedule',
+            href: `/admin/teams/${teamId}/schedule/final-round`,
+          },
+        ]),
+    {
+      id: 'interviewResults',
+      label: 'Interview results',
+      href: `/admin/teams/${teamId}/interview-results?stage=${
+        isFinalRoundView && !skipFinalRound ? 'final_round' : 'first_round'
+      }`,
+    },
+    {
+      id: 'deliberations',
+      label: 'Deliberations',
+      href: openTeamDeliberationsHref(Number(teamId)),
+    },
+    { id: 'export', label: 'Export CSV', href: exportHref, download: true },
+  ];
+
+  const primaryIds = new Set(primaryTeamNavIds(adminView, { skipFinalRound }));
+  const primaryNavItems = allNavItems.filter((item) => primaryIds.has(item.id));
+  const moreNavItems = allNavItems.filter((item) => !primaryIds.has(item.id));
+
+  const renderPrimaryNav = (item: TeamNavItem) => {
+    if (item.download) {
+      return (
+        <Button
+          key={item.id}
+          variant="ghost"
+          nativeButton={false}
+          render={<a href={item.href} download />}
+        >
+          {item.label}
+        </Button>
+      );
+    }
+    return (
+      <NavLinkButton
+        key={item.id}
+        variant={item.emphasize ? 'primary' : 'secondary'}
+        className={item.emphasize ? 'uma-cta-primary' : undefined}
+        href={item.href}
+      >
+        {item.label}
+      </NavLinkButton>
+    );
+  };
+
   return (
     <PageContainer size="wide">
       <PageSection>
@@ -335,52 +535,40 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         description={pageDescription}
       />
       <div data-tour="team-admin-nav">
-        <PageToolbar>
-          {showApplicationHub && (
-            <NavLinkButton
-              variant="secondary"
-              href={`/admin/teams/${teamId}/assignments`}
-            >
-              Review assignments
-            </NavLinkButton>
-          )}
-          <NavLinkButton
-            variant="secondary"
-            href={communicationsHref(
-              outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
-              Number(teamId),
-            )}
-          >
-            Emails
-          </NavLinkButton>
-          <NavLinkButton
-            variant="secondary"
-            href={`/admin/teams/${teamId}/interview-setup`}
-          >
-            Interview Setup
-          </NavLinkButton>
-          <NavLinkButton
-            variant="secondary"
-            href={`/admin/teams/${teamId}/schedule/first-round`}
-          >
-            First Round Schedule
-          </NavLinkButton>
-          <NavLinkButton
-            variant="secondary"
-            href={`/admin/teams/${teamId}/schedule/final-round`}
-          >
-            Final Round Schedule
-          </NavLinkButton>
-          <NavLinkButton
-            variant="secondary"
-            href={openTeamDeliberationsHref(Number(teamId))}
-          >
-            Deliberations
-          </NavLinkButton>
-          {showApplicationHub && (
-            <a href={`/api/admin/teams/${teamId}/export`} download>
-              <LoadingButton variant="secondary">Export CSV</LoadingButton>
-            </a>
+        <PageToolbar wrap>
+          {primaryNavItems.map(renderPrimaryNav)}
+          {moreNavItems.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button type="button" variant="ghost" className="shrink-0" />
+                }
+              >
+                More
+                <ChevronDownIcon data-icon="inline-end" className="size-3.5 opacity-70" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-52">
+                {moreNavItems.map((item) =>
+                  item.download ? (
+                    <DropdownMenuItem
+                      key={item.id}
+                      className="normal-case"
+                      render={<a href={item.href} download />}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      key={item.id}
+                      className="normal-case"
+                      render={<Link href={item.href} prefetch />}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ),
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </PageToolbar>
       </div>
@@ -431,7 +619,14 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
             />
           </div>
           {isFirstRoundView && (
-            <AdminAdvancementReadinessPanel teamId={teamId} fromStage="first_round" />
+            <>
+              <AdminAdvancementReadinessPanel teamId={teamId} fromStage="first_round" />
+              <AdminTeamAdvancementPanel
+                teamId={teamId}
+                fromStage="first_round"
+                teamName={data.team.name}
+              />
+            </>
           )}
         </>
       ) : isDeliberationsView ? (
@@ -451,7 +646,11 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
           </CardContent>
         </Card>
       ) : dashboard ? (
-      <Tabs defaultValue="progress" className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="space-y-6"
+      >
         <TabsList className="max-w-full flex-wrap">
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="grading">Grading Setup</TabsTrigger>
@@ -462,7 +661,14 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
         <TabsContent value="progress" className="space-y-4">
           {isApplicationPhase && (
-            <AdminAdvancementReadinessPanel teamId={teamId} fromStage="application" />
+            <>
+              <AdminAdvancementReadinessPanel teamId={teamId} fromStage="application" />
+              <AdminTeamAdvancementPanel
+                teamId={teamId}
+                fromStage="application"
+                teamName={data.team.name}
+              />
+            </>
           )}
           <Card>
             <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
@@ -529,7 +735,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
               {dashboard.progress.total > 0 &&
                 dashboard.progress.completed === dashboard.progress.total && (
                   <p className="text-sm text-muted-foreground">
-                    After Exec set color signals on their assignments, Directors submit the
+                    After graders set five color ratings (Green → Red) on their assignments, Directors submit the
                     advancement list on{' '}
                     <Link href="/admin/advancements" className="text-primary hover:underline">
                       Advancements

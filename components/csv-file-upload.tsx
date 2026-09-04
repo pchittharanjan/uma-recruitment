@@ -22,6 +22,10 @@ interface CsvFileUploadProps {
   onParsed: (result: CsvParseResult) => void;
   onError: (message: string) => void;
   onClear?: () => void;
+  /** Primary dropzone line when idle (not dragging). */
+  dropLabel?: string;
+  /** Accessible name for the dropzone control. */
+  ariaLabel?: string;
 }
 
 function formatFileSize(bytes: number) {
@@ -32,7 +36,13 @@ function formatFileSize(bytes: number) {
   return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
-export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUploadProps) {
+export default function CsvFileUpload({
+  onParsed,
+  onError,
+  onClear,
+  dropLabel = 'Drop your applications spreadsheet here',
+  ariaLabel = 'Upload applications spreadsheet',
+}: CsvFileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [parsing, setParsing] = useState(false);
@@ -103,7 +113,7 @@ export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUpl
         <div
           role="button"
           tabIndex={0}
-          aria-label="Upload applications spreadsheet"
+          aria-label={ariaLabel}
           className={cn(
             'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
             dragOver
@@ -141,7 +151,7 @@ export default function CsvFileUpload({ onParsed, onError, onClear }: CsvFileUpl
             <Upload className="size-5" aria-hidden />
           </span>
           <p className="text-sm font-medium text-foreground">
-            {dragOver ? 'Drop file to upload' : 'Drop your applications spreadsheet here'}
+            {dragOver ? 'Drop file to upload' : dropLabel}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             or{' '}

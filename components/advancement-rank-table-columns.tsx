@@ -3,7 +3,7 @@
 /**
  * Relative weights — normalized to 100% for whichever columns are active.
  *
- * Recommendation must stay wide enough for the content-sized picker
+ * Rating column must stay wide enough for the content-sized picker
  * (min-w-[9rem] ≈ 144px + cell px-3×2 + optional 4px accent strip).
  * Applicant must NOT be a flexible sink (that created a middle canyon).
  */

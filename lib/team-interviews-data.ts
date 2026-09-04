@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { AssignmentStage, User } from '@/lib/db';
 import { isTeamDirector } from '@/lib/directors';
-import { canUserAccessTeamStage } from '@/lib/stage-access';
+import { getTeamStageAccessDenialReason } from '@/lib/stage-access';
 import { listGraderAssignments } from '@/lib/team-dashboard';
 import { assignmentStageLabel } from '@/lib/stages';
 import type { TeamInterviewResult } from '@/lib/team-interviews-types';
@@ -28,8 +28,9 @@ export async function buildTeamInterviewData(
   }
   const stage = stageRaw as AssignmentStage;
 
-  if (!(await canUserAccessTeamStage(user, teamId, stage))) {
-    return { ok: false, error: 'This stage is not open for you yet.', status: 403 };
+  const denial = await getTeamStageAccessDenialReason(user, teamId, stage);
+  if (denial) {
+    return { ok: false, error: denial, status: 403 };
   }
 
   const assignments = await listGraderAssignments(user.id, teamId, stage);

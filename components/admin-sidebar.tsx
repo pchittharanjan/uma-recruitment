@@ -20,11 +20,18 @@ import { useAdminPhase } from '@/components/admin-phase-provider';
 import { useIsClient, useBrowserSearch } from '@/hooks/use-workspace-embed';
 import { isAdminDashboardPhase, parseDashboardViewPhase } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
-import { LayoutDashboardIcon, Table2Icon, UsersIcon, ListChecksIcon } from 'lucide-react';
+import {
+  FileSpreadsheetIcon,
+  LayoutDashboardIcon,
+  ListChecksIcon,
+  Table2Icon,
+  UsersIcon,
+} from 'lucide-react';
 
 const navItems = [
   { title: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboardIcon },
   { title: 'Advancements', href: '/admin/advancements', icon: ListChecksIcon },
+  { title: 'Import', href: '/admin/import', icon: FileSpreadsheetIcon, hideWhenClosed: true as const },
   { title: 'Applications', href: '/admin/applications', icon: Table2Icon, requiresData: true as const },
   { title: 'Users', href: '/admin/users', icon: UsersIcon },
 ];
@@ -69,9 +76,13 @@ export function AdminSidebar({
         )
       : null;
 
-  const visibleNavItems = navItems.filter(
-    (item) => !('requiresData' in item && item.requiresData) || showApplicationsNav,
-  );
+  const pipelineClosed = phase?.pipelineClosed ?? false;
+
+  const visibleNavItems = navItems.filter((item) => {
+    if ('hideWhenClosed' in item && item.hideWhenClosed && pipelineClosed) return false;
+    if ('requiresData' in item && item.requiresData) return showApplicationsNav;
+    return true;
+  });
 
   return (
     <Sidebar collapsible="icon" {...props}>

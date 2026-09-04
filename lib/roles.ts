@@ -10,6 +10,9 @@ export type AdminCreatableRole = (typeof ADMIN_CREATABLE_ROLES)[number];
 export const LOGIN_ROLES = ['admin', 'exec'] as const;
 export type LoginRole = (typeof LOGIN_ROLES)[number];
 
+/** Roles that can be assigned application-stage grading work. */
+export const APPLICATION_GRADER_ROLES: UserRole[] = ['admin', 'exec', 'ad_hoc_exec'];
+
 export function normalizeUserRole(role: string): UserRole {
   if (role === LEGACY_EXEC_ROLE) return 'exec';
   return role as UserRole;

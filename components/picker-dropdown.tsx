@@ -123,14 +123,19 @@ export function PickerDropdown<T extends string>({
                 disabled={option.disabled}
                 className="rounded-md px-3 py-2"
               >
-                <span className="flex items-center gap-2 whitespace-nowrap">
-                  {option.indicatorClassName ? (
-                    <span
-                      aria-hidden
-                      className={cn('size-2 shrink-0 rounded-full', option.indicatorClassName)}
-                    />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex items-center gap-2 whitespace-nowrap">
+                    {option.indicatorClassName ? (
+                      <span
+                        aria-hidden
+                        className={cn('size-2 shrink-0 rounded-full', option.indicatorClassName)}
+                      />
+                    ) : null}
+                    <span>{option.label}</span>
+                  </span>
+                  {option.description ? (
+                    <span className="pl-4 text-xs text-muted-foreground">{option.description}</span>
                   ) : null}
-                  <span>{option.label}</span>
                 </span>
               </DropdownMenuRadioItem>
             ))}

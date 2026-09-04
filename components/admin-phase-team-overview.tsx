@@ -18,6 +18,7 @@ import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
 import { phaseLabelForTeam } from '@/lib/team-pipeline-profile';
 import { adminTeamPhaseHref, phaseLabel } from '@/lib/stages';
+import { gradingQueueHref } from '@/lib/grading-paths';
 import { teamDotClass, teamStageBadgeClass } from '@/lib/team-colors';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,7 @@ export interface PhaseTeamSummary {
     first_round: TeamInterviewRoundStats | null;
     final_round: TeamInterviewRoundStats | null;
   };
+  myGrading?: { total: number; completed: number } | null;
 }
 
 
@@ -342,19 +344,36 @@ export function AdminPhaseTeamOverview({
                           />
                         </Button>
                       ) : hasRound ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                          nativeButton={false}
-                          render={<Link href={adminTeamPhaseHref(team.id, viewPhase)} />}
-                        >
-                          Open team
-                          <ArrowRightIcon
-                            data-icon="inline-end"
-                            className="transition-transform group-hover/button:translate-x-0.5"
-                          />
-                        </Button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {viewPhase === 'application' &&
+                            team.myGrading &&
+                            team.myGrading.total > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                                nativeButton={false}
+                                render={<Link href={gradingQueueHref(team.id, 'admin')} />}
+                              >
+                                {team.myGrading.completed >= team.myGrading.total
+                                  ? 'Review my scores'
+                                  : `Grade mine (${team.myGrading.total - team.myGrading.completed} left)`}
+                              </Button>
+                            )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                            nativeButton={false}
+                            render={<Link href={adminTeamPhaseHref(team.id, viewPhase)} />}
+                          >
+                            Open team
+                            <ArrowRightIcon
+                              data-icon="inline-end"
+                              className="transition-transform group-hover/button:translate-x-0.5"
+                            />
+                          </Button>
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">Waiting for import</span>
                       )}

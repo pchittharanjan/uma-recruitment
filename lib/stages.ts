@@ -275,7 +275,7 @@ export const ADMIN_PHASE_SLUGS: Partial<Record<RoundStatus, string>> = {
 };
 
 const ADMIN_PHASE_PATH_PATTERNS: Partial<Record<RoundStatus, RegExp>> = {
-  pre_application: /^\/(?:admin\/coffee-chats|coffee-chats)(?:\/|$)/,
+  pre_application: /^\/admin\/coffee-chats(?:\/|$)/,
   // CSV import is an Application-phase task (gated to that status in import layout).
   application: /^\/admin\/(?:phases\/application|import)(?:\/|$)/,
   first_round: /^\/admin\/teams\/\d+\/schedule\/first-round(?:\/|$)/,
@@ -357,7 +357,7 @@ export function adminTeamPhaseHref(teamId: number, status: RoundStatus): string 
 export function teamPhaseHref(teamId: number, status: RoundStatus): string | null {
   switch (status) {
     case 'pre_application':
-      return '/coffee-chats';
+      return teamOverviewHref(teamId);
     case 'application':
       return `/team/${teamId}/grade`;
     case 'first_round':
@@ -381,7 +381,7 @@ export function isTeamOverviewPath(pathname: string): boolean {
 }
 
 const TEAM_PHASE_PATH_PATTERNS: Partial<Record<RoundStatus, RegExp>> = {
-  pre_application: /^\/coffee-chats(?:\/|$)/,
+  pre_application: /^\/team\/\d+\/?$/,
   application: /^\/team\/\d+\/(?:grade(?:\/\d+)?|advancement)(?:\/|$)/,
   first_round: /^\/team\/\d+\/(?:interviews\/first_round|advancement\/first-round)(?:\/|$)/,
   final_round: /^\/team\/\d+\/interviews\/final_round(?:\/|$)/,
@@ -394,7 +394,10 @@ export function isTeamPhaseNavActive(
   options?: { teamCurrentStatus?: RoundStatus | null },
 ): boolean {
   if (isTeamOverviewPath(pathname)) {
-    return false;
+    // Coffee chats are collected off-site; pre-app lands on the team overview.
+    return (
+      phaseStatus === 'pre_application' && options?.teamCurrentStatus === 'pre_application'
+    );
   }
   const pattern = TEAM_PHASE_PATH_PATTERNS[phaseStatus];
   return pattern?.test(pathname) ?? false;

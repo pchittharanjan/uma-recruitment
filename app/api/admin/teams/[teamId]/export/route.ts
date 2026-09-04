@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 import { getDb, getTeamById, initDb } from '@/lib/db';
 import { requireAuth, unauthorized, notFound } from '@/lib/auth';
 import { getActiveRoundForTeam, getRoundSettings } from '@/lib/rounds';
+import { isStoredNumericScore, parseQuestionNotesKey } from '@/lib/grading-model';
 
 export async function GET(
   req: NextRequest,
@@ -55,9 +56,13 @@ export async function GET(
 
     const scoresByAssignment: Record<number, Record<string, number>> = {};
     for (const row of scoresResult.rows) {
+      const fieldName = row.field_name as string;
+      if (parseQuestionNotesKey(fieldName)) continue;
+      const score = row.score;
+      if (!isStoredNumericScore(score)) continue;
       const aid = row.assignment_id as number;
       if (!scoresByAssignment[aid]) scoresByAssignment[aid] = {};
-      scoresByAssignment[aid][row.field_name as string] = row.score as number;
+      scoresByAssignment[aid][fieldName] = score;
     }
 
     const appMap = new Map<

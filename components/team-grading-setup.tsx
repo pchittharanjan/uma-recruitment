@@ -290,7 +290,8 @@ export function TeamGradingSetup({
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
             Graders see <strong className="text-foreground">applicant numbers only</strong> plus the
-            scored questions you select, and nothing else from the CSV.
+            scored questions you select, and nothing else from the CSV. Admins who grade use the same
+            name-blind queue; names stay on the spreadsheet and assignment review.
           </p>
           {scoredQuestionLabels.length > 0 ? (
             <div>

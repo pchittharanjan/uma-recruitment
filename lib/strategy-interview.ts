@@ -4,44 +4,62 @@ export const STRATEGY_GROUP_CASE_PDF = '/interview-cases/strategy-group.pdf';
 export const STRATEGY_INDIV_CASE_PDF = '/interview-cases/strategy-individual.pdf';
 
 export const STRATEGY_GROUP_INTRO =
-  'Present the Liquid Death group case. Take notes on each question, then score the evaluation criteria.';
+  'Present the Supreme group case. Take notes on each question, then score the evaluation criteria.';
 
 /** Previous default copy — still stored on some saved guides / preview drafts. */
 export const STRATEGY_GROUP_INTRO_LEGACY =
-  'Group casing: Liquid Death. Present the case from the PDF, take notes on each question, then score the evaluation criteria.';
+  'Present the Liquid Death group case. Take notes on each question, then score the evaluation criteria.';
 
 export function rewriteLegacyInterviewIntro(intro: string | undefined): string | undefined {
   const trimmed = intro?.trim();
   if (!trimmed) return trimmed;
   if (
     trimmed === STRATEGY_GROUP_INTRO_LEGACY ||
-    /^group casing:/i.test(trimmed)
+    /^group casing:/i.test(trimmed) ||
+    /liquid death/i.test(trimmed)
   ) {
     return STRATEGY_GROUP_INTRO;
   }
   return trimmed;
 }
 
+export const STRATEGY_GROUP_CASE_PROMPT =
+  'Supreme, the New York-founded streetwear label built on weekly "drops," red box logo scarcity, and a rotating cast of surprise collaborators (from Nike and The North Face to Louis Vuitton and even Oreo), turned limited supply into one of the most valuable brand strategies in modern retail. Its business model runs counter to almost every rule of conventional apparel retailing: intentionally under-produce, never restock, and let resale markets (StockX, GOAT, eBay) amplify the brand\'s cultural cachet.\n\n' +
+  'This scarcity engine, combined with an insider, "you\'re either in on it or you\'re not" attitude, built a cult following and command premiums of 5–10x retail on the secondary market. Supreme was acquired by VF Corporation in 2020 for roughly $2.1B, and then sold again in 2024 to EssilorLuxottica for about $1.5B — a steep markdown that signaled investor skepticism about the brand\'s growth trajectory under corporate ownership.\n\n' +
+  'Throughout this period, Supreme has struggled to convert cult loyalty into sustained growth: drop fatigue has set in among longtime fans, resale prices on many items have softened, counterfeit product has proliferated, and a new generation of consumers has more options (Aimé Leon Dore, Corteiz, Chrome Hearts, and a wave of "quiet luxury" and gorpcore competitors) competing for the same cultural real estate that Supreme once owned outright.\n\n' +
+  'The Challenge: Supreme\'s new ownership wants the brand to become a durable, decade-spanning cultural institution rather than a fading 2010s hype phenomenon, without killing the scarcity and insider mystique that made it valuable in the first place. Supreme faces a genuine paradox: broadening its reach (more stores, more product, more markets, more accessible price points) is exactly the kind of move that has diluted comparable brands, while doing nothing risks irrelevance as the customer base ages out and no younger cohort fully replaces it.\n\n' +
+  'Your task is to develop a strategy that deepens Supreme\'s relevance with the newest generation of streetwear consumers, particularly college-age and just-post-college consumers who are culturally influential but were mostly too young to experience Supreme\'s 2012–2018 peak, without compromising the exclusivity that is the brand\'s core asset.';
+
 export const STRATEGY_GROUP_CASE_QUESTIONS = [
-  'Estimate the annual market size for single-serve water, across any different packaging type, consumed by students at U.S. colleges and universities. Consider different consumption occasions, such as dining halls, studying, athletics, and social events, and how students\' purchasing behavior might differ across each.',
-  'What are the common trends among Gen Z students, and how can Liquid Death utilize this for a campaign? (Please refer to the charts provided)',
-  'What challenges and opportunities do you foresee if Liquid Death attempts to expand in this way on college campuses?',
-  'The CEO of Liquid Death asked you for a final summary of your team’s findings and observations. Provide an overall recommendation and summarize what you\'ve just discussed.',
+  'Estimate the annual market size for premium/hype streetwear (apparel and accessories in the $50–500+ per item range) purchased by U.S. college-age consumers (18–24). Consider different channels — direct-to-consumer drops, resale marketplaces, physical flagship/pop-up stores, and secondary "off-brand" collab merchandise — and how purchasing behavior and price sensitivity might differ across each.',
+  'What are the common trends among Gen Z students relevant to fashion, status, and community, and how can Supreme utilize this for a campaign? (Please refer to the charts provided)',
+  'What challenges and opportunities do you foresee if Supreme attempts to expand its relevance this way among college students, particularly given the risk of diluting scarcity value and the brand\'s history of two acquisitions in four years?',
+  'The CEO of Supreme (under EssilorLuxottica) asked you for a final summary of your team\'s findings and observations. Provide an overall recommendation and summarize what you\'ve just discussed.',
 ];
+
+export const STRATEGY_INDIV_CASE_PROMPT =
+  'Our client is HeyTea (喜茶), a Chinese premium tea chain founded in 2012, credited with pioneering the "cheese tea" and modern fruit tea category that now defines the global new-style tea beverage industry. HeyTea entered the U.S. in 2023 and has since opened dozens of stores across cities like New York, Los Angeles, and San Francisco, betting that American Gen Z consumers, already primed by boba culture and TikTok food trends, will embrace the brand the way Chinese consumers did a decade ago.\n\n' +
+  'But the U.S. market looks nothing like China\'s: rent and labor costs are far higher, the boba/bubble tea category is already crowded with established players like Gong Cha, Sharetea, and CoCo, and HeyTea must also compete for the same Gen Z dollar and attention span as Starbucks, Dunkin\', and a constant churn of other TikTok-viral food and drink trends.\n\n' +
+  'Premium Pricing in an Unfamiliar Market: In China, HeyTea has had to cut prices sharply to survive a brutal price war with ultra-low-cost chains like Mixue. In the U.S., HeyTea has taken the opposite approach, launching at a premium price point (many drinks $6–8) with no discounting to speak of, betting that Americans will treat it like a specialty, Instagrammable treat rather than a daily commodity purchase. This protects margins but raises the risk that HeyTea becomes a one-time novelty rather than a habitual stop, especially against cheaper boba competitors already embedded in many U.S. cities.\n\n' +
+  'Viral Launch Moments: Each new HeyTea U.S. store opening has been engineered to go viral, with hours-long lines, limited-edition merchandise (tote bags, cups, stickers), and heavy TikTok and Instagram coverage of the "aesthetic" in-store experience. These launch-day moments generate enormous short-term buzz and press coverage but are, by nature, one-time spikes tied to novelty and scarcity rather than sustained daily demand.\n\n' +
+  'Overarching Challenge: How can HeyTea sustain its cool factor and traffic momentum among American Gen Z consumers without becoming just another viral-launch-day novelty that fades once the next TikTok trend takes its place?\n\n' +
+  'You\'ll have 15 minutes to answer the following questions. It is up to you to decide how long to spend on each one. You may use the charts if you wish, but they are not a requirement.';
 
 export const STRATEGY_INDIV_CASE_QUESTIONS = [
-  'Chili\'s spends $5 million on a social campaign that reaches 100 million people. As a result of the campaign, what percent of people do you think will convert to a visit? Based on this, will the campaign pay for itself? Assume each guest spends $20 for each visit.',
-  'The Triple Dipper appetizer went viral on TikTok, creating a trend for people to visit Chili’s. This has become a core part of their brand; however, trends fade quickly. Suggest strategies to convert these one-time viral visitors into long-term customers.',
-  'Gen-Z is known to prefer delivery, with the percentage of Gen-Z users who use sites like DoorDash, GrubHub, and Uber Eats, rising each year. With Chili’s emphasis on in-person dining, suggest strategies for ensuring Gen Z enters the restaurant.',
+  'HeyTea spends $2 million on a social campaign targeting U.S. Gen Z consumers that reaches 50 million people. As a result of the campaign, what percent of people do you think will convert to a visit? Based on this, will the campaign pay for itself? Assume each guest spends $8 per visit.',
+  'HeyTea\'s U.S. store openings go viral on TikTok and Instagram, driving hours-long lines and sold-out merchandise on launch day, but each of these moments fades within days or weeks once the novelty wears off. Suggest strategies to convert these one-time viral visitors into long-term, repeat customers in U.S. markets.',
+  'Gen-Z in the U.S. is known to prefer delivery, with the percentage of Gen-Z users who use apps like DoorDash, Uber Eats, and Grubhub rising each year. Given that HeyTea\'s in-store "aesthetic" and line culture are a key part of the brand experience, suggest strategies for ensuring American Gen Z consumers visit the physical store rather than defaulting to delivery.',
 ];
 
+export const STRATEGY_INDIV_INTRO =
+  'Individual interview: HeyTea case (15 minutes, part 1), then behavioral & fit questions (part 2). Score each criterion 1–5.';
+
 export const STRATEGY_BEHAVIORAL_QUESTIONS = [
-  'Considering yesterday’s social round, what motivates you to be part of this club beyond your professional goals?',
+  'Tell me about yourself.',
+  'What marketing strategy in the past 12 months captured your attention? It could be anything, ranging from a product, service, to event. Why do you think it was effective?',
+  'Considering yesterday\'s social round, what motivates you to be part of UMA beyond your professional goals?',
   'Can you give an example of a time when you had to persuade a group to see things your way? What strategies did you use, and were you successful?',
-  'Describe a time when you had to adapt quickly to a significant change in your work environment in your last job or internship role. How did you handle it, and what was the outcome?',
-  'Describe a situation where you had to manage multiple priorities. How did you ensure everything was completed on time?',
-  'Any other committees applying for? Which preference?',
-  'What other time commitments do you have this semester?',
+  'Tell me about a time when you identified an opportunity for improvement within a process or system. What steps did you take to implement change?',
 ];
 
 export function strategyDefaultGuides(): InterviewGuidesRecord {
@@ -50,18 +68,17 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
     casePdfUrl: STRATEGY_GROUP_CASE_PDF,
     intro: STRATEGY_GROUP_INTRO,
     caseStudy: {
-      title: 'Liquid Death',
-      prompt:
-        'Liquid Death wants to become the largest hydration brand on college campuses. Develop a strategy that bypasses traditional corporate barriers and makes the brand integral to campus culture.',
+      title: 'Supreme — Group Interview Case',
+      prompt: STRATEGY_GROUP_CASE_PROMPT,
       discussionPoints: [...STRATEGY_GROUP_CASE_QUESTIONS],
     },
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Structure', weight: 25 },
-        { name: 'Quant / analytics', weight: 25 },
-        { name: 'Insight', weight: 25 },
-        { name: 'Communication', weight: 25 },
+        { name: 'Q1. Market Sizing', weight: 25 },
+        { name: 'Q2. Gen Z Trends & Campaign Tie', weight: 25 },
+        { name: 'Q3. Challenges & Opportunities', weight: 25 },
+        { name: 'Q4. Recommendation & Summary', weight: 25 },
       ],
     },
   };
@@ -69,21 +86,29 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
   const finalRound: InterviewGuide = {
     format: 'case_and_behavioral',
     casePdfUrl: STRATEGY_INDIV_CASE_PDF,
-    intro: "Individual interview: Chili's case (part 1), then behavioral questions (part 2). Candidates have 15 minutes for the case.",
+    intro: STRATEGY_INDIV_INTRO,
     caseStudy: {
-      title: 'Chili’s Grill & Bar',
-      prompt:
-        'How can Chili’s sustain its cool factor and traffic momentum among Gen Z without becoming overly reliant on low-margin value deals that could hurt long-term profitability?',
+      title: 'HeyTea U.S. Expansion — Individual Interview Case',
+      prompt: STRATEGY_INDIV_CASE_PROMPT,
       discussionPoints: [...STRATEGY_INDIV_CASE_QUESTIONS],
     },
     questions: [...STRATEGY_BEHAVIORAL_QUESTIONS],
     rubric: {
       scaleMax: 5,
       criteria: [
-        { name: 'Structure', weight: 25 },
-        { name: 'Quant / analytics', weight: 25 },
-        { name: 'Insight', weight: 25 },
-        { name: 'Communication', weight: 25 },
+        { name: 'Q1. Campaign Math & ROI Reasoning', weight: 34 },
+        { name: 'Q2. Retention Without Discounting', weight: 33 },
+        { name: 'Q3. In-Store vs. Delivery', weight: 33 },
+      ],
+    },
+    behavioralRubric: {
+      scaleMax: 5,
+      criteria: [
+        { name: 'Communication (incl. tell me about yourself)', weight: 27 },
+        { name: 'Trend Awareness', weight: 18 },
+        { name: 'Motivation & Fit', weight: 18 },
+        { name: 'Persuasion & Influence', weight: 18 },
+        { name: 'Initiative & Process Improvement', weight: 19 },
       ],
     },
   };

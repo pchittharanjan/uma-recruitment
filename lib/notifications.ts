@@ -129,7 +129,7 @@ export async function notifyApplicationsAssigned(params: {
       userId,
       kind: 'applications_assigned',
       title: `${appLabel} assigned — ${params.teamName}`,
-      body: `Your queue is ready. Grading will open once the Application stage is unlocked.`,
+      body: `Your applications are assigned. Grading opens after Admin unlocks the Application stage.`,
       href,
       teamId: params.teamId,
     });
@@ -165,7 +165,7 @@ export async function notifyApplicationUnlocked(roundIds: number[]): Promise<voi
       userId,
       kind: 'application_unlocked',
       title: `Application grading open — ${row.team_name as string}`,
-      body: `Your assigned applications are ready to grade.`,
+      body: `Application grading is unlocked — start grading now.`,
       href: `/team/${teamId}/grade`,
       teamId,
     });

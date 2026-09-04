@@ -89,7 +89,7 @@ Team execs land on `/team` and work under `/team/[teamId]/...`:
 
 ### Coffee chats
 
-Members can log coffee chats at `/coffee-chats` (separate from the admin/team pipelines).
+Members submit notes via Google Form. Admins download the responses sheet and import it at `/admin/coffee-chats`, which matches each note to a UMA member (Users) and applicant when applications exist.
 
 ---
 

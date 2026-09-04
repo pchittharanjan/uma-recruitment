@@ -100,8 +100,9 @@ body {
   --destructive: #dd6a56;
   --destructive-foreground: #ffffff;
   --success: #5a8a66;
-  --border: rgba(26, 24, 22, 0.06);
-  --input: rgba(26, 24, 22, 0.07);
+  --border: rgba(26, 24, 22, 0.10);
+  /* Form-control borders need enough contrast on cream cards/panels */
+  --input: rgba(26, 24, 22, 0.20);
   --ring: #ef9251;
   --chart-1: #ef9251;
   --chart-2: #dd6a56;
@@ -156,8 +157,8 @@ body {
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.72 0.1 155);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 22%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);

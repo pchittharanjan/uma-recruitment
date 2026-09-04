@@ -57,6 +57,8 @@ function persistDismissed(key: string) {
   }
 }
 
+export type StatusBannerAction = { label: string; href: string };
+
 export default function StatusBanner({
   message,
   type = 'info',
@@ -64,6 +66,7 @@ export default function StatusBanner({
   dismissKey,
   actionLabel,
   actionHref,
+  actions,
 }: {
   message: string;
   type?: Type;
@@ -72,6 +75,8 @@ export default function StatusBanner({
   dismissKey?: string;
   actionLabel?: string;
   actionHref?: string;
+  /** Prefer over actionLabel/actionHref when multiple CTAs are needed. */
+  actions?: StatusBannerAction[];
 }) {
   const [dismissed, setDismissed] = useState(() =>
     dismissKey ? readDismissed(dismissKey) : false,
@@ -89,7 +94,13 @@ export default function StatusBanner({
     message
   );
 
-  const hasAction = Boolean(actionLabel && actionHref);
+  const resolvedActions: StatusBannerAction[] =
+    actions && actions.length > 0
+      ? actions
+      : actionLabel && actionHref
+        ? [{ label: actionLabel, href: actionHref }]
+        : [];
+  const hasAction = resolvedActions.length > 0;
 
   return (
     <Alert
@@ -103,18 +114,34 @@ export default function StatusBanner({
         {content}
       </AlertDescription>
       {(dismissKey || hasAction) && (
-        <div className="col-start-3 flex items-center justify-end gap-1">
-          {hasAction ? (
+        <div className="col-start-3 flex flex-wrap items-center justify-end gap-1">
+          {resolvedActions.map((action) => (
             <Button
+              key={`${action.href}:${action.label}`}
               nativeButton={false}
-              render={<Link href={actionHref!} />}
+              render={
+                <Link
+                  href={action.href}
+                  onClick={(event) => {
+                    if (!action.href.startsWith('#')) return;
+                    const id = action.href.slice(1);
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    event.preventDefault();
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (window.location.hash !== action.href) {
+                      window.history.replaceState(null, '', action.href);
+                    }
+                  }}
+                />
+              }
               variant="outline"
               size="xs"
               className="h-7"
             >
-              {actionLabel}
+              {action.label}
             </Button>
-          ) : null}
+          ))}
           {dismissKey ? (
             <Button
               type="button"

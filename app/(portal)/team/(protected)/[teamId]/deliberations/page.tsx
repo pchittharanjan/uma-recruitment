@@ -16,12 +16,12 @@ export default function TeamDeliberationsPage({
     <PageContainer className="space-y-4">
       <PageHeader
         title="Deliberations"
+        description="Your personal board — autosaved. The admin deliberations screen is the official source for final acceptances."
       />
       <DeliberationsTeamBoard
         teamId={teamId}
         boardApiBase={`/api/team/deliberations?teamId=${teamId}`}
         detailApiBase={`/api/team/deliberations`}
-        canSave={false}
       />
     </PageContainer>
   );

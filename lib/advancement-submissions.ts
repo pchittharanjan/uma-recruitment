@@ -3,7 +3,7 @@ import { buildApplicationAdvancementContext, buildFirstRoundAdvancementContext }
 import { isTeamDirector } from '@/lib/directors';
 import { applicantDisplayId } from '@/lib/blind';
 import { extractCandidateFromFields } from '@/lib/candidates';
-import { getDb, type User } from '@/lib/db';
+import { getDb, getTeamById, type User } from '@/lib/db';
 import {
   applyInterviewAdvancementSelection,
   computeInterviewRankings,
@@ -33,6 +33,7 @@ import {
   resolveAdvancementCapMax,
   resolveAdvancementSelectionMax,
   resolveAdvancementSelectionMin,
+  teamAllowsUncappedFirstRoundAdvancement,
 } from '@/lib/advancement-cap-helpers';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
 
@@ -72,10 +73,12 @@ function validateAdvancementSelection(
     totalRanked: number;
     overCapExtra: number;
     previousSubmittedCount?: number | null;
+    allowUncapped?: boolean;
   },
 ): void {
-  const { cap, totalRanked, overCapExtra, previousSubmittedCount } = options;
-  if (cap === null) {
+  const { cap, totalRanked, overCapExtra, previousSubmittedCount, allowUncapped = false } =
+    options;
+  if (cap === null && !allowUncapped) {
     throw new Error('Advancement limit is not configured for this team. Contact an admin.');
   }
 
@@ -83,12 +86,14 @@ function validateAdvancementSelection(
     cap,
     totalRanked,
     overCapExtra,
+    allowUncapped,
   });
   const maxAllowed = resolveAdvancementSelectionMax({
     cap,
     totalRanked,
     overCapExtra,
     previousSubmittedCount,
+    allowUncapped,
   });
   if (minRequired === null || maxAllowed === null) {
     throw new Error('Advancement limit is not configured for this team. Contact an admin.');
@@ -442,8 +447,12 @@ export async function submitTeamAdvancement(
   }
 
   const { cap, overCapExtra } = await getTeamAdvancementCapState(teamId, fromStage);
+  const team = await getTeamById(teamId);
+  const allowUncapped =
+    fromStage === 'first_round' &&
+    Boolean(team?.name && teamAllowsUncappedFirstRoundAdvancement(team.name));
 
-  if (cap === null) {
+  if (cap === null && !allowUncapped) {
     throw new Error('Advancement limit is not configured for this team. Contact an admin.');
   }
 
@@ -475,12 +484,14 @@ export async function submitTeamAdvancement(
     cap,
     totalRanked,
     overCapExtra,
+    allowUncapped,
   });
   const maxAllowed = resolveAdvancementSelectionMax({
     cap,
     totalRanked,
     overCapExtra,
     previousSubmittedCount,
+    allowUncapped,
   });
 
   if (!applicationIds || applicationIds.length === 0) {
@@ -491,7 +502,7 @@ export async function submitTeamAdvancement(
       minRequired === maxAllowed
         ? `Select exactly ${minRequired} applicant${minRequired === 1 ? '' : 's'} to submit.`
         : `Select at least ${minRequired} applicant${minRequired === 1 ? '' : 's'} to submit (up to ${maxAllowed}).`;
-    throw new Error(`${guidance} Panel color signals are recommendations only.`);
+    throw new Error(`${guidance} Panel color ratings are advisory — only your Advance selections are submitted.`);
   }
   const uniqueIds = [...new Set(applicationIds)];
   if (uniqueIds.length !== applicationIds.length) {
@@ -502,6 +513,7 @@ export async function submitTeamAdvancement(
     totalRanked,
     overCapExtra,
     previousSubmittedCount,
+    allowUncapped,
   });
 
   for (const id of uniqueIds) {
@@ -563,6 +575,181 @@ export async function submitTeamAdvancement(
           LEFT JOIN users r ON r.id = s.reviewed_by
           WHERE s.id = ?`,
     args: [Number(result.lastInsertRowid)],
+  });
+
+  return rowToSubmission(inserted.rows[0] as Record<string, unknown>);
+}
+
+/** Admin submits and optionally applies advancement without waiting for a Director. */
+export async function submitAdminTeamAdvancement(
+  admin: User,
+  teamId: number,
+  fromStage: AdvancementFromStage = 'application',
+  applicationIds: number[],
+  options: { autoApprove?: boolean; force?: boolean } = {},
+): Promise<AdvancementSubmission> {
+  if (admin.role !== 'admin') {
+    throw new Error('Only admins can submit advancement on behalf of a team.');
+  }
+
+  const round = await getActiveRoundForTeam(teamId);
+  if (!round) throw new Error('No active round for this team.');
+
+  const requiredStatus = requiredPipelineStatus(fromStage);
+  if (round.status !== requiredStatus) {
+    throw new Error(
+      `Advancement can only be submitted during the ${requiredStatus.replace('_', ' ')} stage.`,
+    );
+  }
+
+  const existing = await getLatestAdvancementSubmission(teamId, round.id, fromStage);
+  if (existing?.status === 'approved') {
+    throw new Error('Advancement for this round has already been approved.');
+  }
+
+  const { cap, overCapExtra } = await getTeamAdvancementCapState(teamId, fromStage);
+  const team = await getTeamById(teamId);
+  const allowUncapped =
+    fromStage === 'first_round' &&
+    Boolean(team?.name && teamAllowsUncappedFirstRoundAdvancement(team.name));
+  if (cap === null && !allowUncapped) {
+    throw new Error('Advancement limit is not configured for this team.');
+  }
+
+  let candidates: AdvancementCandidate[];
+  let incompleteCount: number;
+  let totalRanked: number;
+  let rankedIds: Set<number>;
+  let ranked: RankedApplication[] | Awaited<
+    ReturnType<typeof computeInterviewRankings>
+  >['ranked'];
+
+  if (fromStage === 'first_round') {
+    const rankings = await computeInterviewRankings(teamId, round.id, 'first_round');
+    incompleteCount = rankings.incompleteCount;
+    ranked = rankings.ranked;
+    totalRanked = ranked.length;
+    rankedIds = new Set(ranked.map((app) => app.id));
+  } else {
+    const rankings = await computeNormalizedRankings(teamId, round.id);
+    incompleteCount = rankings.incompleteCount;
+    ranked = rankings.ranked;
+    totalRanked = ranked.length;
+    rankedIds = new Set(ranked.map((app) => app.id));
+  }
+
+  const previousSubmittedCount =
+    existing?.status === 'submitted' ? existing.candidates.length : null;
+
+  if (!applicationIds || applicationIds.length === 0) {
+    const minRequired = resolveAdvancementSelectionMin({
+      cap,
+      totalRanked,
+      overCapExtra,
+      allowUncapped,
+    });
+    const maxAllowed = resolveAdvancementSelectionMax({
+      cap,
+      totalRanked,
+      overCapExtra,
+      previousSubmittedCount,
+      allowUncapped,
+    });
+    if (minRequired === null || maxAllowed === null) {
+      throw new Error('Advancement limit is not configured for this team.');
+    }
+    const guidance =
+      minRequired === maxAllowed
+        ? `Select exactly ${minRequired} applicant${minRequired === 1 ? '' : 's'}.`
+        : `Select at least ${minRequired} applicant${minRequired === 1 ? '' : 's'} (up to ${maxAllowed}).`;
+    throw new Error(guidance);
+  }
+
+  const uniqueIds = [...new Set(applicationIds)];
+  if (uniqueIds.length !== applicationIds.length) {
+    throw new Error('Duplicate applicants in selection.');
+  }
+  validateAdvancementSelection(uniqueIds, {
+    cap,
+    totalRanked,
+    overCapExtra,
+    previousSubmittedCount,
+    allowUncapped,
+  });
+
+  for (const id of uniqueIds) {
+    if (!rankedIds.has(id)) {
+      throw new Error('One or more selected applicants are invalid for this team.');
+    }
+  }
+
+  if (fromStage === 'first_round') {
+    candidates = toInterviewCandidates(
+      ranked as Awaited<ReturnType<typeof computeInterviewRankings>>['ranked'],
+      uniqueIds,
+    );
+  } else {
+    candidates = toCandidates(ranked as RankedApplication[], uniqueIds);
+  }
+
+  const force = options.force ?? true;
+  if (incompleteCount > 0 && !force) {
+    const pendingNoun = fromStage === 'first_round' ? 'interview' : 'application';
+    throw new Error(
+      `${incompleteCount} ${pendingNoun}${incompleteCount === 1 ? '' : 's'} still need ${fromStage === 'first_round' ? 'scoring' : 'grading'}.`,
+    );
+  }
+
+  const autoApprove = options.autoApprove ?? true;
+  const topN = candidates.length;
+  const db = getDb();
+
+  if (existing?.status === 'submitted') {
+    await db.execute({
+      sql: `UPDATE team_advancement_submissions
+            SET status = 'withdrawn', reviewed_at = unixepoch()
+            WHERE id = ? AND status = 'submitted'`,
+      args: [existing.id],
+    });
+  }
+
+  const initialStatus = autoApprove ? 'approved' : 'submitted';
+  const result = await db.execute({
+    sql: `INSERT INTO team_advancement_submissions
+            (round_id, team_id, from_stage, top_n, application_ids, candidates, status, submitted_by, reviewed_by, reviewed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      round.id,
+      teamId,
+      fromStage,
+      topN,
+      JSON.stringify(uniqueIds),
+      JSON.stringify(candidates),
+      initialStatus,
+      admin.id,
+      autoApprove ? admin.id : null,
+      autoApprove ? Math.floor(Date.now() / 1000) : null,
+    ],
+  });
+
+  const submissionId = Number(result.lastInsertRowid);
+
+  if (autoApprove) {
+    if (fromStage === 'first_round') {
+      await applyInterviewAdvancementSelection(teamId, round.id, uniqueIds);
+    } else {
+      await applyAdvancementSelection(teamId, round.id, uniqueIds);
+    }
+  }
+
+  const inserted = await db.execute({
+    sql: `SELECT s.*, u.name as submitter_name, u.email as submitter_email,
+                 r.name as reviewer_name, r.email as reviewer_email
+          FROM team_advancement_submissions s
+          JOIN users u ON u.id = s.submitted_by
+          LEFT JOIN users r ON r.id = s.reviewed_by
+          WHERE s.id = ?`,
+    args: [submissionId],
   });
 
   return rowToSubmission(inserted.rows[0] as Record<string, unknown>);

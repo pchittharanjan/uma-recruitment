@@ -105,6 +105,7 @@ export default function AdminCommunicationsPage() {
       <PageHeader
         eyebrow={outcomeEmailPhaseEyebrow(resolvedStage)}
         title="Applicant Outcome Emails"
+        description="Compose opens your email app (mailto). Mark as sent only after you actually send each batch."
       />
 
       {error && <StatusBanner type="error" message={error} />}

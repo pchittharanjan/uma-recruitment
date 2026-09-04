@@ -4,8 +4,8 @@ import type { AssignmentStage, User } from '@/lib/db';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
 import { isTeamDirector } from '@/lib/directors';
 import { getActiveRoundForTeam } from '@/lib/rounds';
-import { canUserAccessTeamStage } from '@/lib/stage-access';
-import { listGraderAssignments, userSeesBlindApplications } from '@/lib/team-dashboard';
+import { getTeamStageAccessDenialReason } from '@/lib/stage-access';
+import { listGraderAssignments } from '@/lib/team-dashboard';
 import type { TeamGradingResult } from '@/lib/team-grading-types';
 
 export type { TeamGradingData, TeamGradingResult } from '@/lib/team-grading-types';
@@ -25,8 +25,9 @@ export async function buildTeamGradingData(
   }
   const stage = stageRaw as AssignmentStage;
 
-  if (!(await canUserAccessTeamStage(user, teamId, stage))) {
-    return { ok: false, error: 'This stage is not open for you yet.', status: 403 };
+  const denial = await getTeamStageAccessDenialReason(user, teamId, stage);
+  if (denial) {
+    return { ok: false, error: denial, status: 403 };
   }
 
   const [assignments, round] = await Promise.all([
@@ -40,6 +41,8 @@ export async function buildTeamGradingData(
     : { locked: false, reason: null, message: '' };
 
   const allDone = assignments.length > 0 && completed === assignments.length;
+  const isAdminGrader = user.role === 'admin';
+  const isAdHocExec = user.role === 'ad_hoc_exec';
   const canOpenApplicationAdvancement = user.role === 'exec' && stage === 'application';
   const isDirector =
     canOpenApplicationAdvancement && (await isTeamDirector(user.id, teamId));
@@ -52,10 +55,11 @@ export async function buildTeamGradingData(
         }
       : null;
 
-  const blind = userSeesBlindApplications(user);
-  const safeAssignments = blind
-    ? assignments.map(({ candidateName: _name, ...rest }) => rest)
-    : assignments;
+  // Application grading is always name-blind, including when an admin is the grader.
+  const safeAssignments =
+    stage === 'application'
+      ? assignments.map(({ candidateName: _name, ...rest }) => rest)
+      : assignments;
 
   return {
     ok: true,
@@ -66,6 +70,8 @@ export async function buildTeamGradingData(
       progress: { completed, total: assignments.length },
       gradingEditLock,
       isDirector,
+      isAdminGrader,
+      isAdHocExec,
       nextStep,
     },
   };

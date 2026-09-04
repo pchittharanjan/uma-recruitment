@@ -1,3 +1,6 @@
+import { ResponseText } from '@/components/response-text';
+import { restAfterFirstUrl } from '@/lib/link-preview';
+
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
@@ -8,7 +11,7 @@ function ApplicationFieldValue({ value }: { value: string }) {
   }
 
   const trimmed = value.trim();
-  if (isHttpUrl(trimmed)) {
+  if (isHttpUrl(trimmed) && !restAfterFirstUrl(trimmed)) {
     return (
       <a
         href={trimmed}
@@ -21,7 +24,11 @@ function ApplicationFieldValue({ value }: { value: string }) {
     );
   }
 
-  return <span className="break-words whitespace-pre-wrap text-foreground">{value}</span>;
+  return (
+    <span className="break-words whitespace-pre-wrap text-foreground">
+      <ResponseText text={value} />
+    </span>
+  );
 }
 
 export function ApplicationFieldsList({
@@ -30,6 +37,8 @@ export function ApplicationFieldsList({
 }: {
   fields: Record<string, string>;
   className?: string;
+  /** Accepted for callers that still pass it; Open in Drive is always shown. */
+  blind?: boolean;
 }) {
   return (
     <div className={className ?? 'space-y-3'}>

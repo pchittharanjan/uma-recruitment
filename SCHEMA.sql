@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS round_settings (
   context_fields TEXT NOT NULL DEFAULT '[]',
   portfolio_fields TEXT NOT NULL DEFAULT '[]',
   graders_per_application INTEGER NOT NULL DEFAULT 3 CHECK (graders_per_application >= 1),
+  grading_model TEXT,
   coffee_chat_start_date TEXT,
   application_due_date TEXT
 );
@@ -168,6 +169,20 @@ CREATE TABLE IF NOT EXISTS team_advancement_submissions (
 CREATE INDEX IF NOT EXISTS idx_advancement_submissions_team_round
   ON team_advancement_submissions(team_id, round_id, status);
 
+-- Admin-only color ratings during advancement (not tied to grader assignments).
+CREATE TABLE IF NOT EXISTS admin_advancement_verdicts (
+  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+  application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  from_stage TEXT NOT NULL CHECK (from_stage IN ('application', 'first_round')),
+  admin_user_id INTEGER NOT NULL REFERENCES users(id),
+  verdict TEXT CHECK (verdict IN ('green', 'high_yellow', 'yellow', 'low_yellow', 'red')),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (team_id, round_id, application_id, from_stage, admin_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_advancement_verdicts_team_round
+  ON admin_advancement_verdicts(team_id, round_id, from_stage);
+
 -- ── Pre-Application interactions (info sessions, coffee chats) ─
 CREATE TABLE IF NOT EXISTS pre_application_notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,6 +253,19 @@ CREATE TABLE IF NOT EXISTS deliberation_boards (
   updated_by INTEGER REFERENCES users(id),
   PRIMARY KEY (team_id, round_id)
 );
+
+-- Per-user deliberations scratch board (team exec personal workspace).
+-- Distinct from deliberation_boards (admin official board) and canvas_cards (session-scoped).
+CREATE TABLE IF NOT EXISTS deliberation_personal_boards (
+  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  layout_json TEXT NOT NULL DEFAULT '{}',
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (team_id, round_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_deliberation_personal_boards_user
+  ON deliberation_personal_boards(user_id);
 
 -- Canvas card positions are session-scoped and discarded when the session ends.
 -- Table is intentionally ephemeral — consider an in-memory store (e.g. Redis) instead of SQL

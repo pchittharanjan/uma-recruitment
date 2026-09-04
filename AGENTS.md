@@ -14,7 +14,7 @@ Read `SPEC.md` and `SCHEMA.sql` first. This file covers enforcement rules that a
 
 5. **Access grants are checked, not assumed.** `ad_hoc_exec` role must resolve actual access through `access_grants` (team + optional round + optional stage), checking `revoked_at IS NULL`. Don't hardcode any exec's access.
 
-6. **Canvas state is ephemeral by design.** Don't add persistence/history to `canvas_cards` beyond the current session — that's intentional, not a gap to fill in.
+6. **Deliberations has two board layers.** `deliberation_boards` is the admin official board (source of truth for final acceptances). `deliberation_personal_boards` stores each exec's autosaved scratch layout (`team_id` + `round_id` + `user_id`). `canvas_cards` remain session-scoped and ephemeral.
 
 ## Auth mechanism
 

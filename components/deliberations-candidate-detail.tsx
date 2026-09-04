@@ -119,6 +119,14 @@ function ReviewsSection({
             {review.comment?.trim() ? (
               <p className="mt-2 whitespace-pre-wrap text-base text-foreground">{review.comment}</p>
             ) : null}
+            {Object.entries(review.notes ?? {}).map(([label, note]) =>
+              note.trim() ? (
+                <div key={label} className="mt-2">
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{note}</p>
+                </div>
+              ) : null,
+            )}
           </div>
         ))}
       </div>

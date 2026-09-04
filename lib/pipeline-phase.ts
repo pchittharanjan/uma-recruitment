@@ -16,6 +16,7 @@ import {
   type UnlockableStage,
   UNLOCKABLE_STAGES,
 } from '@/lib/stages';
+import { ensureRecruitmentRoundsStarted } from '@/lib/org-coffee-chat-dates';
 import {
   COHORT_STRATEGY_EVENTS,
   getTeamPipelineProfile,
@@ -200,6 +201,7 @@ export interface GlobalPipelineState {
 
 /** One round per team — same preference rules as getActiveRoundForTeam, batched. */
 export async function getActiveRoundsByTeam(): Promise<TeamPipelineRound[]> {
+  await ensureRecruitmentRoundsStarted();
   const teams = await getTeams();
   if (teams.length === 0) return [];
 
@@ -424,7 +426,7 @@ export async function advanceGlobalPipeline(
     }
   }
 
-  // Do not auto-unlock grader access (except Design deliberations above).
+  // Do not auto-unlock grader access (except autoUnlockDeliberations teams above).
   // Admins set up the phase while the stage stays locked; they open grading from Stage access.
   const sampleNext = state.teams.find((t) => t.round)
     ? nextPipelineStatusForTeam(
@@ -523,13 +525,17 @@ export function formatTeamStatusSummary(teams: TeamPipelineRound[]): string {
     .join(' · ');
 }
 
-/** Default dashboard browse phase — slowest active team (legacy canonical behavior). */
+/** Default dashboard browse phase — unanimous live phase, else Application when mixed. */
 export function suggestedDashboardViewPhase(teams: TeamPipelineRound[]): RoundStatus {
   const statuses = teams.filter((t) => t.round).map((t) => t.round!.status);
   if (statuses.length === 0) return 'pre_application';
   const active = statuses.filter((s) => s !== 'closed');
   if (active.length === 0) return 'deliberations';
-  return active.reduce((lowest, status) =>
+  const unique = [...new Set(active)];
+  if (unique.length === 1) return unique[0];
+  // Mixed team phases — Application when any team is still there; else the slowest live phase.
+  if (unique.includes('application')) return 'application';
+  return unique.reduce((lowest, status) =>
     statusIndex(status) < statusIndex(lowest) ? status : lowest,
   );
 }

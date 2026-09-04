@@ -5,6 +5,8 @@ const EMAIL_HEADER_PATTERNS: RegExp[] = [
   /^email$/,
   /berkeley email/,
   /^e-mail$/,
+  /email address/,
+  /\bemail\b/,
 ];
 
 const FIRST_NAME_PATTERNS: RegExp[] = [/^first name$/, /^given name$/];
@@ -67,7 +69,15 @@ export function findEmailInFields(fields: Record<string, string>): string {
   const berkeley = matches.find((m) => m.isBerkeley);
   if (berkeley) return berkeley.email;
 
-  return matches[0]?.email ?? '';
+  if (matches[0]?.email) return matches[0].email;
+
+  // Last resort: any @berkeley.edu cell when the header wasn't labeled as email.
+  for (const raw of Object.values(fields)) {
+    const value = raw?.trim().toLowerCase() ?? '';
+    if (value.endsWith('@berkeley.edu') && looksLikeEmail(value)) return value;
+  }
+
+  return '';
 }
 
 /** Prefer real email from application fields over placeholder candidates.email. */
@@ -91,6 +101,7 @@ export function findGradeInFields(fields: Record<string, string>): string {
 
 export function extractCandidateFromFields(
   fields: Record<string, string>,
+  options?: { /** Disambiguates synthetic emails when the sheet has no email column. */ uniqueKey?: string | number },
 ): { name: string; email: string } {
   const first = findFieldByPatterns(fields, FIRST_NAME_PATTERNS);
   const last = findFieldByPatterns(fields, LAST_NAME_PATTERNS);
@@ -102,8 +113,70 @@ export function extractCandidateFromFields(
   if (!name && email) name = email.split('@')[0] ?? 'Unknown';
   if (!name) name = 'Unknown';
 
-  const resolvedEmail =
-    email || `${name.toLowerCase().replace(/\s+/g, '.')}@unknown.local`;
+  const slug = name.toLowerCase().replace(/\s+/g, '.');
+  const suffix =
+    options?.uniqueKey != null ? `.${String(options.uniqueKey)}` : '';
+  const resolvedEmail = email || `${slug}${suffix}@unknown.local`;
 
   return { name, email: resolvedEmail };
+}
+
+export type CandidateRowRef = {
+  fields: Record<string, string>;
+  /** 0-based index in the original spreadsheet body (not counting the header). */
+  sourceIndex?: number;
+};
+
+export type DuplicateCandidateEmail = {
+  email: string;
+  appearances: Array<{ sheetRow: number; name: string }>;
+};
+
+/**
+ * Find emails that appear more than once in a row set (same person / colliding
+ * Berkeley emails). Sheet row is 1-based including the header (Excel-style).
+ */
+export function findDuplicateCandidateEmails(
+  rows: CandidateRowRef[],
+): DuplicateCandidateEmail[] {
+  const byEmail = new Map<string, Array<{ sheetRow: number; name: string }>>();
+  for (let i = 0; i < rows.length; i++) {
+    const { fields, sourceIndex } = rows[i];
+    const { name, email } = extractCandidateFromFields(fields);
+    if (isPlaceholderCandidateEmail(email)) continue;
+    const key = email.trim().toLowerCase();
+    const sheetRow = (sourceIndex ?? i) + 2;
+    const list = byEmail.get(key) ?? [];
+    list.push({ sheetRow, name });
+    byEmail.set(key, list);
+  }
+  return [...byEmail.entries()]
+    .filter(([, appearances]) => appearances.length > 1)
+    .map(([email, appearances]) => ({ email, appearances }))
+    .sort((a, b) => a.email.localeCompare(b.email));
+}
+
+export function formatDuplicateCandidateEmailError(
+  duplicates: DuplicateCandidateEmail[],
+  options?: { teamName?: string },
+): string {
+  const shown = duplicates.slice(0, 8).map((d) => {
+    const who = d.appearances
+      .map((a) => `${a.name || 'Unknown'} (sheet row ${a.sheetRow})`)
+      .join(', ');
+    return `${d.email} — ${who}`;
+  });
+  const more =
+    duplicates.length > 8 ? ` (+${duplicates.length - 8} more)` : '';
+  const scope = options?.teamName
+    ? `${options.teamName} has duplicate applicants`
+    : 'Duplicate applicants in the spreadsheet';
+  return `${scope}: ${shown.join('; ')}${more}. Import uses Berkeley Email when present — each person needs a unique email. Fix those rows, then import again.`;
+}
+
+export function isApplicationsUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed:\s*applications\.(candidate_id|round_id|team_id)/i.test(
+    message,
+  );
 }

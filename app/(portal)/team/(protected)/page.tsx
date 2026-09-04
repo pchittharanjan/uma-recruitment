@@ -9,7 +9,7 @@ import type { RoundStatus } from '@/lib/db';
 import { buildTeamNavSnapshot } from '@/lib/team-nav';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { getTeamPortalContext, getTeamPortalUser } from '@/lib/team-portal-context';
-import { phaseLabel, teamLandingHref, teamOverviewHref } from '@/lib/stages';
+import { phaseLabel, teamOverviewHref } from '@/lib/stages';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,19 +59,13 @@ export default async function TeamHomePage() {
         <CenteredMessage
           title="No team access yet"
           description="Ask an Admin to grant you access to a team, then refresh this page."
-          ctaLabel="Coffee Chats"
-          ctaHref="/coffee-chats"
         />
       );
     }
 
     if (teams.length === 1) {
       const team = teams[0];
-      const navTeam = nav.teams.find((t) => t.id === team.id);
-      const href = navTeam?.round?.status
-        ? teamLandingHref(team.id, navTeam.round.status)
-        : teamOverviewHref(team.id);
-      redirect(href);
+      redirect(teamOverviewHref(team.id));
     }
 
     const status = nav.status ?? 'application';
@@ -89,10 +83,7 @@ export default async function TeamHomePage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="team-picker">
             {teams.map((team) => {
-              const navTeam = nav.teams.find((t) => t.id === team.id);
-              const href = navTeam?.round?.status
-                ? teamLandingHref(team.id, navTeam.round.status)
-                : teamOverviewHref(team.id);
+              const href = teamOverviewHref(team.id);
               return <TeamCard key={team.id} team={team} href={href} />;
             })}
           </div>

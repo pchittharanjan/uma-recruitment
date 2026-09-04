@@ -10,7 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cachedJsonFetch, invalidateClientFetchCache } from '@/lib/client-fetch-cache';
 import { teamDotClass } from '@/lib/team-colors';
+import { getTeamPipelineProfile } from '@/lib/team-pipeline-profile';
 import { cn } from '@/lib/utils';
+
+function teamUsesFirstRoundCap(teamName: string): boolean {
+  return !getTeamPipelineProfile(teamName).skipFinalRoundPhase;
+}
 
 const CAP_INPUT_CLASS =
   'h-9 w-full max-w-[6rem] border-foreground/20 bg-background ';
@@ -140,13 +145,18 @@ export function TeamAdvancementCapSettings() {
     if (rows.length !== savedRows.length) return true;
     return rows.some((row, index) => {
       const saved = savedRows[index];
+      if (!saved || row.teamId !== saved.teamId) return true;
+      const usesFirstRoundCap = teamUsesFirstRoundCap(row.teamName);
+      const firstRoundDirty = usesFirstRoundCap
+        ? row.firstRoundCap !== saved.firstRoundCap ||
+          row.firstRoundOverCapExtra !== saved.firstRoundOverCapExtra
+        : // Design: pending clear of a stale Final Round limit still counts as dirty.
+          saved.firstRoundCap !== null || saved.firstRoundOverCapExtra > 0;
       return (
-        row.teamId !== saved?.teamId ||
         row.applicationCap !== saved.applicationCap ||
-        row.firstRoundCap !== saved.firstRoundCap ||
+        firstRoundDirty ||
         row.deliberationsCap !== saved.deliberationsCap ||
         row.applicationOverCapExtra !== saved.applicationOverCapExtra ||
-        row.firstRoundOverCapExtra !== saved.firstRoundOverCapExtra ||
         row.deliberationsOverCapExtra !== saved.deliberationsOverCapExtra
       );
     });
@@ -182,6 +192,7 @@ export function TeamAdvancementCapSettings() {
         );
       }
       if (
+        teamUsesFirstRoundCap(row.teamName) &&
         row.firstRoundCap !== null &&
         saved.firstRoundCap !== null &&
         row.firstRoundCap < saved.firstRoundCap &&
@@ -239,13 +250,17 @@ export function TeamAdvancementCapSettings() {
     try {
       for (const row of rows) {
         const saved = savedRows.find((item) => item.teamId === row.teamId);
+        const usesFirstRoundCap = teamUsesFirstRoundCap(row.teamName);
+        // Design has no Final Round — clear any stale firstRoundCap on save.
+        const nextFirstRoundCap = usesFirstRoundCap ? row.firstRoundCap : null;
+        const nextFirstRoundExtra = usesFirstRoundCap ? row.firstRoundOverCapExtra : 0;
         if (
           saved &&
           saved.applicationCap === row.applicationCap &&
-          saved.firstRoundCap === row.firstRoundCap &&
+          saved.firstRoundCap === nextFirstRoundCap &&
           saved.deliberationsCap === row.deliberationsCap &&
           saved.applicationOverCapExtra === row.applicationOverCapExtra &&
-          saved.firstRoundOverCapExtra === row.firstRoundOverCapExtra &&
+          saved.firstRoundOverCapExtra === nextFirstRoundExtra &&
           saved.deliberationsOverCapExtra === row.deliberationsOverCapExtra
         ) {
           continue;
@@ -257,16 +272,17 @@ export function TeamAdvancementCapSettings() {
           body: JSON.stringify({
             teamId: row.teamId,
             applicationCap: row.applicationCap,
-            firstRoundCap: row.firstRoundCap,
+            firstRoundCap: nextFirstRoundCap,
             deliberationsCap: row.deliberationsCap,
             clearApplicationOverCapExtra:
               saved != null &&
               saved.applicationOverCapExtra > 0 &&
               row.applicationOverCapExtra === 0,
             clearFirstRoundOverCapExtra:
-              saved != null &&
-              saved.firstRoundOverCapExtra > 0 &&
-              row.firstRoundOverCapExtra === 0,
+              !usesFirstRoundCap ||
+              (saved != null &&
+                saved.firstRoundOverCapExtra > 0 &&
+                nextFirstRoundExtra === 0),
             clearDeliberationsOverCapExtra:
               saved != null &&
               saved.deliberationsOverCapExtra > 0 &&
@@ -278,7 +294,13 @@ export function TeamAdvancementCapSettings() {
           throw new Error(json.error ?? `Failed to save limits for ${row.teamName}.`);
         }
       }
-      setSavedRows(rows);
+      const normalized = rows.map((row) =>
+        teamUsesFirstRoundCap(row.teamName)
+          ? row
+          : { ...row, firstRoundCap: null, firstRoundOverCapExtra: 0 },
+      );
+      setRows(normalized);
+      setSavedRows(normalized);
       invalidateClientFetchCache('/api/admin/advancement-caps');
       if (loweredCapWarnings.length > 0) {
         toast.success('Advancement limits saved', {
@@ -386,7 +408,12 @@ export function TeamAdvancementCapSettings() {
                   </div>
                 </div>
               ))
-            : rows.map((row) => (
+            : rows.map((row) => {
+                const usesFirstRoundCap = teamUsesFirstRoundCap(row.teamName);
+                const appStageLabel = usesFirstRoundCap
+                  ? 'Application Advancement'
+                  : 'Application → Interview';
+                return (
                 <div key={row.teamId} role="row" className="contents">
                   <div role="cell" className="flex items-center gap-2 py-1.5 font-medium">
                     <span
@@ -397,22 +424,32 @@ export function TeamAdvancementCapSettings() {
                   </div>
                   <CapCell
                     teamName={row.teamName}
-                    stageLabel="Application Advancement"
+                    stageLabel={appStageLabel}
                     inputId={`app-cap-${row.teamId}`}
                     value={row.applicationCap}
                     extra={row.applicationOverCapExtra}
                     onCapChange={(value) => updateCap(row.teamId, 'applicationCap', value)}
                     onClearExtra={() => clearExtra(row.teamId, 'applicationOverCapExtra')}
                   />
-                  <CapCell
-                    teamName={row.teamName}
-                    stageLabel="First Round Advancement"
-                    inputId={`fr-cap-${row.teamId}`}
-                    value={row.firstRoundCap}
-                    extra={row.firstRoundOverCapExtra}
-                    onCapChange={(value) => updateCap(row.teamId, 'firstRoundCap', value)}
-                    onClearExtra={() => clearExtra(row.teamId, 'firstRoundOverCapExtra')}
-                  />
+                  {usesFirstRoundCap ? (
+                    <CapCell
+                      teamName={row.teamName}
+                      stageLabel="First Round Advancement"
+                      inputId={`fr-cap-${row.teamId}`}
+                      value={row.firstRoundCap}
+                      extra={row.firstRoundOverCapExtra}
+                      onCapChange={(value) => updateCap(row.teamId, 'firstRoundCap', value)}
+                      onClearExtra={() => clearExtra(row.teamId, 'firstRoundOverCapExtra')}
+                    />
+                  ) : (
+                    <div
+                      role="cell"
+                      className="flex h-9 max-w-[6rem] items-center py-1.5 text-sm text-muted-foreground"
+                      title="Design has one interview round — no First Round → Final Round limit"
+                    >
+                      N/A
+                    </div>
+                  )}
                   <CapCell
                     teamName={row.teamName}
                     stageLabel="Deliberations Final Selection"
@@ -423,7 +460,8 @@ export function TeamAdvancementCapSettings() {
                     onClearExtra={() => clearExtra(row.teamId, 'deliberationsOverCapExtra')}
                   />
                 </div>
-              ))}
+                );
+              })}
         </div>
         {!loading ? (
           <div className="flex items-center justify-end gap-2">

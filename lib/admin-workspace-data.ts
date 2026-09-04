@@ -7,7 +7,7 @@ import {
   teamRoundStatsMapKey,
   type TeamRoundKey,
 } from '@/lib/batch-team-stats';
-import { getTeams } from '@/lib/db';
+import { listUserApplicationGradingProgressByTeam } from '@/lib/team-dashboard';
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import {
   formatTeamStatusSummary,
@@ -17,7 +17,7 @@ import {
 } from '@/lib/pipeline-phase';
 import { getPhaseChecklistForStatus } from '@/lib/phase-checklist';
 import { cachedPerRequest } from '@/lib/request-cache';
-import type { RoundStatus } from '@/lib/db';
+import { getTeams, type RoundStatus } from '@/lib/db';
 import type { UnlockableStage } from '@/lib/stages';
 import { PIPELINE_PHASES } from '@/lib/stages';
 import type { PhaseChecklistStep } from '@/lib/phase-checklist';
@@ -34,6 +34,7 @@ export type AdminDashboardTeam = {
   applicationCount: number;
   assignmentProgress: { total: number; completed: number };
   gradersPerApplication: number;
+  myGrading: { total: number; completed: number } | null;
 };
 
 export type AdminDashboardPayload = {
@@ -96,6 +97,7 @@ export async function loadAdminTeamDashboardStats(
           applicationCount: 0,
           assignmentProgress: { total: 0, completed: 0 },
           gradersPerApplication: DEFAULT_GRADERS_PER_APPLICATION,
+          myGrading: null,
         };
       }
 
@@ -124,14 +126,20 @@ export async function loadAdminTeamDashboardStats(
         unlockedStages: unlockByTeam.get(team.id) ?? [],
         interviewStatsByStage: interviews,
         ...stats,
+        myGrading: null,
       };
     });
   });
 }
 
-export async function buildAdminDashboardPayload(): Promise<AdminDashboardPayload> {
+export async function buildAdminDashboardPayload(
+  userId?: number,
+): Promise<AdminDashboardPayload> {
   const [teams, globalState] = await Promise.all([getTeams(), getGlobalPipelineState()]);
-  const teamsWithRounds = await loadAdminTeamDashboardStats(teams, globalState);
+  const [teamsWithRounds, myProgress] = await Promise.all([
+    loadAdminTeamDashboardStats(teams, globalState),
+    userId ? listUserApplicationGradingProgressByTeam(userId) : Promise.resolve(null),
+  ]);
 
   const applicationCount = teamsWithRounds.reduce((sum, t) => sum + t.applicationCount, 0);
   const assignmentProgress = teamsWithRounds.reduce(
@@ -148,10 +156,17 @@ export async function buildAdminDashboardPayload(): Promise<AdminDashboardPayloa
   const gradersPerApplication =
     gradersPerApplicationValues.length > 0 ? gradersPerApplicationValues[0] : null;
 
+  const teamsWithMine = myProgress
+    ? teamsWithRounds.map((team) => ({
+        ...team,
+        myGrading: myProgress.get(team.id) ?? null,
+      }))
+    : teamsWithRounds;
+
   return {
     pipelineStatus: suggestedDashboardViewPhase(globalState.teams),
     teamStatusSummary: formatTeamStatusSummary(globalState.teams),
-    teams: teamsWithRounds,
+    teams: teamsWithMine,
     applicationCount,
     assignmentProgress,
     gradersPerApplication,

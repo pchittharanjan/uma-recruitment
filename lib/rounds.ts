@@ -10,13 +10,28 @@ import {
   type Team,
 } from '@/lib/db';
 import { assignGraders, DEFAULT_GRADERS_PER_APPLICATION } from '@/lib/assignments';
-import { extractCandidateFromFields } from '@/lib/candidates';
+import {
+  extractCandidateFromFields,
+  findDuplicateCandidateEmails,
+  formatDuplicateCandidateEmailError,
+  isApplicationsUniqueConstraintError,
+} from '@/lib/candidates';
 import { parseCsv } from '@/lib/csv';
 import { getOrgCoffeeChatDates } from '@/lib/org-coffee-chat-dates';
 import { cachedPerRequest } from '@/lib/request-cache';
 import { cachedProcess } from '@/lib/process-cache';
 import { getRecruitmentCycleShortLabel } from '@/lib/org-recruitment-cycle-server';
 import { getOrgRubric, mergeOrgRubricIntoHeaders } from '@/lib/org-rubric';
+import type { TeamGradingModel } from '@/lib/grading-model-types';
+
+function parseGradingModel(value: unknown): TeamGradingModel | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  try {
+    return JSON.parse(value) as TeamGradingModel;
+  } catch {
+    return null;
+  }
+}
 
 export interface NormalizationFactor {
   userId: number;
@@ -39,6 +54,7 @@ export interface RoundSettings {
   graders_per_application: number;
   coffee_chat_start_date: string | null;
   application_due_date: string | null;
+  grading_model: TeamGradingModel | null;
 }
 
 interface GraderInput {
@@ -74,6 +90,7 @@ export function rowToRoundSettings(row: ResultSet['rows'][number]): RoundSetting
         : DEFAULT_GRADERS_PER_APPLICATION,
     coffee_chat_start_date: (row.coffee_chat_start_date as string | null) ?? null,
     application_due_date: (row.application_due_date as string | null) ?? null,
+    grading_model: parseGradingModel(row.grading_model),
   };
 }
 
@@ -301,13 +318,20 @@ export async function importApplicationRound(input: ImportRoundInput): Promise<I
 
   const appIds: number[] = [];
 
+  const duplicates = findDuplicateCandidateEmails(
+    parsed.rows.map((fields, sourceIndex) => ({ fields, sourceIndex })),
+  );
+  if (duplicates.length > 0) {
+    throw new Error(formatDuplicateCandidateEmailError(duplicates));
+  }
+
   for (let i = 0; i < parsed.rows.length; i++) {
     const row = parsed.rows[i];
-    const { name, email } = extractCandidateFromFields(row);
+    const { name, email } = extractCandidateFromFields(row, { uniqueKey: i + 1 });
 
     let candidateId: number;
     const existingCandidate = await db.execute({
-      sql: 'SELECT id FROM candidates WHERE email = ?',
+      sql: 'SELECT id FROM candidates WHERE lower(email) = lower(?) LIMIT 1',
       args: [email],
     });
 
@@ -321,12 +345,33 @@ export async function importApplicationRound(input: ImportRoundInput): Promise<I
       candidateId = Number(candidateResult.lastInsertRowid);
     }
 
-    const appResult = await db.execute({
-      sql: `INSERT INTO applications (candidate_id, round_id, team_id, fields, stage, row_index)
-            VALUES (?, ?, ?, ?, 'application', ?)`,
-      args: [candidateId, roundId, input.teamId, JSON.stringify(row), i + 1],
+    const existingApp = await db.execute({
+      sql: `SELECT id FROM applications
+            WHERE candidate_id = ? AND round_id = ? AND team_id = ?
+            LIMIT 1`,
+      args: [candidateId, roundId, input.teamId],
     });
-    appIds.push(Number(appResult.lastInsertRowid));
+    if (existingApp.rows.length > 0) {
+      throw new Error(
+        `This team already has an application for ${name} (${email}). Reset the round, then import again.`,
+      );
+    }
+
+    try {
+      const appResult = await db.execute({
+        sql: `INSERT INTO applications (candidate_id, round_id, team_id, fields, stage, row_index)
+              VALUES (?, ?, ?, ?, 'application', ?)`,
+        args: [candidateId, roundId, input.teamId, JSON.stringify(row), i + 1],
+      });
+      appIds.push(Number(appResult.lastInsertRowid));
+    } catch (err) {
+      if (isApplicationsUniqueConstraintError(err)) {
+        throw new Error(
+          `This team already has an application for ${name} (${email}). Reset the round, then import again.`,
+        );
+      }
+      throw err;
+    }
   }
 
   const assignments = assignGraders(

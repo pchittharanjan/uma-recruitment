@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatGraderVerdictBreakdown } from '@/lib/advancement-rating-copy';
 import { cn } from '@/lib/utils';
 
 interface GraderVerdictProgress {
@@ -103,7 +104,7 @@ export function AdminAdvancementReadinessPanel({
       <Card>
         <CardHeader className="border-b border-border">
           <CardTitle>
-            {fromStage === 'application' ? 'Color signals' : 'Color Recommendations'}
+            Panel color ratings
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -133,7 +134,7 @@ export function AdminAdvancementReadinessPanel({
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
             <CardTitle>
-              {fromStage === 'application' ? 'Color signals' : 'Color Recommendations'}
+              Panel color ratings
             </CardTitle>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -146,7 +147,7 @@ export function AdminAdvancementReadinessPanel({
               />
             )}
             {data.allVerdictsComplete && data.graders.length > 0 && (
-              <StageBadge label="All verdicts in" color="green" size="compact" />
+              <StageBadge label="All ratings in" color="green" size="compact" />
             )}
           </div>
         </div>
@@ -186,7 +187,7 @@ export function AdminAdvancementReadinessPanel({
                     Grader
                   </TableHead>
                   <TableHead className="h-10 px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground">
-                    Recommendations
+                    Ratings
                   </TableHead>
                   {showBreakdown && (
                     <TableHead className="h-10 px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
@@ -224,17 +225,7 @@ export function AdminAdvancementReadinessPanel({
                       </TableCell>
                       {showBreakdown && (
                         <TableCell className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-                          {g.verdictSet === 0 ? (
-                            '-'
-                          ) : (
-                            <>
-                              <span className="text-green-700">{g.green} green</span>
-                              {' · '}
-                              <span className="text-amber-700">{g.yellow + g.highYellow + g.lowYellow} yellow</span>
-                              {' · '}
-                              <span className="text-red-700">{g.red} red</span>
-                            </>
-                          )}
+                          {g.verdictSet === 0 ? '-' : formatGraderVerdictBreakdown(g)}
                         </TableCell>
                       )}
                     </TableRow>

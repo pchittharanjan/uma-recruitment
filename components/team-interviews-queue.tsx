@@ -7,10 +7,13 @@ import ProgressBar from '@/components/progress-bar';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import StageBadge from '@/components/stage-badge';
 import { sessionKeyForAssignment } from '@/lib/interview-sessions';
 import {
   assignmentWorkStatus,
   resolveWorkStatus,
+  WORK_STATUS_DISPLAY,
+  workStatusBadgeColor,
 } from '@/lib/stages';
 import { useShellUser } from '@/components/shell-user-provider';
 import { interviewCompleteGuidance } from '@/lib/next-step-guidance';
@@ -106,6 +109,7 @@ export function TeamInterviewsQueue({
   const allDone = data.progress.completed === data.progress.total && data.progress.total > 0;
   const nextStep = data.nextStep;
   const completeCopy = nextStep ? interviewCompleteGuidance(nextStep.isDirector) : null;
+  const finalRoundComplete = stage === 'final_round' && allDone;
 
   if (data.progress.total === 0) {
     return (
@@ -126,13 +130,25 @@ export function TeamInterviewsQueue({
           eyebrow="Interview queue"
           title={data.stageLabel}
           actions={
-            hasMultipleTeams ? (
-              <NavLinkButton variant="secondary" href="/team">
-                ← Teams
-              </NavLinkButton>
-            ) : undefined
+            <NavLinkButton
+              variant="secondary"
+              href={hasMultipleTeams ? '/team' : `/team/${teamId}`}
+            >
+              {hasMultipleTeams ? '← Teams' : '← Overview'}
+            </NavLinkButton>
           }
         />
+
+        {finalRoundComplete && (
+          <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
+            <div className="space-y-1">
+              <CardTitle className="text-base">All final interviews scored</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
+                Wait for Admin to advance the team before deliberations open.
+              </CardDescription>
+            </div>
+          </Card>
+        )}
 
         {completeCopy && nextStep && (
           <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
@@ -183,28 +199,54 @@ export function TeamInterviewsQueue({
                 const timeLabel = formatSlotTime(session.scheduledAt);
                 const isGroup = session.assignments.length > 1;
                 const scoreTargetId = firstPendingApplicationId(session.assignments);
+                const pendingCount = session.assignments.filter((a) => a.status === 'pending').length;
+                const sessionStatus = resolveWorkStatus(
+                  pendingCount,
+                  session.assignments.length,
+                  session.assignments.some((a) => a.status === 'completed'),
+                );
 
                 return (
-                  <div key={session.key} className="overflow-hidden">
-                    {(timeLabel || session.location) && (
-                      <p className="mt-0 text-sm text-muted-foreground">
-                        Next:{' '}
-                        <span className="font-medium text-foreground">
-                          {timeLabel}
-                          {session.location ? ` · ${session.location}` : ''}
-                        </span>
-                      </p>
-                    )}
+                  <div key={session.key} className="overflow-hidden py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0 space-y-0.5">
+                        {isGroup ? (
+                          <p className="text-sm font-medium text-foreground">
+                            Group interview · {session.assignments.length} candidates
+                          </p>
+                        ) : null}
+                        {(timeLabel || session.location) && (
+                          <p className="text-sm text-muted-foreground">
+                            {timeLabel}
+                            {session.location ? ` · ${session.location}` : ''}
+                          </p>
+                        )}
+                      </div>
+                      {sessionStatus ? (
+                        <StageBadge
+                          label={WORK_STATUS_DISPLAY[sessionStatus]}
+                          color={workStatusBadgeColor(sessionStatus)}
+                          size="compact"
+                        />
+                      ) : null}
+                    </div>
 
                     <ul className="mt-3 divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50 bg-background/60">
                       {session.assignments.map((a) => {
+                        const workStatus = assignmentWorkStatus(a.status);
+
                         if (isGroup) {
                           return (
                             <li
                               key={a.assignmentId}
-                              className="flex items-center px-3 py-3 text-sm"
+                              className="flex items-center justify-between gap-3 px-3 py-3 text-sm"
                             >
                               <span className="min-w-0 truncate text-sm text-foreground">{a.candidateName}</span>
+                              <StageBadge
+                                label={WORK_STATUS_DISPLAY[workStatus]}
+                                color={workStatusBadgeColor(workStatus)}
+                                size="compact"
+                              />
                             </li>
                           );
                         }
@@ -216,6 +258,11 @@ export function TeamInterviewsQueue({
                           >
                             <span className="min-w-0 truncate text-sm text-foreground">{a.candidateName}</span>
                             <div className="flex items-center gap-2 justify-end">
+                              <StageBadge
+                                label={WORK_STATUS_DISPLAY[workStatus]}
+                                color={workStatusBadgeColor(workStatus)}
+                                size="compact"
+                              />
                               {a.status === 'pending' && (
                                 <NavLinkButton
                                   variant="ghost"
@@ -232,14 +279,19 @@ export function TeamInterviewsQueue({
                     </ul>
 
                     {isGroup && scoreTargetId !== null && (
-                      <div className="mt-6 flex items-center justify-end gap-3">
-                        <NavLinkButton
-                          size="sm"
-                          href={`/team/${teamId}/interviews/${stage}/${scoreTargetId}`}
-                          data-tour="interview-queue-next"
-                        >
-                          Next Interview →
-                        </NavLinkButton>
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          Scores auto-save — submit the whole session when every candidate is scored.
+                        </p>
+                        <div className="flex items-center justify-end gap-3">
+                          <NavLinkButton
+                            size="sm"
+                            href={`/team/${teamId}/interviews/${stage}/${scoreTargetId}`}
+                            data-tour="interview-queue-next"
+                          >
+                            Score group session →
+                          </NavLinkButton>
+                        </div>
                       </div>
                     )}
                   </div>

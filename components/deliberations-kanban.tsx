@@ -21,6 +21,7 @@ import { DeliberationsCandidateDetailPanel, prefetchDeliberationsDetail } from '
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
 import LoadingButton from '@/components/loading-button';
+import StatusBanner from '@/components/status-banner';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -671,6 +672,7 @@ export function DeliberationsKanban({
   selectionComplete = false,
   saveUrl,
   finalizeUrl,
+  autosave = false,
   resolveDetailUrl,
   resolveBatchDetailsUrl,
   onFinalized,
@@ -698,6 +700,8 @@ export function DeliberationsKanban({
   saveUrl?: string;
   /** POST target to lock final selection (admin). */
   finalizeUrl?: string;
+  /** Debounced autosave on layout changes (team personal boards). */
+  autosave?: boolean;
   /** Candidate detail GET URL builder. */
   resolveDetailUrl?: (applicationId: number) => string;
   /** Batch details GET URL builder for compare. */
@@ -732,6 +736,9 @@ export function DeliberationsKanban({
     () => initialSavedLayout ?? serializeDeliberationsLayout(initialColumns),
   );
   const [saving, setSaving] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'pending' | 'saved' | 'error'>(
+    'idle',
+  );
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [locked, setLocked] = useState(selectionComplete);
@@ -782,11 +789,67 @@ export function DeliberationsKanban({
     [allCandidates, compareIds],
   );
 
+  const viewOnlyMessage =
+    readOnly && !canSave
+      ? 'Discussion view only — an Admin saves the official board.'
+      : 'Recruitment is closed. This board is view-only.';
+
+  const persistLayout = async (options?: { silent?: boolean }) => {
+    if (!canSave || saving || !isDirty || locked) return false;
+    setSaving(true);
+    if (autosave) setAutosaveState('pending');
+    try {
+      const layout = serializeDeliberationsLayout(columns);
+      const res = await fetch(boardSaveUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layout }),
+      });
+      const json = (await res.json()) as {
+        success?: boolean;
+        layout?: DeliberationsBoardLayout;
+        error?: string;
+      };
+      if (!res.ok) {
+        if (autosave) setAutosaveState('error');
+        if (!options?.silent) {
+          toast.error(json.error || 'Failed to save board.');
+        }
+        return false;
+      }
+      setSavedLayout(json.layout ?? layout);
+      if (autosave) {
+        setAutosaveState('saved');
+      } else if (!options?.silent) {
+        toast.success('Board saved.');
+      }
+      return true;
+    } catch {
+      if (autosave) setAutosaveState('error');
+      if (!options?.silent) {
+        toast.error('Network error: could not save board.');
+      }
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!autosave || !canSave || locked || readOnly || !isDirty) return;
+    setAutosaveState('pending');
+    const timer = window.setTimeout(() => {
+      void persistLayout({ silent: true });
+    }, 800);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- persist when layout changes
+  }, [autosave, canSave, locked, readOnly, isDirty, currentLayout]);
+
   const toggleRejected = (candidateId: string) => {
     if (readOnly || locked) {
       toast.error(
         readOnly
-          ? 'Recruitment is closed. This board is view-only.'
+          ? viewOnlyMessage
           : 'Final selection is locked for this team.',
       );
       return;
@@ -814,31 +877,7 @@ export function DeliberationsKanban({
   };
 
   const handleSave = async () => {
-    if (!canSave || saving || !isDirty || locked) return;
-    setSaving(true);
-    try {
-      const layout = serializeDeliberationsLayout(columns);
-      const res = await fetch(boardSaveUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ layout }),
-      });
-      const json = (await res.json()) as {
-        success?: boolean;
-        layout?: DeliberationsBoardLayout;
-        error?: string;
-      };
-      if (!res.ok) {
-        toast.error(json.error || 'Failed to save board.');
-        return;
-      }
-      setSavedLayout(json.layout ?? layout);
-      toast.success('Board saved.');
-    } catch {
-      toast.error('Network error: could not save board.');
-    } finally {
-      setSaving(false);
-    }
+    await persistLayout();
   };
 
   const acceptCount = columns.accept?.length ?? 0;
@@ -894,7 +933,7 @@ export function DeliberationsKanban({
     overIndex,
   }: KanbanMoveEvent) => {
     if (readOnly) {
-      toast.error('Recruitment is closed. This board is view-only.');
+      toast.error(viewOnlyMessage);
       return;
     }
     if (locked) {
@@ -956,6 +995,12 @@ export function DeliberationsKanban({
 
   return (
     <div className="space-y-3">
+      {canSave && isDirty && !locked && !autosave ? (
+        <StatusBanner
+          type="warning"
+          message="You have unsaved board changes. Click Save before leaving so the team sees the latest layout."
+        />
+      ) : null}
       <div className="display-panel flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div
           className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
@@ -1020,18 +1065,28 @@ export function DeliberationsKanban({
                 Final Selection Locked
               </Badge>
             ) : null}
-            {isDirty && !locked ? (
+            {autosave ? (
+              <p className="text-sm text-muted-foreground">
+                {autosaveState === 'pending' || (isDirty && autosaveState !== 'error')
+                  ? 'Saving…'
+                  : autosaveState === 'error'
+                    ? 'Autosave failed — retry by moving a card'
+                    : 'Autosaved'}
+              </p>
+            ) : isDirty && !locked ? (
               <p className="text-sm text-muted-foreground">Unsaved changes</p>
             ) : null}
-            <LoadingButton
-              type="button"
-              onClick={handleSave}
-              loading={saving}
-              disabled={!isDirty || locked}
-              data-tour="deliberations-save"
-            >
-              Save
-            </LoadingButton>
+            {!autosave ? (
+              <LoadingButton
+                type="button"
+                onClick={handleSave}
+                loading={saving}
+                disabled={!isDirty || locked}
+                data-tour="deliberations-save"
+              >
+                Save
+              </LoadingButton>
+            ) : null}
             {!locked && allowFinalize ? (
               <>
                 <LoadingButton
@@ -1063,7 +1118,7 @@ export function DeliberationsKanban({
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Local preview: admin saves &amp; advances
+            Follow the admin screen for official placements.
           </p>
         )}
       </div>

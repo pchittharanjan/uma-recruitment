@@ -15,11 +15,13 @@ import {
 import {
   resolveAdvancementSelectionMax,
   resolveAdvancementSelectionMin,
+  teamAllowsUncappedFirstRoundAdvancement,
 } from '@/lib/advancement-cap-helpers';
 import { forbidden, unauthorized } from '@/lib/auth';
 import { userHasTeamAccess } from '@/lib/access';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { isTeamDirector } from '@/lib/directors';
+import { getTeamById } from '@/lib/db';
 import { getActiveRoundForTeam } from '@/lib/rounds';
 import { getRecruitmentCycleLabel } from '@/lib/org-recruitment-cycle-server';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
@@ -69,22 +71,29 @@ export async function GET(req: NextRequest) {
       teamId,
       fromStage,
     );
+    const team = await getTeamById(teamId);
+    const allowUncapped =
+      fromStage === 'first_round' &&
+      Boolean(team?.name && teamAllowsUncappedFirstRoundAdvancement(team.name));
     const previousSubmittedCount =
       submission?.status === 'submitted' ? submission.candidates.length : null;
     const selectionMin = resolveAdvancementSelectionMin({
       cap: advancementCap,
       totalRanked: preview.totalApplications,
       overCapExtra,
+      allowUncapped,
     });
     const selectionMax = resolveAdvancementSelectionMax({
       cap: advancementCap,
       totalRanked: preview.totalApplications,
       overCapExtra,
       previousSubmittedCount,
+      allowUncapped,
     });
 
     return NextResponse.json({
       teamId,
+      teamName: team?.name ?? null,
       fromStage,
       round: { id: round.id, label: recruitmentCycleLabel, status: round.status },
       preview,
@@ -96,6 +105,7 @@ export async function GET(req: NextRequest) {
       overCapExtra,
       selectionMin,
       selectionMax,
+      allowUncappedFirstRound: allowUncapped,
       currentUser: {
         id: user.id,
         name: user.name,

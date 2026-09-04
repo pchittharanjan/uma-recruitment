@@ -35,6 +35,60 @@ export async function getActiveRoundCount(): Promise<number> {
   return Number(result.rows[0]?.count ?? 0);
 }
 
+async function createPreApplicationRoundsForAllTeams(
+  dates: OrgCoffeeChatDates = { coffeeChatStartDate: null, applicationDueDate: null },
+): Promise<number> {
+  const db = getDb();
+  const roundLabel = await getRecruitmentCycleShortLabel();
+  const teams = await db.execute({ sql: 'SELECT id FROM teams ORDER BY id' });
+  let created = 0;
+  for (const teamRow of teams.rows) {
+    const teamId = teamRow.id as number;
+    // Per-team guard: concurrent callers that both saw global count=0 must not
+    // insert duplicate pre_application rounds for the same team.
+    const existing = await db.execute({
+      sql: `SELECT id FROM rounds WHERE team_id = ? LIMIT 1`,
+      args: [teamId],
+    });
+    if (existing.rows.length > 0) continue;
+
+    const roundInsert = await db.execute({
+      sql: `INSERT INTO rounds (team_id, label, status)
+            VALUES (?, ?, 'pre_application')`,
+      args: [teamId, roundLabel],
+    });
+    const roundId = Number(roundInsert.lastInsertRowid);
+    await db.execute({
+      sql: `INSERT INTO round_settings (
+              round_id, csv_headers, score_fields, custom_score_fields, context_fields,
+              portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
+            ) VALUES (?, '[]', '[]', '[]', '[]', '[]', ?, ?, ?)`,
+      args: [
+        roundId,
+        DEFAULT_GRADERS_PER_APPLICATION,
+        dates.coffeeChatStartDate,
+        dates.applicationDueDate,
+      ],
+    });
+    created += 1;
+  }
+  return created;
+}
+
+/** Start a fresh recruiting cycle for every team when no rounds exist yet. */
+export async function ensureRecruitmentRoundsStarted(): Promise<boolean> {
+  const db = getDb();
+  const anyRounds = await db.execute({ sql: 'SELECT COUNT(*) AS count FROM rounds' });
+  if (Number(anyRounds.rows[0]?.count ?? 0) > 0) return false;
+
+  const teams = await db.execute({ sql: 'SELECT COUNT(*) AS count FROM teams' });
+  if (Number(teams.rows[0]?.count ?? 0) === 0) return false;
+
+  const orgDates = await getOrgCoffeeChatDates();
+  const created = await createPreApplicationRoundsForAllTeams(orgDates);
+  return created > 0;
+}
+
 export async function getOrgCoffeeChatDates(): Promise<OrgCoffeeChatDates> {
   const db = getDb();
   const result = await db.execute('SELECT * FROM org_coffee_chat_dates WHERE id = 1');
@@ -68,38 +122,6 @@ export async function saveOrgCoffeeChatDates(dates: OrgCoffeeChatDates): Promise
           WHERE round_id IN (SELECT id FROM rounds WHERE status != 'closed')`,
     args: [dates.coffeeChatStartDate, dates.applicationDueDate],
   });
-
-  const activeRounds = await db.execute({
-    sql: `SELECT id, team_id FROM rounds WHERE status != 'closed'`,
-  });
-
-  // Before applications are imported, initialize one pre-application round per team
-  // so coffee chat submissions can run independently of CSV import.
-  if (activeRounds.rows.length === 0) {
-    const roundLabel = await getRecruitmentCycleShortLabel();
-    const teams = await db.execute({ sql: 'SELECT id FROM teams' });
-    for (const teamRow of teams.rows) {
-      const teamId = teamRow.id as number;
-      const roundInsert = await db.execute({
-        sql: `INSERT INTO rounds (team_id, label, status)
-              VALUES (?, ?, 'pre_application')`,
-        args: [teamId, roundLabel],
-      });
-      const roundId = Number(roundInsert.lastInsertRowid);
-      await db.execute({
-        sql: `INSERT INTO round_settings (
-                round_id, csv_headers, score_fields, custom_score_fields, context_fields,
-                portfolio_fields, graders_per_application, coffee_chat_start_date, application_due_date
-              ) VALUES (?, '[]', '[]', '[]', '[]', '[]', ?, ?, ?)`,
-        args: [
-          roundId,
-          DEFAULT_GRADERS_PER_APPLICATION,
-          dates.coffeeChatStartDate,
-          dates.applicationDueDate,
-        ],
-      });
-    }
-  }
 
   return dates;
 }
