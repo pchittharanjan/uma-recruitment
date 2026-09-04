@@ -17,6 +17,105 @@ import {
   resolveGradingRubric,
 } from '@/lib/grading-model';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
+import type { TeamGradingModel } from '@/lib/grading-model-types';
+
+function noteValue(notes: Record<string, string> | undefined, key: string): string | null {
+  const value = notes?.[key]?.trim();
+  return value ? value : null;
+}
+
+function validateFullScores(
+  scores: Record<string, number>,
+  scoreFields: string[],
+): string | null {
+  for (const field of scoreFields) {
+    const val = scores[field];
+    if (val === undefined) {
+      return `Missing score for field: ${field}`;
+    }
+    if (!Number.isInteger(val) || val < 1 || val > 5) {
+      return `Score for "${field}" must be an integer between 1 and 5`;
+    }
+  }
+  return null;
+}
+
+function validatePartialScores(
+  scores: Record<string, number>,
+  scoreFields: string[],
+): string | null {
+  const allowed = new Set(scoreFields);
+  for (const [field, val] of Object.entries(scores)) {
+    if (!allowed.has(field) || val === undefined) continue;
+    if (!Number.isInteger(val) || val < 1 || val > 5) {
+      return `Score for "${field}" must be an integer between 1 and 5`;
+    }
+  }
+  return null;
+}
+
+async function saveApplicationScore(args: {
+  assignmentId: number;
+  userId: number;
+  scoreFields: string[];
+  scores: Record<string, number>;
+  notes: Record<string, string> | undefined;
+  comment: string;
+  rubric: {
+    usesCriterionRubric: boolean;
+    applicationQuestions: TeamGradingModel['components'][number]['questions'];
+  };
+  complete: boolean;
+}): Promise<void> {
+  const {
+    assignmentId,
+    userId,
+    scoreFields,
+    scores,
+    notes,
+    comment,
+    rubric,
+    complete,
+  } = args;
+
+  const questionNoteRows = rubric.usesCriterionRubric
+    ? primaryScoredQuestions(rubric.applicationQuestions).map((question) => ({
+        sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, NULL, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET note = excluded.note`,
+        args: [assignmentId, questionNotesKey(question.id), noteValue(notes, question.id)],
+      }))
+    : [];
+
+  const db = getDb();
+  await db.batch(
+    [
+      ...scoreFields.map((field) => ({
+        sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, ?, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET
+                score = excluded.score,
+                note = excluded.note`,
+        args: [
+          assignmentId,
+          field,
+          scores[field] ?? null,
+          rubric.usesCriterionRubric ? null : noteValue(notes, field),
+        ],
+      })),
+      ...questionNoteRows,
+      complete
+        ? {
+            sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
+                  WHERE id = ? AND user_id = ?`,
+            args: [comment || null, assignmentId, userId],
+          }
+        : {
+            sql: `UPDATE assignments SET comment = ? WHERE id = ? AND user_id = ?`,
+            args: [comment || null, assignmentId, userId],
+          },
+    ],
+    'write',
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -62,64 +161,51 @@ export async function POST(
     if (!team) return notFound('Team not found');
 
     const body = await req.json();
-    const scores = body.scores as Record<string, number>;
+    const scores = (body.scores as Record<string, number> | undefined) ?? {};
     const notes = (body.notes as Record<string, string> | undefined) ?? {};
     const comment = (body.comment as string | undefined) ?? '';
+    const isDraft = body.draft === true;
 
     const scoreFields = requiredGradingScoreFields(settings, team.name);
-    for (const field of scoreFields) {
-      const val = scores[field];
-      if (val === undefined) {
-        return NextResponse.json({ error: `Missing score for field: ${field}` }, { status: 400 });
+    const rubric = resolveGradingRubric(settings, team.name);
+
+    if (isDraft) {
+      const validationError = validatePartialScores(scores, scoreFields);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
       }
-      if (!Number.isInteger(val) || val < 1 || val > 5) {
-        return NextResponse.json(
-          { error: `Score for "${field}" must be an integer between 1 and 5` },
-          { status: 400 },
-        );
-      }
+
+      await saveApplicationScore({
+        assignmentId: assignment.assignmentId,
+        userId: user.id,
+        scoreFields,
+        scores,
+        notes,
+        comment,
+        rubric,
+        complete: false,
+      });
+
+      return NextResponse.json({ success: true, draft: true });
     }
 
-    const rubric = resolveGradingRubric(settings, team.name);
-    const noteValue = (key: string): string | null => {
-      const value = notes[key]?.trim();
-      return value ? value : null;
-    };
-    const questionNoteRows = rubric.usesCriterionRubric
-      ? primaryScoredQuestions(rubric.applicationQuestions).map((question) => ({
-          sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, NULL, ?)
-                ON CONFLICT(assignment_id, field_name) DO UPDATE SET note = excluded.note`,
-          args: [assignment.assignmentId, questionNotesKey(question.id), noteValue(question.id)],
-        }))
-      : [];
+    const validationError = validateFullScores(scores, scoreFields);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
+    await saveApplicationScore({
+      assignmentId: assignment.assignmentId,
+      userId: user.id,
+      scoreFields,
+      scores,
+      notes,
+      comment,
+      rubric,
+      complete: true,
+    });
 
     const db = getDb();
-    const assignmentId = assignment.assignmentId;
-
-    await db.batch(
-      [
-        ...scoreFields.map((field) => ({
-          sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, ?, ?)
-                ON CONFLICT(assignment_id, field_name) DO UPDATE SET
-                  score = excluded.score,
-                  note = excluded.note`,
-          args: [
-            assignmentId,
-            field,
-            scores[field],
-            rubric.usesCriterionRubric ? null : noteValue(field),
-          ],
-        })),
-        ...questionNoteRows,
-        {
-          sql: `UPDATE assignments SET status = 'completed', completed_at = unixepoch(), comment = ?
-                WHERE id = ? AND user_id = ?`,
-          args: [comment || null, assignmentId, user.id],
-        },
-      ],
-      'write',
-    );
-
     const next = await db.execute({
       sql: `SELECT app.id as application_id
             FROM assignments a

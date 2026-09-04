@@ -1,22 +1,24 @@
 'use client';
 
-import React, { use, useCallback, useEffect, useRef, useState } from 'react';
+import React, { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import { CenteredMessage } from '@/components/centered-message';
-import { PageContainer, PageContent, PageHeader } from '@/components/page-shell';
+import { PageContainer, PageContent } from '@/components/page-shell';
 import { ApplicationQuestionRubricCard } from '@/components/application-question-rubric';
 import { PortfolioLinkPreview } from '@/components/portfolio-link-preview';
 import { ResponseText } from '@/components/response-text';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import LoadingButton from '@/components/loading-button';
 import { GradingSubmitFooter } from '@/components/grading-submit-footer';
 import { applicantDisplayId } from '@/lib/blind';
 import ScoreSelector from '@/components/ScoreSelector';
 import StatusBanner from '@/components/status-banner';
 import { RequiredAsterisk } from '@/components/ui/label';
+import { DocumentSaveStatusLine } from '@/components/document-save-status';
+import { useAutosaveStatus } from '@/hooks/use-autosave-status';
 import {
+  invalidateGradeData,
   invalidateTeamGradeData,
   loadGradeData,
   prefetchNextPendingGradeData,
@@ -29,6 +31,14 @@ import { gradingAppHref, gradingQueueHref } from '@/lib/grading-paths';
 import { cn } from '@/lib/utils';
 import { useOptionalShellUser } from '@/components/shell-user-provider';
 import type { TeamName } from '@/lib/db';
+
+function serializeGradeDraft(
+  scores: Record<string, number>,
+  notes: Record<string, string>,
+  comment: string,
+): string {
+  return JSON.stringify({ scores, notes, comment });
+}
 
 export default function TeamGradingScorePage({
   params,
@@ -89,6 +99,56 @@ export default function TeamGradingScorePage({
     : [];
   const activeField = allScoredFields.find((f) => scores[f] === undefined) ?? null;
 
+  const saveSnapshot = useMemo(
+    () => serializeGradeDraft(scores, notes, comment),
+    [scores, notes, comment],
+  );
+
+  const persistDraft = useCallback(
+    async (snapshot: string) => {
+      const parsed = JSON.parse(snapshot) as {
+        scores: Record<string, number>;
+        notes: Record<string, string>;
+        comment: string;
+      };
+      const res = await fetch(`/api/team/grading/${applicationId}/score?teamId=${teamId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft: true, ...parsed }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Couldn't save");
+      }
+      // Drop stale GET cache so reopen loads the draft.
+      invalidateGradeData(teamId, applicationId);
+    },
+    [applicationId, teamId],
+  );
+
+  const { status: saveStatus, errorMessage: saveError, flush } = useAutosaveStatus({
+    snapshot: saveSnapshot,
+    ready: Boolean(appData),
+    resetKey: applicationId,
+    enabled: Boolean(appData) && !gradingLocked && !submitting,
+    persist: persistDraft,
+  });
+
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+
+  // Flush pending draft when leaving the screen (route change / unmount).
+  useEffect(() => {
+    return () => {
+      void flushRef.current();
+    };
+  }, [applicationId]);
+
+  const leaveToQueue = useCallback(async () => {
+    await flushRef.current();
+    router.push(gradingQueueHref(teamId, audience));
+  }, [audience, router, teamId]);
+
   const handleSubmit = useCallback(async () => {
     if (!appData || submitting) return;
     const allFields = usesCriterionRubric
@@ -104,6 +164,8 @@ export default function TeamGradingScorePage({
     setSubmitting(true);
     setSubmitError('');
     try {
+      // Wait out any in-flight draft (don't write another) so it can't race the submit.
+      await flushRef.current({ persist: false });
       const res = await fetch(`/api/team/grading/${applicationId}/score?teamId=${teamId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,11 +204,12 @@ export default function TeamGradingScorePage({
     }
   }, [appData, applicationId, audience, comment, notes, router, scores, submitting, teamId, teamName, usesCriterionRubric]);
 
-  /** Leave this applicant pending and open the next unscored one — no score write. */
+  /** Leave this applicant pending and open the next unscored one — draft is flushed first. */
   const handleSkip = useCallback(async () => {
     if (!appData || submitting || skipping || gradingLocked) return;
     setSkipping(true);
     try {
+      await flushRef.current();
       const nextId = await resolveNextPendingApplicationId(teamId, appData.applicationId);
       if (nextId == null) {
         toast.message('This is the last pending application in your queue.', {
@@ -233,7 +296,7 @@ export default function TeamGradingScorePage({
         title="Couldn't load application"
         description={error}
         ctaLabel="Back"
-        onCtaClick={() => router.push(gradingQueueHref(teamId, audience))}
+        onCtaClick={() => void leaveToQueue()}
       />
     );
   }
@@ -266,7 +329,7 @@ export default function TeamGradingScorePage({
           >
             <button
               type="button"
-              onClick={() => router.push(gradingQueueHref(teamId, audience))}
+              onClick={() => void leaveToQueue()}
               className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
             >
               ← Back
@@ -279,12 +342,22 @@ export default function TeamGradingScorePage({
                 {appData.graderProgress.completed} of {appData.graderProgress.total} done
               </p>
             </div>
-            <span
-              className="shrink-0 text-sm tabular-nums text-muted-foreground"
-              data-tour="grade-form-progress"
-            >
-              {scoredCount}/{totalScored} scored
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
+              {!gradingLocked ? (
+                <DocumentSaveStatusLine
+                  status={saveStatus}
+                  errorMessage={saveError}
+                  savedLabel="Saved"
+                  className="text-xs"
+                />
+              ) : null}
+              <span
+                className="text-sm tabular-nums text-muted-foreground"
+                data-tour="grade-form-progress"
+              >
+                {scoredCount}/{totalScored} scored
+              </span>
+            </div>
           </PageContent>
         </PageContainer>
       </div>
