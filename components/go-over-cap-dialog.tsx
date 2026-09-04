@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import { PasswordInput } from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -111,14 +112,14 @@ export function GoOverCapDialog({
         <div className="space-y-4 border-t border-border px-6 py-5">
           <div className="space-y-1.5">
             <Label htmlFor={`go-over-code-${teamId}-${stage}`}>Go-over code</Label>
-            <Input
+            <PasswordInput
               id={`go-over-code-${teamId}-${stage}`}
-              type="password"
               autoComplete="off"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               disabled={submitting}
               className="h-10 bg-background"
+              wrapperClassName="max-w-none"
             />
           </div>
           <div className="space-y-1.5">

@@ -6,7 +6,7 @@ import { requireAuth, unauthorized } from '@/lib/auth';
 import { setOrgOverCapCode } from '@/lib/team-advancement-caps';
 import { assertPipelineWritable } from '@/lib/pipeline-writable';
 
-/** Admin-only: set or replace the org-wide go-over code (stored as SHA-256 hash). */
+/** Admin-only: set or replace the org-wide go-over code (hash for verify + plain for admin reveal). */
 export async function PUT(req: NextRequest) {
   try {
     await initDb();
@@ -19,7 +19,7 @@ export async function PUT(req: NextRequest) {
     const code = typeof body.code === 'string' ? body.code : '';
     await setOrgOverCapCode(code, user.id);
 
-    return NextResponse.json({ success: true, overCapCodeSet: true });
+    return NextResponse.json({ success: true, overCapCodeSet: true, overCapCode: code.trim() });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Internal server error';
     const status =

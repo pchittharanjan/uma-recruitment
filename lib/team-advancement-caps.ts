@@ -96,6 +96,16 @@ export async function isOverCapCodeSet(): Promise<boolean> {
   return typeof hash === 'string' && hash.length > 0;
 }
 
+/** Admin-only: plaintext go-over code when available (null if set before plain storage). */
+export async function getOrgOverCapCodePlain(): Promise<string | null> {
+  const db = getDb();
+  const result = await db.execute(
+    `SELECT code_plain FROM org_over_cap_code WHERE id = 1`,
+  );
+  const plain = result.rows[0]?.code_plain;
+  return typeof plain === 'string' && plain.length > 0 ? plain : null;
+}
+
 export async function setOrgOverCapCode(code: string, updatedBy: number): Promise<void> {
   const trimmed = code.trim();
   if (!trimmed) {
@@ -107,13 +117,14 @@ export async function setOrgOverCapCode(code: string, updatedBy: number): Promis
   const db = getDb();
   const codeHash = hashOverCapCode(trimmed);
   await db.execute({
-    sql: `INSERT INTO org_over_cap_code (id, code_hash, updated_at, updated_by)
-          VALUES (1, ?, unixepoch(), ?)
+    sql: `INSERT INTO org_over_cap_code (id, code_hash, code_plain, updated_at, updated_by)
+          VALUES (1, ?, ?, unixepoch(), ?)
           ON CONFLICT(id) DO UPDATE SET
             code_hash = excluded.code_hash,
+            code_plain = excluded.code_plain,
             updated_at = unixepoch(),
             updated_by = excluded.updated_by`,
-    args: [codeHash, updatedBy],
+    args: [codeHash, trimmed, updatedBy],
   });
 }
 

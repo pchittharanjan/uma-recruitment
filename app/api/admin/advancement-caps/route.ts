@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { requireAuth, unauthorized } from '@/lib/auth';
 import {
+  getOrgOverCapCodePlain,
   isOverCapCodeSet,
   listTeamAdvancementCaps,
   upsertTeamAdvancementCaps,
@@ -16,11 +17,12 @@ export async function GET(req: NextRequest) {
     const user = await requireAuth(req, { roles: ['admin'] });
     if (!user) return unauthorized();
 
-    const [teams, overCapCodeSet] = await Promise.all([
+    const [teams, overCapCodeSet, overCapCode] = await Promise.all([
       listTeamAdvancementCaps(),
       isOverCapCodeSet(),
+      getOrgOverCapCodePlain(),
     ]);
-    return NextResponse.json({ teams, overCapCodeSet });
+    return NextResponse.json({ teams, overCapCodeSet, overCapCode });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -339,10 +339,12 @@ CREATE TABLE IF NOT EXISTS team_advancement_caps (
   updated_by INTEGER REFERENCES users(id)
 );
 
--- Org-wide secret for directors to raise a team's over-cap extra (SHA-256 hash only).
+-- Org-wide secret for directors to raise a team's over-cap extra.
+-- Hash is used for verify; plain is admin-readable so the code can be revealed later.
 CREATE TABLE IF NOT EXISTS org_over_cap_code (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   code_hash TEXT NOT NULL,
+  code_plain TEXT,
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_by INTEGER REFERENCES users(id)
 );

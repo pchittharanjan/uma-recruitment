@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import LoadingButton from '@/components/loading-button';
+import { PasswordInput } from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -103,6 +104,7 @@ export function TeamAdvancementCapSettings() {
   const [savedRows, setSavedRows] = useState<TeamCapRow[]>([]);
   const [overCapCodeSet, setOverCapCodeSet] = useState(false);
   const [goOverCode, setGoOverCode] = useState('');
+  const [savedGoOverCode, setSavedGoOverCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
@@ -115,6 +117,7 @@ export function TeamAdvancementCapSettings() {
       const { ok, json } = await cachedJsonFetch<{
         teams?: TeamCapRow[];
         overCapCodeSet?: boolean;
+        overCapCode?: string | null;
         error?: string;
       }>('/api/admin/advancement-caps');
       if (!ok || !json) {
@@ -130,6 +133,12 @@ export function TeamAdvancementCapSettings() {
       setRows(teams);
       setSavedRows(teams);
       setOverCapCodeSet(Boolean(json.overCapCodeSet));
+      const plain =
+        typeof json.overCapCode === 'string' && json.overCapCode.trim()
+          ? json.overCapCode.trim()
+          : null;
+      setSavedGoOverCode(plain);
+      setGoOverCode(plain ?? '');
     } catch {
       setError('Failed to load advancement limits.');
     } finally {
@@ -226,11 +235,19 @@ export function TeamAdvancementCapSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: goOverCode }),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        overCapCode?: string;
+      };
       if (!res.ok) {
         throw new Error(json.error ?? 'Failed to save go-over code.');
       }
-      setGoOverCode('');
+      const saved =
+        typeof json.overCapCode === 'string' && json.overCapCode.trim()
+          ? json.overCapCode.trim()
+          : goOverCode.trim();
+      setSavedGoOverCode(saved);
+      setGoOverCode(saved);
       setOverCapCodeSet(true);
       invalidateClientFetchCache('/api/admin/advancement-caps');
       toast.success(overCapCodeSet ? 'Go-over code replaced' : 'Go-over code set');
@@ -332,16 +349,22 @@ export function TeamAdvancementCapSettings() {
           </Label>
           <p className="text-xs text-muted-foreground">
             {overCapCodeSet
-              ? 'Code is set. Enter a new value below to replace it. Directors use this code to take extra slots past a team limit.'
-              : 'Set a shared code. Directors enter it when they need extra slots past a team limit.'}
+              ? savedGoOverCode
+                ? 'Current code is saved below. Use the eye to show it, or type a new value to replace it. Directors use this code to take extra slots past a team limit.'
+                : 'Code is set, but was saved before it could be shown here. Enter it again below (eye to reveal while typing) so you can view it later. Directors use this code to take extra slots past a team limit.'
+              : 'Set a shared code. Directors enter it when they need extra slots past a team limit. Use the eye to show or hide it.'}
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <Input
+            <PasswordInput
               id="org-go-over-code"
-              type="password"
-              autoComplete="new-password"
-              placeholder={overCapCodeSet ? 'Enter new code to replace' : 'Enter code'}
-              className="h-9 max-w-xs border-foreground/20 bg-background"
+              placeholder={
+                overCapCodeSet && !savedGoOverCode
+                  ? 'Enter new code to replace'
+                  : overCapCodeSet
+                    ? 'Current go-over code'
+                    : 'Enter code'
+              }
+              className="h-9 border-foreground/20 bg-background"
               value={goOverCode}
               onChange={(e) => setGoOverCode(e.target.value)}
               disabled={loading || savingCode}
@@ -349,7 +372,7 @@ export function TeamAdvancementCapSettings() {
             <LoadingButton
               type="button"
               loading={savingCode}
-              disabled={!goOverCode.trim()}
+              disabled={!goOverCode.trim() || goOverCode.trim() === (savedGoOverCode ?? '')}
               onClick={handleSaveCode}
             >
               {overCapCodeSet ? 'Replace code' : 'Set code'}

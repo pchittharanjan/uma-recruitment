@@ -354,6 +354,7 @@ const MIGRATIONS = [
     )`,
     `CREATE INDEX IF NOT EXISTS idx_admin_advancement_verdicts_team_round
       ON admin_advancement_verdicts(team_id, round_id, from_stage)`,
+    'ALTER TABLE org_over_cap_code ADD COLUMN code_plain TEXT',
 ];
 
 async function scoresNeedsScaleMigration(
