@@ -12,10 +12,10 @@ import { cn } from '@/lib/utils';
 export type AvgScoreVariant = 'application' | 'interview';
 
 export const AVG_SCORE_TOOLTIP_APPLICATION =
-  'Primary number is the leniency-adjusted average used for ranking: each rubric score (1–5) is nudged so tough and easy graders are comparable, then averaged. “Raw” is the same scores averaged with no adjustment.';
+  'Team avg is visible to everyone on this team. Primary number is the leniency-adjusted average used for ranking: each rubric score (1–5) is nudged so tough and easy graders are comparable, then averaged. Hover for “Raw” — the same scores averaged with no adjustment.';
 
 export const AVG_SCORE_TOOLTIP_INTERVIEW =
-  'Mean of this applicant’s completed interview assignment totals. No leniency adjustment.';
+  'Team avg is visible to everyone on this team. Mean of this applicant’s completed interview assignment totals. No leniency adjustment.';
 
 export const AVG_SCORE_TOOLTIP = AVG_SCORE_TOOLTIP_APPLICATION;
 
@@ -46,12 +46,12 @@ export function AvgScoreHeader({
           align === 'right' && 'w-full justify-end',
         )}
       >
-        Avg score
+        Team avg
         <Tooltip>
           <TooltipTrigger
             type="button"
             className="inline-flex text-muted-foreground hover:text-foreground"
-            aria-label="What avg score means"
+            aria-label="What team avg means"
           >
             <InfoIcon className="size-3.5" />
           </TooltipTrigger>
@@ -64,15 +64,17 @@ export function AvgScoreHeader({
   );
 }
 
-/** Adjusted average; raw (if provided) is available on hover only. */
+/** Team avg primary; optional personal mean as a muted secondary line. Raw (if provided) on hover. */
 export function AvgScoreCell({
   average,
   rawAverage,
+  myAverage,
   align = 'left',
   className,
 }: {
   average: number;
   rawAverage?: number | null;
+  myAverage?: number | null;
   align?: 'left' | 'right';
   className?: string;
 }) {
@@ -80,16 +82,25 @@ export function AvgScoreCell({
     rawAverage !== undefined &&
     rawAverage !== null &&
     Number.isFinite(rawAverage);
+  const showMine =
+    myAverage !== undefined &&
+    myAverage !== null &&
+    Number.isFinite(myAverage);
 
   const content = (
     <span
       className={cn(
-        'text-sm tabular-nums',
-        align === 'right' && 'text-right',
+        'inline-flex flex-col gap-0.5 text-sm tabular-nums',
+        align === 'right' && 'items-end text-right',
         className,
       )}
     >
-      {average.toFixed(2)}
+      <span>{average.toFixed(2)}</span>
+      {showMine ? (
+        <span className="text-xs text-muted-foreground">
+          Yours {myAverage.toFixed(2)}
+        </span>
+      ) : null}
     </span>
   );
 

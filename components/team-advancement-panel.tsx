@@ -174,6 +174,7 @@ function rowVerdictContext(
   canSetVerdict: boolean;
   myVerdict: AdvancementVerdict | null;
   panelVerdicts: AdvancementPanelVerdict[];
+  myAverage: number | null;
 } {
   if (fromStage === 'first_round') {
     const ctx = interviewContextFor(data, applicationId);
@@ -181,6 +182,7 @@ function rowVerdictContext(
       canSetVerdict: Boolean(ctx?.iInterviewed),
       myVerdict: ctx?.myVerdict ?? null,
       panelVerdicts: ctx?.panelVerdicts ?? [],
+      myAverage: ctx?.myAverage ?? null,
     };
   }
   const ctx = applicationContextFor(data, applicationId);
@@ -188,6 +190,7 @@ function rowVerdictContext(
     canSetVerdict: Boolean(ctx?.iGraded),
     myVerdict: ctx?.myVerdict ?? null,
     panelVerdicts: ctx?.panelVerdicts ?? [],
+    myAverage: ctx?.myAverage ?? null,
   };
 }
 
@@ -806,6 +809,12 @@ export function TeamAdvancementPanel({
         />
       )}
 
+      {canMarkVerdicts && !isPending && !isApproved && (
+        <p className="text-sm text-muted-foreground">
+          Team avg is shared with everyone on this team. If you graded someone, your average shows under Yours.
+        </p>
+      )}
+
       {!canSubmitList && canMarkVerdicts && myRecommendationsComplete && (
         <StatusBanner
           type="success"
@@ -1276,6 +1285,7 @@ export function TeamAdvancementPanel({
                                     <AvgScoreCell
                                       average={app.average}
                                       rawAverage={isFirstRound ? undefined : app.rawAverage}
+                                      myAverage={rowCtx.myAverage}
                                     />
                                   </TableCell>
                                   <TableCell className="px-3 whitespace-normal">
@@ -1418,6 +1428,7 @@ export function TeamAdvancementPanel({
                             <AvgScoreCell
                               average={app.average}
                               rawAverage={isFirstRound ? undefined : app.rawAverage}
+                              myAverage={rowCtx.myAverage}
                             />
                           </TableCell>
                           <TableCell className="px-3 whitespace-normal">

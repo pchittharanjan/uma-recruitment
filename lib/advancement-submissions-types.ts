@@ -94,12 +94,16 @@ export interface AdvancementGroupMember {
 
 export interface AdvancementApplicationContext {
   iGraded: boolean;
+  /** Mean of this viewer’s numeric criterion scores; null if they didn’t finish grading. */
+  myAverage: number | null;
   myVerdict: AdvancementVerdict | null;
   panelVerdicts: AdvancementPanelVerdict[];
 }
 
 export interface AdvancementInterviewContext {
   iInterviewed: boolean;
+  /** Mean of this viewer’s numeric interview scores; null if they didn’t finish scoring. */
+  myAverage: number | null;
   myVerdict: AdvancementVerdict | null;
   panelVerdicts: AdvancementPanelVerdict[];
   myNotes: string | null;

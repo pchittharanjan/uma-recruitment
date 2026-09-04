@@ -15,14 +15,14 @@ export function gradingCompleteGuidance(isDirector: boolean): {
     return {
       title: 'Required next step: rate who advances',
       description:
-        `Pick ${FIVE_LEVEL_RATING_PHRASE} for each applicant you graded (see the legend on the next page). Then meet with your PMs and submit the final list to Admin.`,
+        `Pick ${FIVE_LEVEL_RATING_PHRASE} for each applicant you graded (see the legend on the next page). Team avg scores for the whole pool are on Advancements. Then meet with your PMs and submit the final list to Admin.`,
       ctaLabel: 'Rate who advances →',
     };
   }
   return {
     title: 'Required next step: rate who advances',
     description:
-      `Pick ${FIVE_LEVEL_RATING_PHRASE} for each applicant you graded. Directors use your ratings when they decide who moves forward.`,
+      `Pick ${FIVE_LEVEL_RATING_PHRASE} for each applicant you graded. Team avg scores for the whole pool are on Advancements. Directors use your ratings when they decide who moves forward.`,
     ctaLabel: 'Rate who advances →',
   };
 }

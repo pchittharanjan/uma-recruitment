@@ -9,6 +9,48 @@ import type {
 } from '@/lib/advancement-submissions-types';
 import { sessionKeyForAssignment } from '@/lib/interview-sessions';
 
+/** Arithmetic mean of numeric score rows for one assignment; null if none. */
+function meanOfScores(scores: number[]): number | null {
+  if (scores.length === 0) return null;
+  const sum = scores.reduce((a, b) => a + b, 0);
+  return Math.round((sum / scores.length) * 1000) / 1000;
+}
+
+async function myAveragesByApplication(
+  userId: number,
+  stage: 'application' | 'first_round',
+  applicationIds: number[],
+): Promise<Map<number, number>> {
+  const averages = new Map<number, number>();
+  if (applicationIds.length === 0) return averages;
+
+  const db = getDb();
+  const placeholders = applicationIds.map(() => '?').join(',');
+  const result = await db.execute({
+    sql: `SELECT a.application_id, s.score
+          FROM assignments a
+          JOIN scores s ON s.assignment_id = a.id
+          WHERE a.user_id = ? AND a.stage = ? AND a.status = 'completed'
+            AND a.application_id IN (${placeholders})
+            AND s.score IS NOT NULL`,
+    args: [userId, stage, ...applicationIds],
+  });
+
+  const scoresByApp = new Map<number, number[]>();
+  for (const row of result.rows) {
+    const applicationId = row.application_id as number;
+    if (!scoresByApp.has(applicationId)) scoresByApp.set(applicationId, []);
+    scoresByApp.get(applicationId)!.push(row.score as number);
+  }
+
+  for (const [applicationId, scores] of scoresByApp) {
+    const mean = meanOfScores(scores);
+    if (mean !== null) averages.set(applicationId, mean);
+  }
+
+  return averages;
+}
+
 function formatSlotTime(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -173,6 +215,8 @@ export async function buildFirstRoundAdvancementContext(
     applicationIds,
   );
 
+  const myAverages = await myAveragesByApplication(userId, 'first_round', applicationIds);
+
   const assignmentsByApp = new Map<
     number,
     Array<{
@@ -243,6 +287,7 @@ export async function buildFirstRoundAdvancementContext(
 
     contextByApp.set(applicationId, {
       iInterviewed,
+      myAverage: iInterviewed ? (myAverages.get(applicationId) ?? null) : null,
       myVerdict: parseVerdict(mine?.advancementVerdict ?? null),
       panelVerdicts: panelVerdictsFor(applicationId, userId),
       myNotes: mine?.comment ?? null,
@@ -294,6 +339,8 @@ export async function buildApplicationAdvancementContext(
     applicationIds,
   );
 
+  const myAverages = await myAveragesByApplication(userId, 'application', applicationIds);
+
   const assignmentsByApp = new Map<
     number,
     Array<{ userId: number; name: string; status: string; advancementVerdict: string | null }>
@@ -321,6 +368,7 @@ export async function buildApplicationAdvancementContext(
 
     contextByApp.set(applicationId, {
       iGraded,
+      myAverage: iGraded ? (myAverages.get(applicationId) ?? null) : null,
       myVerdict: parseVerdict(mine?.advancementVerdict ?? null),
       panelVerdicts: (verdictsByApp.get(applicationId) ?? [])
         .filter((v) => v.userId !== userId)
