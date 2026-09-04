@@ -90,8 +90,8 @@ export function TeamGradingQueue({
             : allDone
               ? undefined
               : isAdmin
-                ? 'Score each assigned application. Names and identifying fields are hidden here.'
-                : 'Score each assigned application. Names are hidden during application grading — that is intentional. When you finish, you will rate who should advance using five color ratings (Green → Red).'
+                ? 'Score each assigned application in any order — skip one and come back later if needed. Names and identifying fields are hidden here.'
+                : 'Score each assigned application in any order — skip one and come back later if needed. Names are hidden during application grading — that is intentional. When you finish, you will rate who should advance using five color ratings (Green → Red).'
         }
         actions={
           <NavLinkButton variant="secondary" href={backHref} data-tour="grade-overview">

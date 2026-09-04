@@ -1,6 +1,7 @@
 'use client';
 
 import LoadingButton from '@/components/loading-button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,9 @@ interface GradingSubmitFooterProps {
   submitting?: boolean;
   locked?: boolean;
   lockedLabel?: string;
+  /** Navigate to next pending without submitting. Omitting hides the control. */
+  onSkip?: () => void;
+  skipping?: boolean;
   /** Sticky card footer for full-page scroll; flat bar for nested preview panels. */
   variant?: 'sticky' | 'embedded';
   className?: string;
@@ -24,6 +28,8 @@ export function GradingSubmitFooter({
   submitting = false,
   locked = false,
   lockedLabel = 'Editing locked',
+  onSkip,
+  skipping = false,
   variant = 'sticky',
   className,
 }: GradingSubmitFooterProps) {
@@ -31,6 +37,7 @@ export function GradingSubmitFooter({
   const allScored = totalScored > 0 && remaining === 0;
   const progressValue = totalScored > 0 ? Math.round((scoredCount / totalScored) * 100) : 0;
   const isEmbedded = variant === 'embedded';
+  const busy = submitting || skipping;
 
   const body = (
     <>
@@ -54,15 +61,29 @@ export function GradingSubmitFooter({
           )}
         </p>
 
-        <LoadingButton
-          onClick={onSubmit}
-          loading={submitting}
-          disabled={locked}
-          variant="primary"
-          className="min-w-28 shrink-0"
-        >
-          {locked ? lockedLabel : 'Submit →'}
-        </LoadingButton>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {onSkip && !locked && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={onSkip}
+              className="text-muted-foreground"
+            >
+              {skipping ? 'Skipping…' : 'Skip for now'}
+            </Button>
+          )}
+          <LoadingButton
+            onClick={onSubmit}
+            loading={submitting}
+            disabled={locked || skipping}
+            variant="primary"
+            className="min-w-28 shrink-0"
+          >
+            {locked ? lockedLabel : 'Submit →'}
+          </LoadingButton>
+        </div>
       </div>
     </>
   );

@@ -20,6 +20,7 @@ import {
   invalidateTeamGradeData,
   loadGradeData,
   prefetchNextPendingGradeData,
+  resolveNextPendingApplicationId,
   type GradeAppData,
 } from '@/lib/grading-client';
 import { primaryScoredQuestions, questionsLinkedTo } from '@/lib/grading-model';
@@ -41,6 +42,7 @@ export default function TeamGradingScorePage({
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const router = useRouter();
   const pathname = usePathname();
@@ -139,6 +141,38 @@ export default function TeamGradingScorePage({
       setSubmitting(false);
     }
   }, [appData, applicationId, audience, comment, notes, router, scores, submitting, teamId, teamName, usesCriterionRubric]);
+
+  /** Leave this applicant pending and open the next unscored one — no score write. */
+  const handleSkip = useCallback(async () => {
+    if (!appData || submitting || skipping || gradingLocked) return;
+    setSkipping(true);
+    try {
+      const nextId = await resolveNextPendingApplicationId(teamId, appData.applicationId);
+      if (nextId == null) {
+        toast.message('This is the last pending application in your queue.', {
+          description: 'Finish scoring it, or use Back to return to the list.',
+        });
+        return;
+      }
+      const nextAudience =
+        appData.isAdminGrader || audience === 'admin' ? 'admin' : 'team';
+      await loadGradeData(teamId, nextId, teamName).catch(() => {});
+      router.push(gradingAppHref(teamId, nextId, nextAudience));
+    } catch {
+      toast.error("Couldn't find the next application. Try again or use Back.");
+    } finally {
+      setSkipping(false);
+    }
+  }, [
+    appData,
+    audience,
+    gradingLocked,
+    router,
+    skipping,
+    submitting,
+    teamId,
+    teamName,
+  ]);
 
   const scoreField = useCallback(
     (field: string, n: number) => {
@@ -498,6 +532,8 @@ export default function TeamGradingScorePage({
             totalScored={totalScored}
             onSubmit={handleSubmit}
             submitting={submitting}
+            onSkip={handleSkip}
+            skipping={skipping}
             locked={gradingLocked}
           />
         </PageContent>

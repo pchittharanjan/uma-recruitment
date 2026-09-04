@@ -131,24 +131,34 @@ export function invalidateTeamGradeData(teamId: string): void {
 }
 
 /**
- * Warm the cache for the applicant the grader will most likely see next:
- * the first pending assignment (by row order) other than the current one.
+ * First pending assignment (by row order) other than the current one.
  * Mirrors the next-application choice made by the score submit endpoint.
+ */
+export async function resolveNextPendingApplicationId(
+  teamId: string,
+  currentApplicationId: number,
+): Promise<number | null> {
+  const r = await fetch(`/api/team/grading?teamId=${teamId}`);
+  const d = await r.json();
+  if (d.error) return null;
+  const assignments = (d.assignments ?? []) as QueueAssignment[];
+  const next = assignments
+    .filter((a) => a.status === 'pending' && a.applicationId !== currentApplicationId)
+    .sort((a, b) => a.rowIndex - b.rowIndex)[0];
+  return next?.applicationId ?? null;
+}
+
+/**
+ * Warm the cache for the applicant the grader will most likely see next.
  */
 export async function prefetchNextPendingGradeData(
   teamId: string,
   currentApplicationId: number,
 ): Promise<void> {
   try {
-    const r = await fetch(`/api/team/grading?teamId=${teamId}`);
-    const d = await r.json();
-    if (d.error) return;
-    const assignments = (d.assignments ?? []) as QueueAssignment[];
-    const next = assignments
-      .filter((a) => a.status === 'pending' && a.applicationId !== currentApplicationId)
-      .sort((a, b) => a.rowIndex - b.rowIndex)[0];
-    if (next) {
-      void loadGradeData(teamId, next.applicationId).catch(() => {});
+    const nextId = await resolveNextPendingApplicationId(teamId, currentApplicationId);
+    if (nextId != null) {
+      void loadGradeData(teamId, nextId).catch(() => {});
     }
   } catch {
     // Prefetch is best-effort; the normal fetch path still works without it.
