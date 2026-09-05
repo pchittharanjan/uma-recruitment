@@ -6,6 +6,7 @@ import { ResponseText } from '@/components/response-text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 import { displayLabelForScoreField } from '@/lib/grading-model';
+import { cn } from '@/lib/utils';
 
 interface QuestionReview {
   id: string;
@@ -13,6 +14,22 @@ interface QuestionReview {
   responses: Array<{ field: string; value: string }>;
   criteria: Array<{ key: string; name: string; score: number | null }>;
   note: string | null;
+  graderNotes: Array<{ graderName: string; note: string; isMine: boolean }>;
+  graderScores: Array<{
+    graderName: string;
+    isMine: boolean;
+    criteria: Array<{ key: string; name: string; score: number | null }>;
+  }>;
+}
+
+interface GraderReview {
+  graderName: string;
+  status: string;
+  comment: string | null;
+  questionNotes: Array<{ label: string; note: string }>;
+  scores: Record<string, number>;
+  average: number | null;
+  isMine: boolean;
 }
 
 interface ApplicationDetailData {
@@ -23,6 +40,7 @@ interface ApplicationDetailData {
   existingComment: string | null;
   questionNotes: Array<{ label: string; note: string }>;
   questionReviews: QuestionReview[] | null;
+  graderReviews: GraderReview[];
   scoreFields: string[];
   customScoreFields: string[];
   scoreFieldLabels: Record<string, string>;
@@ -31,13 +49,39 @@ interface ApplicationDetailData {
 }
 
 export function advancementDetailUrl(teamId: string, applicationId: number): string {
-  // v=2: question-grouped scores + responses (also busts older client cache).
-  return `/api/team/advancement/${applicationId}?teamId=${teamId}&fromStage=application&v=2`;
+  // v=3: all graders' notes visible during color selection.
+  return `/api/team/advancement/${applicationId}?teamId=${teamId}&fromStage=application&v=3`;
 }
 
 /** Warm the short-lived client cache before expand (e.g. on hover). */
 export function prefetchAdvancementDetail(teamId: string, applicationId: number): void {
   void cachedJsonFetch(advancementDetailUrl(teamId, applicationId));
+}
+
+function ReviewerHeading({
+  name,
+  isMine,
+  average,
+}: {
+  name: string;
+  isMine: boolean;
+  average?: number | null;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <p className="min-w-0 font-medium text-foreground">
+        {name}
+        {isMine ? (
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span>
+        ) : null}
+      </p>
+      {average != null ? (
+        <p className="shrink-0 tabular-nums text-sm font-medium text-foreground">
+          {average.toFixed(2)}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function ApplicationAdvancementDetailPanel({
@@ -72,6 +116,7 @@ export function ApplicationAdvancementDetailPanel({
           existingComment: json.existingComment ?? null,
           questionNotes: json.questionNotes ?? [],
           questionReviews: json.questionReviews ?? null,
+          graderReviews: json.graderReviews ?? [],
           scoreFields: json.scoreFields ?? [],
           customScoreFields: json.customScoreFields ?? [],
           scoreFieldLabels: json.scoreFieldLabels ?? {},
@@ -108,11 +153,8 @@ export function ApplicationAdvancementDetailPanel({
 
   const questionReviews = data.questionReviews;
   const useQuestionLayout = (questionReviews?.length ?? 0) > 0;
-  const scoreFields = [...data.scoreFields, ...data.customScoreFields];
-  const hasFlatScores =
-    !useQuestionLayout &&
-    scoreFields.some((field) => data.existingScores[field] !== undefined);
   const leftoverFields = Object.keys(data.fields).length > 0;
+  const graderReviews = data.graderReviews ?? [];
 
   return (
     <div className="min-w-0 space-y-4 px-1 py-3 text-sm">
@@ -134,7 +176,10 @@ export function ApplicationAdvancementDetailPanel({
             Written responses
           </p>
           {questionReviews!.map((review) => {
-            const scoredCriteria = review.criteria.filter((c) => c.score != null);
+            const hasGraderScores = review.graderScores?.some((g) =>
+              g.criteria.some((c) => c.score != null),
+            );
+            const hasGraderNotes = (review.graderNotes?.length ?? 0) > 0;
             return (
               <div key={review.id} className="display-panel min-w-0 space-y-3 p-4">
                 <p className="text-sm font-semibold text-foreground/80">{review.label}</p>
@@ -160,26 +205,56 @@ export function ApplicationAdvancementDetailPanel({
                   </div>
                 ) : null}
 
-                {scoredCriteria.length > 0 ? (
-                  <div className="min-w-0 divide-y divide-border/40 rounded-md bg-muted/45">
-                    {scoredCriteria.map((criterion) => (
-                      <div
-                        key={criterion.key}
-                        className="flex items-start gap-3 px-3 py-2.5"
-                      >
-                        <p className="min-w-0 flex-1 break-words text-sm font-medium text-muted-foreground">
-                          {criterion.name}
-                        </p>
-                        <p className="shrink-0 tabular-nums font-medium">{criterion.score}</p>
-                      </div>
-                    ))}
+                {hasGraderScores ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Scores</p>
+                    {review.graderScores.map((grader) => {
+                      const scored = grader.criteria.filter((c) => c.score != null);
+                      if (scored.length === 0) return null;
+                      return (
+                        <div
+                          key={grader.graderName}
+                          className={cn(
+                            'min-w-0 rounded-md bg-muted/45',
+                            grader.isMine && 'ring-1 ring-border',
+                          )}
+                        >
+                          <div className="border-b border-border/40 px-3 py-2">
+                            <ReviewerHeading name={grader.graderName} isMine={grader.isMine} />
+                          </div>
+                          <div className="divide-y divide-border/40">
+                            {scored.map((criterion) => (
+                              <div
+                                key={criterion.key}
+                                className="flex items-start gap-3 px-3 py-2.5"
+                              >
+                                <p className="min-w-0 flex-1 break-words text-sm font-medium text-muted-foreground">
+                                  {criterion.name}
+                                </p>
+                                <p className="shrink-0 tabular-nums font-medium">
+                                  {criterion.score}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
 
-                {review.note ? (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Your notes</p>
-                    <p className="mt-1 whitespace-pre-wrap text-foreground">{review.note}</p>
+                {hasGraderNotes ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                    {review.graderNotes.map((entry) => (
+                      <div
+                        key={`${entry.graderName}-${entry.note.slice(0, 12)}`}
+                        className="display-field px-3 py-2"
+                      >
+                        <ReviewerHeading name={entry.graderName} isMine={entry.isMine} />
+                        <p className="mt-1 whitespace-pre-wrap text-foreground">{entry.note}</p>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -188,56 +263,73 @@ export function ApplicationAdvancementDetailPanel({
         </div>
       ) : null}
 
-      {hasFlatScores && (
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Your scores
+      {!useQuestionLayout && graderReviews.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Grader notes & scores
           </p>
-          <div className="min-w-0 divide-y divide-border/40 rounded-md bg-muted/45">
-            {scoreFields.map((field) => {
-              const score = data.existingScores[field];
-              if (score === undefined) return null;
-              return (
-                <div key={field} className="flex items-start gap-3 px-3 py-2.5">
-                  <p className="min-w-0 flex-1 break-words text-sm font-medium text-muted-foreground">
-                    {displayLabelForScoreField(field, data.scoreFieldLabels)}
-                  </p>
-                  <p className="shrink-0 tabular-nums font-medium">{score}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {!useQuestionLayout && data.questionNotes?.length ? (
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Your question notes
-          </p>
-          <div className="space-y-3">
-            {data.questionNotes.map((entry) => (
-              <div key={entry.label}>
-                <p className="text-xs font-medium text-muted-foreground">{entry.label}</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">{entry.note}</p>
+          {graderReviews.map((grader) => {
+            const scoreEntries = Object.entries(grader.scores);
+            return (
+              <div key={grader.graderName} className="display-field space-y-2 px-3 py-2">
+                <ReviewerHeading
+                  name={grader.graderName}
+                  isMine={grader.isMine}
+                  average={grader.average}
+                />
+                {scoreEntries.length > 0 ? (
+                  <div className="divide-y divide-border/40 rounded-md bg-muted/45">
+                    {scoreEntries.map(([field, score]) => (
+                      <div key={field} className="flex items-start gap-3 px-3 py-2.5">
+                        <p className="min-w-0 flex-1 break-words text-sm font-medium text-muted-foreground">
+                          {displayLabelForScoreField(field, data.scoreFieldLabels)}
+                        </p>
+                        <p className="shrink-0 tabular-nums font-medium">{score}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {grader.questionNotes.map((entry) => (
+                  <div key={entry.label}>
+                    <p className="text-xs font-medium text-muted-foreground">{entry.label}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-foreground">{entry.note}</p>
+                  </div>
+                ))}
+                {grader.comment?.trim() ? (
+                  <p className="whitespace-pre-wrap text-foreground">{grader.comment}</p>
+                ) : !grader.questionNotes.length && scoreEntries.length === 0 ? (
+                  <p className="text-muted-foreground italic">No notes recorded.</p>
+                ) : null}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       ) : null}
 
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Overall comments
-        </p>
-        {data.existingComment?.trim() ? (
-          <p className="display-field mt-1 whitespace-pre-wrap text-foreground">
-            {data.existingComment}
+      {useQuestionLayout && graderReviews.some((g) => g.comment?.trim()) ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Overall comments
           </p>
-        ) : (
+          {graderReviews.map((grader) =>
+            grader.comment?.trim() ? (
+              <div key={grader.graderName} className="display-field px-3 py-2">
+                <ReviewerHeading name={grader.graderName} isMine={grader.isMine} />
+                <p className="mt-1 whitespace-pre-wrap text-foreground">{grader.comment}</p>
+              </div>
+            ) : null,
+          )}
+        </div>
+      ) : null}
+
+      {!useQuestionLayout && graderReviews.length === 0 ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Overall comments
+          </p>
           <p className="mt-1 text-muted-foreground italic">No overall comments recorded.</p>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {leftoverFields ? (
         <div>

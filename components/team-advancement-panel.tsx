@@ -37,6 +37,7 @@ import type {
   AdvancementFromStage,
   AdvancementInterviewContext,
   AdvancementPanelVerdict,
+  AdvancementReviewerNotes,
 } from '@/lib/advancement-submissions-types';
 import { resolveAdvancementSelectionMax, resolveAdvancementSelectionMin, advancementPageDescription } from '@/lib/advancement-cap-helpers';
 import { pendingWorkLabel } from '@/lib/stages';
@@ -280,6 +281,70 @@ function sessionSectionLabel(group: AdvancementSessionGroup): string {
   return parts.join(' · ');
 }
 
+function ReviewerNotesBlock({
+  title,
+  reviews,
+  emptyLabel,
+}: {
+  title: string;
+  reviews: AdvancementReviewerNotes[];
+  emptyLabel: string;
+}) {
+  if (reviews.length === 0) {
+    return (
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {title}
+        </p>
+        <p className="mt-1 text-muted-foreground italic">{emptyLabel}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      {reviews.map((review) => {
+        const hasComment = Boolean(review.comment?.trim());
+        const hasQuestionNotes = review.questionNotes.some((n) => n.note.trim());
+        return (
+          <div key={review.reviewerName} className="display-field space-y-2 px-3 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium text-foreground">
+                {review.reviewerName}
+                {review.isMine ? (
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span>
+                ) : null}
+              </p>
+              {review.average != null ? (
+                <p className="shrink-0 tabular-nums text-sm font-medium">
+                  {review.average.toFixed(2)}
+                </p>
+              ) : null}
+            </div>
+            {hasComment ? (
+              <p className="whitespace-pre-wrap text-foreground">{review.comment}</p>
+            ) : null}
+            {review.questionNotes.map((entry) =>
+              entry.note.trim() ? (
+                <div key={entry.label}>
+                  <p className="text-xs font-medium text-muted-foreground">{entry.label}</p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-foreground">{entry.note}</p>
+                </div>
+              ) : null,
+            )}
+            {!hasComment && !hasQuestionNotes ? (
+              <p className="text-muted-foreground italic">No notes.</p>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ApplicantDetailPanel({
   context,
   candidateName,
@@ -290,6 +355,29 @@ function ApplicantDetailPanel({
   const otherGroupMembers = context.groupMembers.filter(
     (member) => member.candidateName !== candidateName,
   );
+
+  const interviewNotes: AdvancementReviewerNotes[] =
+    context.interviewNotes ??
+    [
+      ...(context.myNotes
+        ? [
+            {
+              reviewerName: 'You',
+              comment: context.myNotes,
+              questionNotes: [] as AdvancementReviewerNotes['questionNotes'],
+              average: context.myAverage,
+              isMine: true,
+            },
+          ]
+        : []),
+      ...context.panelNotes.map((note) => ({
+        reviewerName: note.interviewerName,
+        comment: note.comment,
+        questionNotes: note.questionNotes ?? [],
+        average: null as number | null,
+        isMine: false,
+      })),
+    ];
 
   return (
     <div className="space-y-4 px-1 py-3 text-sm">
@@ -304,37 +392,17 @@ function ApplicantDetailPanel({
         </div>
       )}
 
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Your notes
-        </p>
-        {context.myNotes?.trim() ? (
-          <p className="display-field mt-1 whitespace-pre-wrap text-foreground">{context.myNotes}</p>
-        ) : (
-          <p className="mt-1 text-muted-foreground italic">No notes recorded.</p>
-        )}
-      </div>
+      <ReviewerNotesBlock
+        title="Interview notes"
+        reviews={interviewNotes}
+        emptyLabel="No interview notes recorded."
+      />
 
-      {context.panelNotes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Other interviewers' notes
-          </p>
-          {context.panelNotes.map((note) => (
-            <div
-              key={note.interviewerName}
-              className="display-field px-3 py-2"
-            >
-              <p className="font-medium text-foreground">{note.interviewerName}</p>
-              {note.comment?.trim() ? (
-                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{note.comment}</p>
-              ) : (
-                <p className="mt-1 text-muted-foreground italic">No notes.</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <ReviewerNotesBlock
+        title="Application notes"
+        reviews={context.applicationNotes ?? []}
+        emptyLabel="No application notes recorded."
+      />
     </div>
   );
 }
@@ -727,12 +795,11 @@ export function TeamAdvancementPanel({
   const showExpandColumn = isFirstRound;
 
   const canViewApplication = useCallback(
-    (applicationId: number) => {
-      if (!data || isFirstRound) return false;
-      if (canSubmitList) return true;
-      return rowVerdictContext(data, applicationId, fromStage).canSetVerdict;
+    (_applicationId: number) => {
+      // Color selection: any team exec on this page can open notes for any applicant.
+      return Boolean(data) && !isFirstRound;
     },
-    [canSubmitList, data, fromStage, isFirstRound],
+    [data, isFirstRound],
   );
 
   const detailColumnCount =

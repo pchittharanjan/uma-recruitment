@@ -82,9 +82,25 @@ export interface AdvancementPanelVerdict {
   verdict: AdvancementVerdict | null;
 }
 
+export interface AdvancementQuestionNote {
+  label: string;
+  note: string;
+}
+
 export interface AdvancementPanelNote {
   interviewerName: string;
   comment: string | null;
+  /** Per-question / per-field notes from the scores table. */
+  questionNotes: AdvancementQuestionNote[];
+}
+
+/** One grader or interviewer’s notes shown during advancement color selection. */
+export interface AdvancementReviewerNotes {
+  reviewerName: string;
+  comment: string | null;
+  questionNotes: AdvancementQuestionNote[];
+  average: number | null;
+  isMine: boolean;
 }
 
 export interface AdvancementGroupMember {
@@ -98,6 +114,8 @@ export interface AdvancementApplicationContext {
   myAverage: number | null;
   myVerdict: AdvancementVerdict | null;
   panelVerdicts: AdvancementPanelVerdict[];
+  /** Every grader’s comments + question notes (including the viewer). */
+  graderNotes: AdvancementReviewerNotes[];
 }
 
 export interface AdvancementInterviewContext {
@@ -108,6 +126,10 @@ export interface AdvancementInterviewContext {
   panelVerdicts: AdvancementPanelVerdict[];
   myNotes: string | null;
   panelNotes: AdvancementPanelNote[];
+  /** Every interviewer’s overall + question notes (including the viewer). */
+  interviewNotes: AdvancementReviewerNotes[];
+  /** Application-stage grader notes for the same candidate (for color selection). */
+  applicationNotes: AdvancementReviewerNotes[];
   groupLabel: string | null;
   groupMembers: AdvancementGroupMember[];
   scheduledAt: string | null;

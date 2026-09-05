@@ -1,13 +1,33 @@
-import { getDb } from '@/lib/db';
+import { getDb, getTeamById } from '@/lib/db';
 import { listTeamAdvancementVerdicts, normalizeAdvancementVerdict } from '@/lib/advancement-verdicts';
+import {
+  applicationQuestionLabels,
+  loadAdvancementStageReviews,
+  type AdvancementStageReview,
+} from '@/lib/advancement-stage-reviews';
 import type {
   AdvancementApplicationContext,
   AdvancementGroupMember,
   AdvancementInterviewContext,
   AdvancementPanelNote,
   AdvancementPanelVerdict,
+  AdvancementReviewerNotes,
 } from '@/lib/advancement-submissions-types';
+import { getRoundSettings } from '@/lib/rounds';
 import { sessionKeyForAssignment } from '@/lib/interview-sessions';
+
+function toReviewerNotes(
+  reviews: AdvancementStageReview[],
+  viewerUserId: number,
+): AdvancementReviewerNotes[] {
+  return reviews.map((review) => ({
+    reviewerName: review.reviewerName,
+    comment: review.comment,
+    questionNotes: review.questionNotes,
+    average: review.average,
+    isMine: review.userId === viewerUserId,
+  }));
+}
 
 /** Arithmetic mean of numeric score rows for one assignment; null if none. */
 function meanOfScores(scores: number[]): number | null {
@@ -217,6 +237,27 @@ export async function buildFirstRoundAdvancementContext(
 
   const myAverages = await myAveragesByApplication(userId, 'first_round', applicationIds);
 
+  const team = await getTeamById(teamId);
+  const settings = await getRoundSettings(roundId);
+  const questionLabels =
+    team && settings ? applicationQuestionLabels(settings, team.name) : undefined;
+
+  const [interviewReviewsByApp, applicationReviewsByApp] = await Promise.all([
+    loadAdvancementStageReviews({
+      teamId,
+      roundId,
+      stage: 'first_round',
+      applicationIds,
+    }),
+    loadAdvancementStageReviews({
+      teamId,
+      roundId,
+      stage: 'application',
+      applicationIds,
+      questionLabels,
+    }),
+  ]);
+
   const assignmentsByApp = new Map<
     number,
     Array<{
@@ -246,10 +287,10 @@ export async function buildFirstRoundAdvancementContext(
 
   function panelVerdictsFor(
     applicationId: number,
-    userId: number,
+    viewerId: number,
   ): AdvancementPanelVerdict[] {
     return (verdictsByApp.get(applicationId) ?? [])
-      .filter((v) => v.userId !== userId)
+      .filter((v) => v.userId !== viewerId)
       .map((v) => ({ name: v.name, verdict: v.verdict }));
   }
 
@@ -257,12 +298,15 @@ export async function buildFirstRoundAdvancementContext(
     const assignments = assignmentsByApp.get(applicationId) ?? [];
     const mine = assignments.find((a) => a.userId === userId);
     const iInterviewed = Boolean(mine?.status === 'completed');
+    const interviewReviews = interviewReviewsByApp.get(applicationId) ?? [];
+    const interviewNotes = toReviewerNotes(interviewReviews, userId);
 
-    const panelNotes: AdvancementPanelNote[] = assignments
+    const panelNotes: AdvancementPanelNote[] = interviewReviews
       .filter((a) => a.userId !== userId)
       .map((a) => ({
-        interviewerName: a.interviewerName,
+        interviewerName: a.reviewerName,
         comment: a.comment,
+        questionNotes: a.questionNotes,
       }));
 
     const slot = slotByApp.get(applicationId);
@@ -285,13 +329,20 @@ export async function buildFirstRoundAdvancementContext(
         })
       : 'unscheduled';
 
+    const myReview = interviewReviews.find((r) => r.userId === userId);
+
     contextByApp.set(applicationId, {
       iInterviewed,
       myAverage: iInterviewed ? (myAverages.get(applicationId) ?? null) : null,
       myVerdict: parseVerdict(mine?.advancementVerdict ?? null),
       panelVerdicts: panelVerdictsFor(applicationId, userId),
-      myNotes: mine?.comment ?? null,
+      myNotes: myReview?.comment ?? mine?.comment ?? null,
       panelNotes,
+      interviewNotes,
+      applicationNotes: toReviewerNotes(
+        applicationReviewsByApp.get(applicationId) ?? [],
+        userId,
+      ),
       groupLabel: buildGroupLabel(
         groupMembers,
         scheduledAt,
@@ -341,6 +392,18 @@ export async function buildApplicationAdvancementContext(
 
   const myAverages = await myAveragesByApplication(userId, 'application', applicationIds);
 
+  const team = await getTeamById(teamId);
+  const settings = await getRoundSettings(roundId);
+  const questionLabels =
+    team && settings ? applicationQuestionLabels(settings, team.name) : undefined;
+  const graderReviewsByApp = await loadAdvancementStageReviews({
+    teamId,
+    roundId,
+    stage: 'application',
+    applicationIds,
+    questionLabels,
+  });
+
   const assignmentsByApp = new Map<
     number,
     Array<{ userId: number; name: string; status: string; advancementVerdict: string | null }>
@@ -373,6 +436,7 @@ export async function buildApplicationAdvancementContext(
       panelVerdicts: (verdictsByApp.get(applicationId) ?? [])
         .filter((v) => v.userId !== userId)
         .map((v) => ({ name: v.name, verdict: v.verdict })),
+      graderNotes: toReviewerNotes(graderReviewsByApp.get(applicationId) ?? [], userId),
     });
   }
 
