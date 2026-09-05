@@ -14,6 +14,10 @@ import { NumberDraftInput } from '@/components/number-draft-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { RoundStatus } from '@/lib/db';
+import {
+  MAX_INTERVIEW_GROUP_SIZE,
+  MIN_INTERVIEW_GROUP_SIZE,
+} from '@/lib/interview-schedule-config';
 import { phaseLabel } from '@/lib/stages';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -194,13 +198,17 @@ export function InterviewScheduleSettings({
                   id="groupSize"
                   integer
                   className={settingsControlClass}
-                  min={2}
-                  max={12}
+                  min={MIN_INTERVIEW_GROUP_SIZE}
+                  max={MAX_INTERVIEW_GROUP_SIZE}
                   value={config.groupSize}
                   onCommit={(groupSize) =>
                     setConfig((prev) => (prev ? { ...prev, groupSize } : prev))
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Target size for auto-scheduling. You can put up to{' '}
+                  {MAX_INTERVIEW_GROUP_SIZE} applicants in a session manually.
+                </p>
               </div>
             ) : null}
             <LoadingButton size="sm" className="ml-auto" disabled={saving} onClick={handleSave}>

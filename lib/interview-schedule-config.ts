@@ -3,6 +3,10 @@ import type { InterviewSlotInput, InterviewSlotStage } from '@/lib/interview-slo
 
 export const GROUP_FIRST_ROUND_TEAMS = ['Strategy', 'Events', 'Design'] as const;
 
+/** Max candidates in one group interview (manual schedule + auto-gen). */
+export const MAX_INTERVIEW_GROUP_SIZE = 12;
+export const MIN_INTERVIEW_GROUP_SIZE = 2;
+
 export interface InterviewScheduleConfig {
   firstRoundDate: string | null;
   firstRoundStartTime: string;
@@ -82,8 +86,10 @@ export async function saveInterviewScheduleConfig(
   if (next.blockMinutes < 15 || next.blockMinutes > 120) {
     throw new Error('Block length must be between 15 and 120 minutes.');
   }
-  if (next.groupSize < 2 || next.groupSize > 12) {
-    throw new Error('Group size must be between 2 and 12.');
+  if (next.groupSize < MIN_INTERVIEW_GROUP_SIZE || next.groupSize > MAX_INTERVIEW_GROUP_SIZE) {
+    throw new Error(
+      `Group size must be between ${MIN_INTERVIEW_GROUP_SIZE} and ${MAX_INTERVIEW_GROUP_SIZE}.`,
+    );
   }
   if (next.parallelGroupsPerBlock < 1 || next.parallelGroupsPerBlock > 8) {
     throw new Error('Parallel groups per block must be between 1 and 8.');

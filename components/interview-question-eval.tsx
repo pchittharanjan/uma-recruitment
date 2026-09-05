@@ -21,7 +21,19 @@ const interviewNoteTextareaClass =
 const QUESTION_STRIPE_ODD = 'bg-background';
 const QUESTION_STRIPE_EVEN = 'bg-[#f4eee8]';
 const QUESTION_STRIPE_HAIRLINE = 'border-b border-black/[0.06]';
-const COLUMN_GRID = 'grid grid-cols-4 gap-3';
+
+function columnsGridClass(count: number): string {
+  return cn(
+    'grid gap-3',
+    count <= 1 && 'grid-cols-1',
+    count === 2 && 'grid-cols-2',
+    count === 3 && 'grid-cols-3',
+    count === 4 && 'grid-cols-4',
+    count === 5 && 'grid-cols-5',
+    count === 6 && 'grid-cols-6',
+    count >= 7 && 'grid-cols-6 min-w-[72rem]',
+  );
+}
 
 function questionStripeClass(index: number) {
   return cn(
@@ -322,8 +334,14 @@ export function InterviewNotesAndScoringForm({
   );
 }
 
-function ColumnsQuestionRow({ children }: { children: ReactNode }) {
-  return <div className={COLUMN_GRID}>{children}</div>;
+function ColumnsQuestionRow({
+  children,
+  columnCount,
+}: {
+  children: ReactNode;
+  columnCount: number;
+}) {
+  return <div className={columnsGridClass(columnCount)}>{children}</div>;
 }
 
 function ColumnsQuestionCell({
@@ -351,7 +369,7 @@ function ColumnsQuestionCell({
   );
 }
 
-/** Row-major 4-col notes: one full-width stripe per question, four candidate cells inside. */
+/** Row-major notes: one stripe per question, one cell per candidate. */
 export function InterviewNotesAndScoringColumns({
   guide,
   columns,
@@ -366,12 +384,16 @@ export function InterviewNotesAndScoringColumns({
   const scaleMax = interviewScaleMax(guide);
   const hasNoteQuestions = noteQuestions.length > 0;
   const caseLabel = caseQuestionsLabel(guide);
+  const columnCount = Math.max(columns.length, 1);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 overflow-x-auto">
       {hasNoteQuestions
         ? noteQuestions.map((question, index) => (
-            <ColumnsQuestionRow key={`${index}-${question.slice(0, 32)}`}>
+            <ColumnsQuestionRow
+              key={`${index}-${question.slice(0, 32)}`}
+              columnCount={columnCount}
+            >
               {columns.map((column, columnIndex) => (
                 <ColumnsQuestionCell
                   key={column.id ?? columnIndex}
@@ -422,7 +444,10 @@ export function InterviewNotesAndScoringColumns({
           <div key={group.key} className="space-y-3">
             {blocks.map((block) =>
               block.fields.map((field, index) => (
-                <ColumnsQuestionRow key={`${block.name}-${field}`}>
+                <ColumnsQuestionRow
+                  key={`${block.name}-${field}`}
+                  columnCount={columnCount}
+                >
                   {columns.map((column, columnIndex) => (
                     <ColumnsQuestionCell
                       key={column.id ?? columnIndex}
@@ -458,7 +483,7 @@ export function InterviewNotesAndScoringColumns({
         );
       })}
 
-      <ColumnsQuestionRow>
+      <ColumnsQuestionRow columnCount={columnCount}>
         {columns.map((column, columnIndex) => (
           <ColumnsQuestionCell
             key={column.id ?? columnIndex}

@@ -30,7 +30,7 @@ const TABS_BODY =
 
 const LAYOUT_OPTIONS: { value: GroupInterviewLayout; label: string }[] = [
   { value: 'tabs', label: 'Tabs' },
-  { value: 'columns', label: '4 columns' },
+  { value: 'columns', label: 'Columns' },
 ];
 
 function isGroupInterviewLayout(value: string | null): value is GroupInterviewLayout {
@@ -104,9 +104,23 @@ function CandidateNameHeader({
   );
 }
 
+function columnGridClass(count: number): string {
+  // Keep readable columns; scroll horizontally when there are many candidates.
+  return cn(
+    'grid w-full gap-3',
+    count <= 1 && 'grid-cols-1',
+    count === 2 && 'grid-cols-2',
+    count === 3 && 'grid-cols-3',
+    count === 4 && 'grid-cols-4',
+    count === 5 && 'grid-cols-5',
+    count === 6 && 'grid-cols-6',
+    count >= 7 && 'grid-cols-6 min-w-[72rem]',
+  );
+}
+
 function ColumnNameRow({ candidates }: { candidates: GroupInterviewCandidate[] }) {
   return (
-    <div className="grid w-full grid-cols-4 gap-3">
+    <div className={columnGridClass(candidates.length)}>
       {candidates.map((candidate) => (
         <div
           key={candidate.id}
@@ -239,7 +253,9 @@ export function GroupInterviewCandidateWorkspace({
 
   const chrome =
     layout === 'columns' ? (
-      <ColumnNameRow candidates={candidates} />
+      <div className="overflow-x-auto">
+        <ColumnNameRow candidates={candidates} />
+      </div>
     ) : (
       <TabsChrome candidates={candidates} activeCandidate={activeCandidate} />
     );
@@ -256,7 +272,7 @@ export function GroupInterviewCandidateWorkspace({
           }))}
         />
       ) : (
-        <div className="grid w-full grid-cols-4 gap-3">
+        <div className={columnGridClass(candidates.length)}>
           {candidates.map((candidate) => (
             <section
               key={candidate.id}

@@ -20,6 +20,7 @@ import {
   assignmentsFromUiSessions,
   validateInterviewerAssignments,
 } from '@/lib/interview-schedule-validation';
+import { MAX_INTERVIEW_GROUP_SIZE } from '@/lib/interview-schedule-config';
 import { cn } from '@/lib/utils';
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -200,11 +201,13 @@ function maxApplicantsForFormat(format: 'group' | 'individual', groupSize: numbe
 function slotsToSessions(
   slots: SlotRow[],
   format: 'group' | 'individual',
+  groupSize: number,
 ): ScheduleSession[] {
   const assigned = slots.filter((s) => s.scheduledAt.trim());
   if (assigned.length === 0) return [];
 
   const sessionMap = new Map<string, ScheduleSession>();
+  const maxPerSession = maxApplicantsForFormat(format, groupSize);
 
   for (const slot of assigned) {
     const baseKey = slot.groupKey
@@ -215,9 +218,8 @@ function slotsToSessions(
     let session = sessionMap.get(sessionKey);
 
     if (session && format === 'group') {
-      const max = maxApplicantsForFormat(format, 4);
       const filled = session.applicantApplicationIds.filter((id) => id != null).length;
-      if (filled >= max) {
+      if (filled >= maxPerSession) {
         sessionKey = `${baseKey}|overflow-${slot.applicationId}`;
         session = undefined;
       }
@@ -447,9 +449,10 @@ export function TeamInterviewScheduleEditor({
   const scrollAfterAddRef = useRef(false);
 
   const interviewFormat = data?.interviewFormat ?? 'individual';
+  // Manual schedule editing allows up to the platform max; auto-gen still uses config.groupSize.
   const maxApplicants = maxApplicantsForFormat(
     interviewFormat,
-    data?.scheduleConfig.groupSize ?? 4,
+    interviewFormat === 'group' ? MAX_INTERVIEW_GROUP_SIZE : 1,
   );
 
   const load = useCallback(async () => {
@@ -465,7 +468,13 @@ export function TeamInterviewScheduleEditor({
     }
     setData(json);
     setAllSlots(json.slots);
-    const loaded = slotsToSessions(json.slots, json.interviewFormat);
+    const loaded = slotsToSessions(
+      json.slots,
+      json.interviewFormat,
+      json.interviewFormat === 'group'
+        ? MAX_INTERVIEW_GROUP_SIZE
+        : (json.scheduleConfig?.groupSize ?? 4),
+    );
     const loadedSessions = loaded.length > 0 ? loaded : [emptySession()];
     setSessions(loadedSessions);
     setScheduleBaseline(serializeSessionsForBaseline(loadedSessions));
@@ -842,7 +851,13 @@ export function TeamInterviewScheduleEditor({
     const res = await fetch(apiPath);
     if (res.ok) {
       const json = await res.json();
-      const loaded = slotsToSessions(json.slots, json.interviewFormat);
+      const loaded = slotsToSessions(
+        json.slots,
+        json.interviewFormat,
+        json.interviewFormat === 'group'
+          ? MAX_INTERVIEW_GROUP_SIZE
+          : (json.scheduleConfig?.groupSize ?? 4),
+      );
       const nextSessions =
         loaded.length > 0
           ? loaded
