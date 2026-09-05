@@ -129,10 +129,24 @@ function emptyCaseStudy() {
 }
 
 function withFilledRubric(guide: InterviewGuide): InterviewRubric {
-  const normalized = normalizeInterviewRubric(guide.rubric);
-  if (normalized) {
-    const categories = rubricCategoriesForEdit(normalized);
-    return rubricFromCategories(normalized.scaleMax, categories);
+  const rubric = guide.rubric;
+  // Pass draft rubrics through unchanged. Re-normalizing here trims descriptions on every
+  // keystroke and makes the space bar look broken in criterion prompts.
+  if (rubric?.categories && rubric.categories.length > 0) {
+    return {
+      scaleMax: rubric.scaleMax || 5,
+      categories: rubric.categories,
+      criteria: rubric.criteria?.length ? rubric.criteria : [{ name: '', weight: 100 }],
+    };
+  }
+  if (rubric?.criteria && rubric.criteria.length > 0) {
+    return rubricFromCategories(
+      rubric.scaleMax || 5,
+      rubricCategoriesForEdit({
+        scaleMax: rubric.scaleMax || 5,
+        criteria: rubric.criteria,
+      }),
+    );
   }
   return emptyInterviewRubric();
 }
@@ -498,7 +512,7 @@ function RubricEditor({
                   key={`${stage}-category-${categoryIndex}`}
                   className="space-y-3 rounded-xl border bg-background/60 p-4"
                 >
-                  <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
                     <Input
                       value={category.name}
                       onChange={(e) => {
@@ -506,6 +520,9 @@ function RubricEditor({
                           i === categoryIndex ? { ...row, name: e.target.value } : row,
                         );
                         commit(next);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === ' ') e.stopPropagation();
                       }}
                       placeholder="Category name (e.g. Supreme Case)"
                       className="bg-background font-medium"
@@ -568,6 +585,9 @@ function RubricEditor({
                                   : cat,
                               );
                               commit(next);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === ' ') e.stopPropagation();
                             }}
                             placeholder={`e.g. Q1. Market Sizing`}
                             className="bg-background"
@@ -640,6 +660,10 @@ function RubricEditor({
                                 : cat,
                             );
                             commit(next);
+                          }}
+                          onKeyDown={(e) => {
+                            // Keep Space inside the field (parent tab widgets must not steal it).
+                            if (e.key === ' ') e.stopPropagation();
                           }}
                           placeholder="Optional grading prompt (shown to interviewers)"
                           className="bg-background text-sm"
@@ -928,17 +952,8 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
           return false;
         }
         savedSnapshots.current[targetStage] = serialized;
-        if (json.guide && targetStage === stageRef.current) {
-          setGuides((prev) => ({
-            ...prev,
-            [targetStage]: guideFromApi(json.guide, json.guide.format),
-          }));
-          savedSnapshots.current[targetStage] = serializeInterviewGuidePayload(
-            guideFromApi(json.guide, json.guide.format),
-          );
-        } else {
-          savedSnapshots.current[targetStage] = serialized;
-        }
+        // Do not replace local guide state from the API response — that races with typing
+        // and re-trims in-progress criterion descriptions.
         if (targetStage === stageRef.current) {
           setSaveStatus('saved');
           setError('');

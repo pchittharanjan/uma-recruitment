@@ -163,8 +163,11 @@ function normalizeCriterion(raw: unknown): InterviewRubricCriterion | null {
   const row = raw as { name?: unknown; weight?: unknown; description?: unknown };
   const name = typeof row.name === 'string' ? row.name.trim() : '';
   if (!name) return null;
+  // Do not trim description here — trailing spaces must survive controlled inputs while typing.
   const description =
-    typeof row.description === 'string' ? row.description.trim() || undefined : undefined;
+    typeof row.description === 'string' && row.description.length > 0
+      ? row.description
+      : undefined;
   return { name, weight: normalizeWeight(row.weight), ...(description ? { description } : {}) };
 }
 
