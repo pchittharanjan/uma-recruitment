@@ -1,11 +1,13 @@
 import { getDb } from '@/lib/db';
 import type { InterviewSlotInput, InterviewSlotStage } from '@/lib/interview-slots';
+import {
+  MAX_INTERVIEW_GROUP_SIZE,
+  MIN_INTERVIEW_GROUP_SIZE,
+} from '@/lib/interview-schedule-constants';
+
+export { MAX_INTERVIEW_GROUP_SIZE, MIN_INTERVIEW_GROUP_SIZE } from '@/lib/interview-schedule-constants';
 
 export const GROUP_FIRST_ROUND_TEAMS = ['Strategy', 'Events', 'Design'] as const;
-
-/** Max candidates in one group interview (manual schedule + auto-gen). */
-export const MAX_INTERVIEW_GROUP_SIZE = 12;
-export const MIN_INTERVIEW_GROUP_SIZE = 2;
 
 export interface InterviewScheduleConfig {
   firstRoundDate: string | null;

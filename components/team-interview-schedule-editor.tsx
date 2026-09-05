@@ -20,7 +20,7 @@ import {
   assignmentsFromUiSessions,
   validateInterviewerAssignments,
 } from '@/lib/interview-schedule-validation';
-import { MAX_INTERVIEW_GROUP_SIZE } from '@/lib/interview-schedule-config';
+import { MAX_INTERVIEW_GROUP_SIZE } from '@/lib/interview-schedule-constants';
 import { cn } from '@/lib/utils';
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 import { toast } from 'sonner';

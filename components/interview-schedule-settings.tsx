@@ -17,7 +17,7 @@ import type { RoundStatus } from '@/lib/db';
 import {
   MAX_INTERVIEW_GROUP_SIZE,
   MIN_INTERVIEW_GROUP_SIZE,
-} from '@/lib/interview-schedule-config';
+} from '@/lib/interview-schedule-constants';
 import { phaseLabel } from '@/lib/stages';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
