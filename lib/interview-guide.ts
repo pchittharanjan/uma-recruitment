@@ -73,9 +73,23 @@ function isGuideFormat(value: unknown): value is InterviewGuideFormat {
 export function normalizeCasePdfUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
-  if (!trimmed.startsWith('/interview-cases/')) return undefined;
-  if (trimmed.includes('..') || trimmed.includes('//', 1)) return undefined;
-  return trimmed;
+  if (!trimmed) return undefined;
+
+  if (trimmed.startsWith('/interview-cases/')) {
+    if (trimmed.includes('..') || trimmed.includes('//', 1)) return undefined;
+    return trimmed;
+  }
+
+  // Uploaded case PDFs on Vercel Blob (public URLs).
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'https:') return undefined;
+    if (!/\.blob\.vercel-storage\.com$/i.test(url.hostname)) return undefined;
+    if (!url.pathname.toLowerCase().endsWith('.pdf')) return undefined;
+    return trimmed;
+  } catch {
+    return undefined;
+  }
 }
 
 export function emptyInterviewRubric(): InterviewRubric {
