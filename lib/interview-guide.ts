@@ -244,7 +244,10 @@ export function rubricFromCategories(
         ? category.criteria.map((c) => ({
             name: c.name,
             weight: Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0,
-            ...(c.description?.trim() ? { description: c.description.trim() } : {}),
+            // Keep trailing spaces while typing; trim only for the scored/saved leaf list below.
+            ...(c.description != null && c.description !== ''
+              ? { description: c.description }
+              : {}),
           }))
         : [{ name: '', weight: 100 }],
   }));
@@ -254,7 +257,11 @@ export function rubricFromCategories(
       ...category,
       name: category.name.trim(),
       criteria: category.criteria
-        .map((c) => ({ ...c, name: c.name.trim() }))
+        .map((c) => ({
+          ...c,
+          name: c.name.trim(),
+          ...(c.description?.trim() ? { description: c.description.trim() } : {}),
+        }))
         .filter((c) => c.name),
     }))
     .filter((category) => category.name && category.criteria.length > 0);
