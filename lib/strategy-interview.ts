@@ -74,11 +74,53 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
     },
     rubric: {
       scaleMax: 5,
+      categories: [
+        {
+          name: 'Supreme Case',
+          weight: 60,
+          criteria: [
+            {
+              name: 'Q1. Market Sizing',
+              weight: 15,
+              description: 'Can they structure a market-sizing estimate and sanity-check it?',
+            },
+            {
+              name: 'Q2. Gen Z Insight & Campaign Idea',
+              weight: 30,
+              description:
+                'Do they understand Gen Z behavior and turn it into one real, specific campaign idea?',
+            },
+            {
+              name: 'Q3. Growth vs. Scarcity Tradeoff',
+              weight: 30,
+              description:
+                'Do they see both the real risk (dilution) and real upside (a fresh cohort)?',
+            },
+            {
+              name: 'Q4. Recommendation & Summary',
+              weight: 25,
+              description: 'Do they land on one clear recommendation instead of listing everything?',
+            },
+          ],
+        },
+        {
+          name: 'Group Process',
+          weight: 40,
+          criteria: [
+            {
+              name: 'Group Contribution',
+              weight: 100,
+              description: 'Do they actively participate and present their part clearly?',
+            },
+          ],
+        },
+      ],
       criteria: [
-        { name: 'Q1. Market Sizing', weight: 25 },
-        { name: 'Q2. Gen Z Trends & Campaign Tie', weight: 25 },
-        { name: 'Q3. Challenges & Opportunities', weight: 25 },
-        { name: 'Q4. Recommendation & Summary', weight: 25 },
+        { name: 'Q1. Market Sizing', weight: 9 },
+        { name: 'Q2. Gen Z Insight & Campaign Idea', weight: 18 },
+        { name: 'Q3. Growth vs. Scarcity Tradeoff', weight: 18 },
+        { name: 'Q4. Recommendation & Summary', weight: 15 },
+        { name: 'Group Contribution', weight: 40 },
       ],
     },
   };

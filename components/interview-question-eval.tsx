@@ -61,6 +61,7 @@ export function InterviewQuestionEval({
   scaleMax = 5,
   showNotes = true,
   weightPercent,
+  description,
   compact = false,
   rowIndex = 0,
   striped = true,
@@ -74,6 +75,7 @@ export function InterviewQuestionEval({
   scaleMax?: number;
   showNotes?: boolean;
   weightPercent?: number;
+  description?: string;
   compact?: boolean;
   rowIndex?: number;
   striped?: boolean;
@@ -83,7 +85,12 @@ export function InterviewQuestionEval({
   return (
     <div className={striped ? questionStripeClass(rowIndex) : 'uma-stack-block'}>
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 text-sm leading-relaxed text-foreground/90">{question}</p>
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm leading-relaxed text-foreground/90">{question}</p>
+          {description?.trim() ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">{description.trim()}</p>
+          ) : null}
+        </div>
         {weightPercent != null ? (
           <p className="shrink-0 text-xs text-muted-foreground/85">{weightPercent}%</p>
         ) : null}
@@ -137,15 +144,28 @@ export function InterviewQuestionGroups({
     <div className="uma-stack-page">
       {groups.map((group) => {
         const scoreOnly = group.key === 'case';
-        const percents =
-          scoreOnly && group.weights && group.fields.length > 0
-            ? interviewWeightPercents(
-                group.fields.map((field) => ({
-                  name: field,
-                  weight: group.weights?.[field] ?? 1,
-                })),
-              )
-            : null;
+        const blocks =
+          group.categories && group.categories.length > 0
+            ? group.categories
+            : [
+                {
+                  name: '',
+                  weightPercent: 100,
+                  fields: group.fields,
+                  fieldWeightPercents:
+                    scoreOnly && group.weights && group.fields.length > 0
+                      ? interviewWeightPercents(
+                          group.fields.map((field) => ({
+                            name: field,
+                            weight: group.weights?.[field] ?? 1,
+                          })),
+                        )
+                      : group.fields.map(() => undefined as number | undefined),
+                  descriptions: undefined as Array<string | undefined> | undefined,
+                },
+              ];
+
+        let rowIndex = 0;
         return (
           <section key={group.key} className="uma-stack-section">
             {group.label ? (
@@ -154,21 +174,39 @@ export function InterviewQuestionGroups({
               </p>
             ) : null}
             <div className="flex flex-col">
-              {group.fields.map((field, index) => (
-                <InterviewQuestionEval
-                  key={field}
-                  question={field}
-                  note={notes[field] ?? ''}
-                  score={scores[field] ?? null}
-                  disabled={disabled}
-                  scaleMax={scaleMax}
-                  showNotes={!scoreOnly}
-                  weightPercent={percents?.[index]}
-                  compact={compact}
-                  rowIndex={index}
-                  onNoteChange={(value) => onNoteChange(field, value)}
-                  onScoreChange={(value) => onScoreChange(field, value)}
-                />
+              {blocks.map((block) => (
+                <div key={`${group.key}-${block.name || 'flat'}`} className="flex flex-col">
+                  {block.name ? (
+                    <div className={questionStripeClass(rowIndex++)}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-foreground">{block.name}</p>
+                        <p className="shrink-0 text-xs text-muted-foreground/85">
+                          {block.weightPercent}%
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {block.fields.map((field, index) => {
+                    const currentRow = rowIndex++;
+                    return (
+                      <InterviewQuestionEval
+                        key={field}
+                        question={field}
+                        description={block.descriptions?.[index]}
+                        note={notes[field] ?? ''}
+                        score={scores[field] ?? null}
+                        disabled={disabled}
+                        scaleMax={scaleMax}
+                        showNotes={!scoreOnly}
+                        weightPercent={block.fieldWeightPercents[index]}
+                        compact={compact}
+                        rowIndex={currentRow}
+                        onNoteChange={(value) => onNoteChange(field, value)}
+                        onScoreChange={(value) => onScoreChange(field, value)}
+                      />
+                    );
+                  })}
+                </div>
               ))}
             </div>
           </section>
@@ -359,42 +397,63 @@ export function InterviewNotesAndScoringColumns({
 
       {fieldGroups.map((group) => {
         const scoreOnly = group.key === 'case';
-        const percents =
-          scoreOnly && group.weights && group.fields.length > 0
-            ? interviewWeightPercents(
-                group.fields.map((field) => ({
-                  name: field,
-                  weight: group.weights?.[field] ?? 1,
-                })),
-              )
-            : null;
+        const blocks =
+          group.categories && group.categories.length > 0
+            ? group.categories
+            : [
+                {
+                  name: group.label,
+                  weightPercent: 100,
+                  fields: group.fields,
+                  fieldWeightPercents:
+                    scoreOnly && group.weights && group.fields.length > 0
+                      ? interviewWeightPercents(
+                          group.fields.map((field) => ({
+                            name: field,
+                            weight: group.weights?.[field] ?? 1,
+                          })),
+                        )
+                      : group.fields.map(() => undefined as number | undefined),
+                  descriptions: undefined as Array<string | undefined> | undefined,
+                },
+              ];
+
         return (
           <div key={group.key} className="space-y-3">
-            {group.fields.map((field, index) => (
-              <ColumnsQuestionRow key={field}>
-                {columns.map((column, columnIndex) => (
-                  <ColumnsQuestionCell
-                    key={column.id ?? columnIndex}
-                    rowIndex={index}
-                    sectionLabel={index === 0 ? group.label : undefined}
-                  >
-                    <InterviewQuestionEval
-                      question={field}
-                      note={column.notes[field] ?? ''}
-                      score={column.scores[field] ?? null}
-                      disabled={column.disabled}
-                      scaleMax={scaleMax}
-                      showNotes={!scoreOnly}
-                      weightPercent={percents?.[index]}
-                      compact={compact}
-                      striped={false}
-                      onNoteChange={(value) => column.onNoteChange(field, value)}
-                      onScoreChange={(value) => column.onScoreChange(field, value)}
-                    />
-                  </ColumnsQuestionCell>
-                ))}
-              </ColumnsQuestionRow>
-            ))}
+            {blocks.map((block) =>
+              block.fields.map((field, index) => (
+                <ColumnsQuestionRow key={`${block.name}-${field}`}>
+                  {columns.map((column, columnIndex) => (
+                    <ColumnsQuestionCell
+                      key={column.id ?? columnIndex}
+                      rowIndex={index}
+                      sectionLabel={
+                        index === 0
+                          ? block.name
+                            ? `${block.name} · ${block.weightPercent}%`
+                            : group.label
+                          : undefined
+                      }
+                    >
+                      <InterviewQuestionEval
+                        question={field}
+                        description={block.descriptions?.[index]}
+                        note={column.notes[field] ?? ''}
+                        score={column.scores[field] ?? null}
+                        disabled={column.disabled}
+                        scaleMax={scaleMax}
+                        showNotes={!scoreOnly}
+                        weightPercent={block.fieldWeightPercents[index]}
+                        compact={compact}
+                        striped={false}
+                        onNoteChange={(value) => column.onNoteChange(field, value)}
+                        onScoreChange={(value) => column.onScoreChange(field, value)}
+                      />
+                    </ColumnsQuestionCell>
+                  ))}
+                </ColumnsQuestionRow>
+              )),
+            )}
           </div>
         );
       })}

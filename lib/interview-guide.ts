@@ -7,13 +7,32 @@ export type InterviewGuideStage = 'first_round' | 'final_round';
 
 export type InterviewRubricCriterion = {
   name: string;
+  /** Share within its category (or of the whole rubric when flat). */
   weight: number;
+  /** Optional grading prompt shown under the criterion name. */
+  description?: string;
+};
+
+export type InterviewRubricCategory = {
+  name: string;
+  /** Share of this rubric part (categories must sum to 100). */
+  weight: number;
+  criteria: InterviewRubricCriterion[];
 };
 
 export type InterviewRubric = {
   /** Highest score interviewers can give (inclusive). Default 5. */
   scaleMax: number;
+  /**
+   * Flat leaf criteria with absolute shares of the rubric (sum 100).
+   * Always kept in sync when `categories` is set — used for scoring math.
+   */
   criteria: InterviewRubricCriterion[];
+  /**
+   * Nested categories (e.g. Supreme Case 60% → Q1–Q4). When present and non-empty,
+   * this is the source of truth for setup UI; `criteria` is the flattened absolute shares.
+   */
+  categories?: InterviewRubricCategory[];
 };
 
 export interface InterviewGuide {
@@ -36,12 +55,25 @@ export interface InterviewGuide {
 
 export type InterviewGuidesRecord = Record<InterviewGuideStage, InterviewGuide | null>;
 
+export type InterviewScoreCategoryBlock = {
+  name: string;
+  /** Category share of this scored part (percent). */
+  weightPercent: number;
+  fields: string[];
+  /** Within-category shares aligned with `fields`. */
+  fieldWeightPercents: number[];
+  /** Optional prompts aligned with `fields`. */
+  descriptions?: Array<string | undefined>;
+};
+
 export type InterviewScoreFieldGroup = {
   key: 'case' | 'behavioral' | 'questions' | 'overall';
   label: string;
   fields: string[];
   /** Relative weights keyed by field name. Missing keys are treated as 1. */
   weights?: Record<string, number>;
+  /** Nested category headers for interviewer UI (optional). */
+  categories?: InterviewScoreCategoryBlock[];
 };
 
 export const INTERVIEW_SCALE_MAX_OPTIONS = [5, 7, 10] as const;
@@ -93,16 +125,22 @@ export function normalizeCasePdfUrl(value: unknown): string | undefined {
 }
 
 export function emptyInterviewRubric(): InterviewRubric {
+  const criteria = [{ name: '', weight: 100 }];
   return {
     scaleMax: DEFAULT_INTERVIEW_SCALE_MAX,
-    criteria: [{ name: '', weight: 100 }],
+    criteria,
+    categories: [{ name: '', weight: 100, criteria: [{ name: '', weight: 100 }] }],
   };
 }
 
 function defaultInterviewRubric(): InterviewRubric {
+  const criteria = [{ name: 'Overall assessment', weight: 100 }];
   return {
     scaleMax: DEFAULT_INTERVIEW_SCALE_MAX,
-    criteria: [{ name: 'Overall assessment', weight: 100 }],
+    criteria,
+    categories: [
+      { name: 'Evaluation', weight: 100, criteria: [{ name: 'Overall assessment', weight: 100 }] },
+    ],
   };
 }
 
@@ -120,20 +158,178 @@ function normalizeWeight(value: unknown): number {
   return Math.round(n * 100) / 100;
 }
 
+function normalizeCriterion(raw: unknown): InterviewRubricCriterion | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as { name?: unknown; weight?: unknown; description?: unknown };
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (!name) return null;
+  const description =
+    typeof row.description === 'string' ? row.description.trim() || undefined : undefined;
+  return { name, weight: normalizeWeight(row.weight), ...(description ? { description } : {}) };
+}
+
+function normalizeCategory(raw: unknown): InterviewRubricCategory | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as { name?: unknown; weight?: unknown; criteria?: unknown };
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (!name) return null;
+  const criteriaRaw = Array.isArray(row.criteria) ? row.criteria : [];
+  const criteria: InterviewRubricCriterion[] = [];
+  for (const item of criteriaRaw) {
+    const criterion = normalizeCriterion(item);
+    if (criterion) criteria.push(criterion);
+  }
+  if (criteria.length === 0) return null;
+  return { name, weight: normalizeWeight(row.weight), criteria };
+}
+
+/** Flatten category × within-category shares into absolute rubric shares that sum to 100. */
+export function flattenRubricCategories(
+  categories: InterviewRubricCategory[],
+): InterviewRubricCriterion[] {
+  const leaves: InterviewRubricCriterion[] = [];
+  for (const category of categories) {
+    const within = interviewWeightPercents(category.criteria);
+    category.criteria.forEach((criterion, i) => {
+      const share = Math.round(((category.weight * (within[i] ?? 0)) / 100) * 100) / 100;
+      leaves.push({
+        name: criterion.name,
+        weight: share,
+        ...(criterion.description ? { description: criterion.description } : {}),
+      });
+    });
+  }
+  if (leaves.length === 0) return leaves;
+  const total = criteriaShareTotal(leaves);
+  if (total === 100) return leaves;
+  if (total <= 0) {
+    const equal = interviewWeightPercents(leaves.map((c) => ({ ...c, weight: 1 })));
+    return leaves.map((c, i) => ({ ...c, weight: equal[i] ?? 0 }));
+  }
+  const scaled = interviewWeightPercents(leaves);
+  return leaves.map((c, i) => ({ ...c, weight: scaled[i] ?? 0 }));
+}
+
+/**
+ * Categories for editing: use saved categories, or wrap flat criteria in one "Evaluation" bucket.
+ */
+export function rubricCategoriesForEdit(rubric: InterviewRubric): InterviewRubricCategory[] {
+  if (rubric.categories && rubric.categories.length > 0) {
+    return rubric.categories.map((category) => ({
+      name: category.name,
+      weight: category.weight,
+      criteria:
+        category.criteria.length > 0
+          ? category.criteria.map((c) => ({ ...c }))
+          : [{ name: '', weight: 100 }],
+    }));
+  }
+  const criteria =
+    rubric.criteria.length > 0
+      ? rubric.criteria.map((c) => ({ ...c }))
+      : [{ name: '', weight: 100 }];
+  return [{ name: 'Evaluation', weight: 100, criteria: criteriaAsPercentShares(criteria) }];
+}
+
+/** Rebuild rubric from category editor state (keeps flat criteria in sync). */
+export function rubricFromCategories(
+  scaleMax: number,
+  categories: InterviewRubricCategory[],
+): InterviewRubric {
+  const draft = categories.map((category) => ({
+    name: category.name,
+    weight: Number.isFinite(category.weight) && category.weight > 0 ? category.weight : 0,
+    criteria:
+      category.criteria.length > 0
+        ? category.criteria.map((c) => ({
+            name: c.name,
+            weight: Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0,
+            ...(c.description?.trim() ? { description: c.description.trim() } : {}),
+          }))
+        : [{ name: '', weight: 100 }],
+  }));
+
+  const complete = draft
+    .map((category) => ({
+      ...category,
+      name: category.name.trim(),
+      criteria: category.criteria
+        .map((c) => ({ ...c, name: c.name.trim() }))
+        .filter((c) => c.name),
+    }))
+    .filter((category) => category.name && category.criteria.length > 0);
+
+  return {
+    scaleMax,
+    // Keep in-progress empty names so the editor does not drop rows while typing.
+    categories: draft,
+    criteria:
+      complete.length > 0
+        ? flattenRubricCategories(complete)
+        : [{ name: '', weight: 100 }],
+  };
+}
+
+function validateRubricShares(rubric: InterviewRubric, label: string): string | null {
+  if (rubric.categories && rubric.categories.length > 0) {
+    if (criteriaShareTotal(rubric.categories.map((c) => ({ name: c.name, weight: c.weight }))) !== 100) {
+      return `${label} category shares must add up to 100%.`;
+    }
+    const names = new Set<string>();
+    for (const category of rubric.categories) {
+      if (category.criteria.length === 0) {
+        return `Add at least one criterion under “${category.name}”.`;
+      }
+      if (criteriaShareTotal(category.criteria) !== 100) {
+        return `Criteria shares under “${category.name}” must add up to 100%.`;
+      }
+      for (const criterion of category.criteria) {
+        const key = criterion.name.toLowerCase();
+        if (names.has(key)) {
+          return `Criterion names must be unique (duplicate: “${criterion.name}”).`;
+        }
+        names.add(key);
+      }
+    }
+    return null;
+  }
+  if (rubric.criteria.length === 0) {
+    return `Add at least one ${label.toLowerCase()} criterion.`;
+  }
+  if (criteriaShareTotal(rubric.criteria) !== 100) {
+    return `${label} shares must add up to 100%.`;
+  }
+  return null;
+}
+
 export function normalizeInterviewRubric(raw: unknown): InterviewRubric | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
-  const obj = raw as { scaleMax?: unknown; criteria?: unknown };
+  const obj = raw as { scaleMax?: unknown; criteria?: unknown; categories?: unknown };
+  const scaleMax = clampScaleMax(obj.scaleMax);
+
+  const categoriesRaw = Array.isArray(obj.categories) ? obj.categories : [];
+  const categories: InterviewRubricCategory[] = [];
+  for (const item of categoriesRaw) {
+    const category = normalizeCategory(item);
+    if (category) categories.push(category);
+  }
+
+  if (categories.length > 0) {
+    return {
+      scaleMax,
+      categories,
+      criteria: flattenRubricCategories(categories),
+    };
+  }
+
   const criteriaRaw = Array.isArray(obj.criteria) ? obj.criteria : [];
   const criteria: InterviewRubricCriterion[] = [];
   for (const item of criteriaRaw) {
-    if (!item || typeof item !== 'object') continue;
-    const row = item as { name?: unknown; weight?: unknown };
-    const name = typeof row.name === 'string' ? row.name.trim() : '';
-    if (!name) continue;
-    criteria.push({ name, weight: normalizeWeight(row.weight) });
+    const criterion = normalizeCriterion(item);
+    if (criterion) criteria.push(criterion);
   }
   if (criteria.length === 0) return undefined;
-  return { scaleMax: clampScaleMax(obj.scaleMax), criteria };
+  return { scaleMax, criteria };
 }
 
 function normalizeCaseStudy(raw: unknown): InterviewGuide['caseStudy'] | null {
@@ -247,18 +443,16 @@ export function validateInterviewGuide(guide: InterviewGuide): string | null {
     if (!rubric || rubric.criteria.length === 0) {
       return 'Add at least one evaluation criterion.';
     }
-    if (criteriaShareTotal(rubric.criteria) !== 100) {
-      return 'Evaluation shares must add up to 100%.';
-    }
+    const rubricError = validateRubricShares(rubric, 'Evaluation');
+    if (rubricError) return rubricError;
     if (guide.format === 'case_and_behavioral') {
       const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
       if (behavioralRubric) {
         if (behavioralRubric.criteria.length === 0) {
           return 'Add at least one behavioral evaluation criterion.';
         }
-        if (criteriaShareTotal(behavioralRubric.criteria) !== 100) {
-          return 'Behavioral evaluation shares must add up to 100%.';
-        }
+        const behavioralError = validateRubricShares(behavioralRubric, 'Behavioral evaluation');
+        if (behavioralError) return behavioralError;
       }
     }
   }
@@ -286,10 +480,20 @@ function formatCaseStudyLines(guide: InterviewGuide): string[] {
   if (rubric) {
     lines.push('');
     lines.push(`Evaluation (1–${rubric.scaleMax}):`);
-    const percents = interviewWeightPercents(rubric.criteria);
-    rubric.criteria.forEach((criterion, i) => {
-      lines.push(`• ${criterion.name} (${percents[i]}%)`);
-    });
+    if (rubric.categories && rubric.categories.length > 0) {
+      for (const category of rubric.categories) {
+        lines.push(`• ${category.name} (${category.weight}%)`);
+        const within = interviewWeightPercents(category.criteria);
+        category.criteria.forEach((criterion, i) => {
+          lines.push(`  – ${criterion.name} (${within[i]}%)`);
+        });
+      }
+    } else {
+      const percents = interviewWeightPercents(rubric.criteria);
+      rubric.criteria.forEach((criterion, i) => {
+        lines.push(`• ${criterion.name} (${percents[i]}%)`);
+      });
+    }
   }
   return lines;
 }
@@ -408,14 +612,44 @@ export function criteriaAsPercentShares(
   return normalized.map((c, i) => ({ ...c, weight: percents[i] ?? 0 }));
 }
 
-function rubricScoreFields(guide: InterviewGuide): { fields: string[]; weights: Record<string, number> } {
-  const rubric = normalizeInterviewRubric(guide.rubric) ?? defaultInterviewRubric();
+function scoreBlocksFromRubric(rubric: InterviewRubric): {
+  fields: string[];
+  weights: Record<string, number>;
+  categories?: InterviewScoreCategoryBlock[];
+} {
   const fields = rubric.criteria.map((c) => c.name);
   const weights: Record<string, number> = {};
   for (const criterion of rubric.criteria) {
     weights[criterion.name] = criterion.weight;
   }
+
+  if (rubric.categories && rubric.categories.length > 0) {
+    const categoryWeights = interviewWeightPercents(
+      rubric.categories.map((c) => ({ name: c.name, weight: c.weight })),
+    );
+    return {
+      fields,
+      weights,
+      categories: rubric.categories.map((category, index) => ({
+        name: category.name,
+        weightPercent: categoryWeights[index] ?? category.weight,
+        fields: category.criteria.map((c) => c.name),
+        fieldWeightPercents: interviewWeightPercents(category.criteria),
+        descriptions: category.criteria.map((c) => c.description),
+      })),
+    };
+  }
+
   return { fields, weights };
+}
+
+function rubricScoreFields(guide: InterviewGuide): {
+  fields: string[];
+  weights: Record<string, number>;
+  categories?: InterviewScoreCategoryBlock[];
+} {
+  const rubric = normalizeInterviewRubric(guide.rubric) ?? defaultInterviewRubric();
+  return scoreBlocksFromRubric(rubric);
 }
 
 function questionScoreFields(questions: string[] | undefined, fallback: string): string[] {
@@ -458,26 +692,23 @@ export function interviewScoreFieldGroups(
     ];
   }
 
-  const { fields: caseFields, weights } = rubricScoreFields(guide);
+  const { fields: caseFields, weights, categories } = rubricScoreFields(guide);
 
   if (guide.format === 'case_study') {
-    return [{ key: 'case', label: 'Evaluation', fields: caseFields, weights }];
+    return [{ key: 'case', label: 'Evaluation', fields: caseFields, weights, categories }];
   }
 
   const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
   if (behavioralRubric && behavioralRubric.criteria.length > 0) {
-    const behavioralFields = behavioralRubric.criteria.map((c) => c.name);
-    const behavioralWeights: Record<string, number> = {};
-    for (const criterion of behavioralRubric.criteria) {
-      behavioralWeights[criterion.name] = criterion.weight;
-    }
+    const behavioral = scoreBlocksFromRubric(behavioralRubric);
     return [
-      { key: 'case', label: 'Part 1: Case evaluation', fields: caseFields, weights },
+      { key: 'case', label: 'Part 1: Case evaluation', fields: caseFields, weights, categories },
       {
         key: 'behavioral',
         label: 'Part 2: Behavioral evaluation',
-        fields: behavioralFields,
-        weights: behavioralWeights,
+        fields: behavioral.fields,
+        weights: behavioral.weights,
+        categories: behavioral.categories,
       },
     ];
   }
@@ -573,6 +804,17 @@ export function teamUsesCasePdf(teamName: string): boolean {
   return teamName === 'Strategy' || teamName === 'Events';
 }
 
+function isLegacyFlatStrategyCaseRubric(rubric: InterviewGuide['rubric']): boolean {
+  if (!rubric || (rubric.categories && rubric.categories.length > 0)) return false;
+  const names = (rubric.criteria ?? []).map((c) => c.name.trim().toLowerCase());
+  if (names.length < 3 || names.length > 5) return false;
+  const joined = names.join(' | ');
+  return (
+    joined.includes('market sizing') &&
+    (joined.includes('gen z') || joined.includes('recommendation'))
+  );
+}
+
 function mergeGuideWithDefault(
   saved: InterviewGuide | null,
   fallback: InterviewGuide | null,
@@ -594,6 +836,11 @@ function mergeGuideWithDefault(
     fallback.format === 'case_and_behavioral' &&
     !normalizeInterviewRubric(saved.behavioralRubric) &&
     Boolean(normalizeInterviewRubric(fallback.behavioralRubric));
+  const missingRubricCategories =
+    Boolean(fallback.rubric?.categories?.length) &&
+    Boolean(normalizeInterviewRubric(saved.rubric)) &&
+    !(saved.rubric?.categories && saved.rubric.categories.length > 0) &&
+    isLegacyFlatStrategyCaseRubric(saved.rubric);
 
   if (missingCaseQuestions || missingBehavioral) {
     return {
@@ -613,6 +860,9 @@ function mergeGuideWithDefault(
     next = { ...next, casePdfUrl: fallback.casePdfUrl };
   }
   if (missingRubric && fallback.rubric) {
+    next = { ...next, rubric: fallback.rubric };
+  } else if (missingRubricCategories && fallback.rubric) {
+    // Upgrade flat Strategy defaults to nested categories without wiping custom case copy.
     next = { ...next, rubric: fallback.rubric };
   }
   if (missingBehavioralRubric && fallback.behavioralRubric) {

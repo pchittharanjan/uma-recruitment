@@ -39,13 +39,40 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
             Evaluation (1–{interviewScaleMax(guide)})
           </p>
-          <ul className="list-disc space-y-1 pl-5">
-            {rubric.criteria.map((criterion, i) => (
-              <li key={i}>
-                {criterion.name} ({percents[i]}%)
-              </li>
-            ))}
-          </ul>
+          {rubric.categories && rubric.categories.length > 0 ? (
+            <ul className="space-y-2">
+              {rubric.categories.map((category, categoryIndex) => {
+                const within = interviewWeightPercents(category.criteria);
+                return (
+                  <li key={categoryIndex}>
+                    <p className="font-medium">
+                      {category.name} ({category.weight}%)
+                    </p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                      {category.criteria.map((criterion, i) => (
+                        <li key={i}>
+                          {criterion.name} ({within[i]}%)
+                          {criterion.description?.trim() ? (
+                            <span className="block text-xs opacity-80">
+                              {criterion.description.trim()}
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <ul className="list-disc space-y-1 pl-5">
+              {rubric.criteria.map((criterion, i) => (
+                <li key={i}>
+                  {criterion.name} ({percents[i]}%)
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
     </div>

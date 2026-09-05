@@ -31,12 +31,14 @@ import {
   INTERVIEW_SCALE_MAX_OPTIONS,
   normalizeInterviewRubric,
   validateInterviewGuide,
-  criteriaAsPercentShares,
   criteriaShareTotal,
+  rubricCategoriesForEdit,
+  rubricFromCategories,
   type InterviewGuide,
   type InterviewGuideFormat,
   type InterviewGuideStage,
   type InterviewRubric,
+  type InterviewRubricCategory,
 } from '@/lib/interview-guide';
 import { teamUsesInterviewStage } from '@/lib/team-pipeline-profile';
 import { serializeInterviewGuidePayload } from '@/lib/interview-guide-serialize';
@@ -127,15 +129,10 @@ function emptyCaseStudy() {
 }
 
 function withFilledRubric(guide: InterviewGuide): InterviewRubric {
-  const rubric = guide.rubric;
-  if (rubric?.criteria && rubric.criteria.length > 0) {
-    return {
-      scaleMax: rubric.scaleMax,
-      criteria: rubric.criteria.map((c) => ({
-        name: c.name,
-        weight: Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0,
-      })),
-    };
+  const normalized = normalizeInterviewRubric(guide.rubric);
+  if (normalized) {
+    const categories = rubricCategoriesForEdit(normalized);
+    return rubricFromCategories(normalized.scaleMax, categories);
   }
   return emptyInterviewRubric();
 }
@@ -171,24 +168,22 @@ function guideFromApi(guide: InterviewGuide | null, format: InterviewGuideFormat
   if (!guide) return emptyGuide(format);
   const intro = rewriteLegacyInterviewIntro(guide.intro) ?? '';
   if (guide.format === 'case_and_behavioral') {
-    const rubric = withFilledRubric(guide);
     return {
       format: 'case_and_behavioral',
       intro,
       casePdfUrl: guide.casePdfUrl,
       caseStudy: withFilledCase(guide),
       questions: guide.questions && guide.questions.length > 0 ? guide.questions : [''],
-      rubric: { ...rubric, criteria: criteriaAsPercentShares(rubric.criteria) },
+      rubric: withFilledRubric(guide),
     };
   }
   if (guide.format === 'case_study') {
-    const rubric = withFilledRubric(guide);
     return {
       format: 'case_study',
       intro,
       casePdfUrl: guide.casePdfUrl,
       caseStudy: withFilledCase(guide),
-      rubric: { ...rubric, criteria: criteriaAsPercentShares(rubric.criteria) },
+      rubric: withFilledRubric(guide),
     };
   }
   return {
@@ -289,36 +284,56 @@ function RubricPreview({ guide }: { guide: InterviewGuide }) {
       ) : null}
 
       {groups.map((group) => {
-        const percents =
-          group.weights && group.fields.length > 0
-            ? interviewWeightPercents(
-                group.fields.map((field) => ({
-                  name: field,
-                  weight: group.weights?.[field] ?? 1,
-                })),
-              )
-            : null;
+        const blocks =
+          group.categories && group.categories.length > 0
+            ? group.categories
+            : [
+                {
+                  name: group.label || 'Scored',
+                  weightPercent: 100,
+                  fields: group.fields,
+                  fieldWeightPercents:
+                    group.weights && group.fields.length > 0
+                      ? interviewWeightPercents(
+                          group.fields.map((field) => ({
+                            name: field,
+                            weight: group.weights?.[field] ?? 1,
+                          })),
+                        )
+                      : group.fields.map(() => 0),
+                },
+              ];
         return (
-          <div key={group.key} className="space-y-1.5">
+          <div key={group.key} className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground">
               {group.label || 'Scored'}
               {isCase || group.key === 'questions' ? ` · 1–${scaleMax}` : null}
             </p>
-            <ul className="space-y-1">
-              {group.fields.map((field, index) => (
-                <li
-                  key={`${group.key}-${field}-${index}`}
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background/80 px-3 py-2 text-sm"
-                >
-                  <span>{field}</span>
-                  {percents ? (
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {percents[index]}%
+            {blocks.map((block) => (
+              <div key={`${group.key}-${block.name}`} className="space-y-1.5">
+                {group.categories && group.categories.length > 0 ? (
+                  <p className="flex items-center justify-between gap-3 text-sm font-medium">
+                    <span>{block.name}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {block.weightPercent}%
                     </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                  </p>
+                ) : null}
+                <ul className="space-y-1">
+                  {block.fields.map((field, index) => (
+                    <li
+                      key={`${group.key}-${block.name}-${field}-${index}`}
+                      className="flex items-center justify-between gap-3 rounded-md border bg-background/80 px-3 py-2 text-sm"
+                    >
+                      <span>{field}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {block.fieldWeightPercents[index]}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         );
       })}
@@ -412,14 +427,20 @@ function RubricEditor({
   rubric: InterviewRubric;
   onChange: (rubric: InterviewRubric) => void;
 }) {
-  const rows = rubric.criteria.length > 0 ? rubric.criteria : [{ name: '', weight: 100 }];
-  const shareTotal = criteriaShareTotal(rows);
-  const sharesInvalid = shareTotal !== 100;
+  const categories = rubricCategoriesForEdit(rubric);
+  const categoryShareTotal = criteriaShareTotal(
+    categories.map((c) => ({ name: c.name, weight: c.weight })),
+  );
+  const categoriesInvalid = categoryShareTotal !== 100;
+
+  const commit = (nextCategories: InterviewRubricCategory[]) => {
+    onChange(rubricFromCategories(rubric.scaleMax, nextCategories));
+  };
 
   return (
     <GuideSection
       title="Evaluation Criteria"
-      description="After notes, interviewers score the candidate on these criteria. Set the scale and each criterion's share of the score. Shares must add up to 100%."
+      description="Group criteria into categories (e.g. Supreme Case 60%, Group Process 40%). Category shares must total 100%, and criteria shares within each category must also total 100%."
       required
       action={
         <Button
@@ -427,119 +448,267 @@ function RubricEditor({
           variant="outline"
           size="sm"
           className="shrink-0"
-          onClick={() => onChange({ ...rubric, criteria: [...rows, { name: '', weight: 0 }] })}
+          onClick={() =>
+            commit([
+              ...categories,
+              { name: '', weight: 0, criteria: [{ name: '', weight: 100 }] },
+            ])
+          }
         >
           <Plus className="mr-1 size-4" />
-          Add Criterion
+          Add Category
         </Button>
       }
     >
       <Card>
-      <CardContent className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor={`scale-max-${stage}`}>Scale max</Label>
-          <Select
-            value={String(rubric.scaleMax)}
-            onValueChange={(value) => {
-              if (value == null) return;
-              onChange({ ...rubric, scaleMax: Number(value) });
-            }}
-          >
-            <SelectTrigger id={`scale-max-${stage}`} className="w-40 bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {INTERVIEW_SCALE_MAX_OPTIONS.map((max) => (
-                <SelectItem key={max} value={String(max)}>
-                  1–{max}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2 text-xs font-medium text-muted-foreground">
-            <span>Criterion</span>
-            <span>Share</span>
-            <span />
-          </div>
-          {rows.map((row, i) => (
-            <div
-              key={`${stage}-criterion-${i}`}
-              className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2"
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor={`scale-max-${stage}`}>Scale max</Label>
+            <Select
+              value={String(rubric.scaleMax)}
+              onValueChange={(value) => {
+                if (value == null) return;
+                onChange(rubricFromCategories(Number(value), categories));
+              }}
             >
-              <Input
-                value={row.name}
-                onChange={(e) => {
-                  const next = [...rows];
-                  next[i] = { ...next[i], name: e.target.value };
-                  onChange({ ...rubric, criteria: next });
-                }}
-                placeholder={`e.g. Structure`}
-                className="bg-background"
-              />
-              <div className="flex items-center gap-1">
-                <NumberDraftInput
-                  integer
-                  min={0}
-                  max={100}
-                  commitOnChange
-                  invalid={sharesInvalid}
-                  value={row.weight}
-                  onCommit={(weight) => {
-                    const next = [...rows];
-                    next[i] = { ...next[i], weight };
-                    onChange({ ...rubric, criteria: next });
-                  }}
-                  aria-label={`Share for criterion ${i + 1}`}
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-              {rows.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    const next = rows.filter((_, j) => j !== i);
-                    onChange({
-                      ...rubric,
-                      criteria: next.length ? next : [{ name: '', weight: 100 }],
-                    });
-                  }}
-                  aria-label={`Remove criterion ${i + 1}`}
+              <SelectTrigger id={`scale-max-${stage}`} className="w-40 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVIEW_SCALE_MAX_OPTIONS.map((max) => (
+                  <SelectItem key={max} value={String(max)}>
+                    1–{max}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-4">
+            {categories.map((category, categoryIndex) => {
+              const criteriaRows =
+                category.criteria.length > 0
+                  ? category.criteria
+                  : [{ name: '', weight: 100 }];
+              const criterionShareTotal = criteriaShareTotal(criteriaRows);
+              const criteriaInvalid = criterionShareTotal !== 100;
+
+              return (
+                <div
+                  key={`${stage}-category-${categoryIndex}`}
+                  className="space-y-3 rounded-xl border bg-background/60 p-4"
                 >
-                  <X className="size-4" />
-                </Button>
-              ) : (
-                <span />
-              )}
-            </div>
-          ))}
-          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                    <Input
+                      value={category.name}
+                      onChange={(e) => {
+                        const next = categories.map((row, i) =>
+                          i === categoryIndex ? { ...row, name: e.target.value } : row,
+                        );
+                        commit(next);
+                      }}
+                      placeholder="Category name (e.g. Supreme Case)"
+                      className="bg-background font-medium"
+                    />
+                    <div className="flex items-center gap-1">
+                      <NumberDraftInput
+                        integer
+                        min={0}
+                        max={100}
+                        commitOnChange
+                        invalid={categoriesInvalid}
+                        value={category.weight}
+                        onCommit={(weight) => {
+                          const next = categories.map((row, i) =>
+                            i === categoryIndex ? { ...row, weight } : row,
+                          );
+                          commit(next);
+                        }}
+                        aria-label={`Share for category ${categoryIndex + 1}`}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    {categories.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          commit(categories.filter((_, i) => i !== categoryIndex))
+                        }
+                        aria-label={`Remove category ${categoryIndex + 1}`}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pl-1">
+                    <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <span>Criterion</span>
+                      <span>Share</span>
+                      <span />
+                    </div>
+                    {criteriaRows.map((row, criterionIndex) => (
+                      <div key={`${stage}-cat-${categoryIndex}-crit-${criterionIndex}`} className="space-y-2">
+                        <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                          <Input
+                            value={row.name}
+                            onChange={(e) => {
+                              const nextCriteria = [...criteriaRows];
+                              nextCriteria[criterionIndex] = {
+                                ...nextCriteria[criterionIndex],
+                                name: e.target.value,
+                              };
+                              const next = categories.map((cat, i) =>
+                                i === categoryIndex
+                                  ? { ...cat, criteria: nextCriteria }
+                                  : cat,
+                              );
+                              commit(next);
+                            }}
+                            placeholder={`e.g. Q1. Market Sizing`}
+                            className="bg-background"
+                          />
+                          <div className="flex items-center gap-1">
+                            <NumberDraftInput
+                              integer
+                              min={0}
+                              max={100}
+                              commitOnChange
+                              invalid={criteriaInvalid}
+                              value={row.weight}
+                              onCommit={(weight) => {
+                                const nextCriteria = [...criteriaRows];
+                                nextCriteria[criterionIndex] = {
+                                  ...nextCriteria[criterionIndex],
+                                  weight,
+                                };
+                                const next = categories.map((cat, i) =>
+                                  i === categoryIndex
+                                    ? { ...cat, criteria: nextCriteria }
+                                    : cat,
+                                );
+                                commit(next);
+                              }}
+                              aria-label={`Share for criterion ${criterionIndex + 1} in category ${categoryIndex + 1}`}
+                            />
+                            <span className="text-sm text-muted-foreground">%</span>
+                          </div>
+                          {criteriaRows.length > 1 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const nextCriteria = criteriaRows.filter(
+                                  (_, j) => j !== criterionIndex,
+                                );
+                                const next = categories.map((cat, i) =>
+                                  i === categoryIndex
+                                    ? {
+                                        ...cat,
+                                        criteria: nextCriteria.length
+                                          ? nextCriteria
+                                          : [{ name: '', weight: 100 }],
+                                      }
+                                    : cat,
+                                );
+                                commit(next);
+                              }}
+                              aria-label={`Remove criterion ${criterionIndex + 1}`}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          ) : (
+                            <span />
+                          )}
+                        </div>
+                        <Input
+                          value={row.description ?? ''}
+                          onChange={(e) => {
+                            const nextCriteria = [...criteriaRows];
+                            nextCriteria[criterionIndex] = {
+                              ...nextCriteria[criterionIndex],
+                              description: e.target.value,
+                            };
+                            const next = categories.map((cat, i) =>
+                              i === categoryIndex
+                                ? { ...cat, criteria: nextCriteria }
+                                : cat,
+                            );
+                            commit(next);
+                          }}
+                          placeholder="Optional grading prompt (shown to interviewers)"
+                          className="bg-background text-sm"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const next = categories.map((cat, i) =>
+                            i === categoryIndex
+                              ? {
+                                  ...cat,
+                                  criteria: [...criteriaRows, { name: '', weight: 0 }],
+                                }
+                              : cat,
+                          );
+                          commit(next);
+                        }}
+                      >
+                        <Plus className="mr-1 size-4" />
+                        Add Criterion
+                      </Button>
+                      <p
+                        className={
+                          criteriaInvalid
+                            ? 'flex items-center gap-1.5 text-sm text-destructive'
+                            : 'text-sm text-muted-foreground'
+                        }
+                        role={criteriaInvalid ? 'alert' : undefined}
+                      >
+                        {criteriaInvalid ? (
+                          <>
+                            <TriangleAlertIcon className="size-3.5 shrink-0" aria-hidden />
+                            Within category: {criterionShareTotal}% (need 100%)
+                          </>
+                        ) : (
+                          'Within category: 100%'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
             <p
               className={
-                sharesInvalid
-                  ? 'col-span-2 flex items-center justify-end gap-1.5 text-right text-sm text-destructive'
-                  : 'col-span-2 text-right text-sm text-muted-foreground'
+                categoriesInvalid
+                  ? 'flex items-center justify-end gap-1.5 text-sm text-destructive'
+                  : 'text-right text-sm text-muted-foreground'
               }
-              role={sharesInvalid ? 'alert' : undefined}
+              role={categoriesInvalid ? 'alert' : undefined}
             >
-              {sharesInvalid ? (
+              {categoriesInvalid ? (
                 <>
                   <TriangleAlertIcon className="size-3.5 shrink-0" aria-hidden />
-                  Shares add up to {shareTotal}%. They must total 100%.
+                  Category shares add up to {categoryShareTotal}%. They must total 100%.
                 </>
               ) : (
-                'Total 100%'
+                'Categories total 100%'
               )}
             </p>
-            <span />
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
     </GuideSection>
   );
 }
