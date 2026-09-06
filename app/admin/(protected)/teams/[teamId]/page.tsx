@@ -16,6 +16,7 @@ import { phaseLabel, parseAdminPhaseSlug } from '@/lib/stages';
 import type { RoundStatus } from '@/lib/db';
 import { openTeamDeliberationsHref } from '@/lib/deliberations-workspace';
 import { gradingQueueHref } from '@/lib/grading-paths';
+import { interviewQueueHref } from '@/lib/interview-paths';
 import { communicationsHref, outcomeEmailStageFromPipeline } from '@/lib/communications-stages';
 import type { TeamInterviewRoundStats } from '@/lib/interview-slots';
 import { isAdminPhasePreview } from '@/lib/admin-phase-preview';
@@ -111,6 +112,11 @@ interface TeamDashboardResponse {
   round: { id: number; label: string; status: RoundStatus } | null;
   interviewStats?: TeamInterviewRoundStats | null;
   myGrading?: { total: number; completed: number } | null;
+  myInterviewing?: {
+    stage: 'first_round' | 'final_round';
+    total: number;
+    completed: number;
+  } | null;
   dashboard: {
     progress: { total: number; completed: number };
     graders: GraderProgress[];
@@ -143,6 +149,7 @@ type TeamNavItemId =
   | 'assignments'
   | 'grade'
   | 'emails'
+  | 'myInterviews'
   | 'interviewSetup'
   | 'firstRoundSchedule'
   | 'finalRoundSchedule'
@@ -153,18 +160,36 @@ type TeamNavItemId =
 /** Phase-relevant toolbar actions; everything else goes under More. */
 function primaryTeamNavIds(
   adminView: RoundStatus,
-  opts: { skipFinalRound: boolean },
+  opts: { skipFinalRound: boolean; hasMyInterviews: boolean },
 ): TeamNavItemId[] {
   if (adminView === 'application' || adminView === 'closed') {
     return ['assignments', 'grade', 'emails'];
   }
   if (adminView === 'first_round') {
-    return ['interviewSetup', 'firstRoundSchedule', 'interviewResults', 'emails'];
+    return [
+      ...(opts.hasMyInterviews ? (['myInterviews'] as const) : []),
+      'interviewSetup',
+      'firstRoundSchedule',
+      'interviewResults',
+      'emails',
+    ];
   }
   if (adminView === 'final_round') {
     return opts.skipFinalRound
-      ? ['interviewSetup', 'firstRoundSchedule', 'interviewResults', 'emails']
-      : ['interviewSetup', 'finalRoundSchedule', 'interviewResults', 'emails'];
+      ? [
+          ...(opts.hasMyInterviews ? (['myInterviews'] as const) : []),
+          'interviewSetup',
+          'firstRoundSchedule',
+          'interviewResults',
+          'emails',
+        ]
+      : [
+          ...(opts.hasMyInterviews ? (['myInterviews'] as const) : []),
+          'interviewSetup',
+          'finalRoundSchedule',
+          'interviewResults',
+          'emails',
+        ];
   }
   if (adminView === 'deliberations') {
     return ['deliberations', 'emails', 'export'];
@@ -431,6 +456,12 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         : `Grade my applications (${data.myGrading.total - data.myGrading.completed} left)`
       : 'Grade name-blind';
   const gradeIsActiveCta = Boolean(data.myGrading && data.myGrading.total > 0);
+  const myInterviewing = data.myInterviewing ?? null;
+  const interviewCtaLabel = myInterviewing
+    ? myInterviewing.completed >= myInterviewing.total
+      ? 'Review my interviews'
+      : `Score my interviews (${myInterviewing.total - myInterviewing.completed} left)`
+    : null;
   const emailsHref = communicationsHref(
     outcomeEmailStageFromPipeline(isClosed ? 'deliberations' : roundStatus),
     Number(teamId),
@@ -457,6 +488,16 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       href: gradingQueueHref(teamId, 'admin'),
       emphasize: gradeIsActiveCta,
     },
+    ...(myInterviewing && interviewCtaLabel
+      ? [
+          {
+            id: 'myInterviews' as const,
+            label: interviewCtaLabel,
+            href: interviewQueueHref(teamId, myInterviewing.stage, 'admin'),
+            emphasize: myInterviewing.completed < myInterviewing.total,
+          },
+        ]
+      : []),
     { id: 'emails', label: 'Emails', href: emailsHref },
     {
       id: 'interviewSetup',
@@ -492,7 +533,12 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     { id: 'export', label: 'Export CSV', href: exportHref, download: true },
   ];
 
-  const primaryIds = new Set(primaryTeamNavIds(adminView, { skipFinalRound }));
+  const primaryIds = new Set(
+    primaryTeamNavIds(adminView, {
+      skipFinalRound,
+      hasMyInterviews: Boolean(myInterviewing),
+    }),
+  );
   const primaryNavItems = allNavItems.filter((item) => primaryIds.has(item.id));
   const moreNavItems = allNavItems.filter((item) => !primaryIds.has(item.id));
 

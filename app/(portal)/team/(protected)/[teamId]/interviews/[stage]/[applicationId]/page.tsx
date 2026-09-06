@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import PageLoading from '@/components/page-loading';
 import {
   InterviewCaseEvalSplit,
@@ -47,6 +47,11 @@ import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
 import { formatInterviewProgressLabel } from '@/lib/interview-sessions';
 import { interviewCompleteGuidance, interviewCompleteToast } from '@/lib/next-step-guidance';
+import {
+  interviewAppHref,
+  interviewAudienceFromPathname,
+  interviewQueueHref,
+} from '@/lib/interview-paths';
 import { cn } from '@/lib/utils';
 
 interface GroupMember {
@@ -208,6 +213,9 @@ export default function TeamInterviewScorePage({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const router = useRouter();
+  const pathname = usePathname();
+  const audience = interviewAudienceFromPathname(pathname);
+  const queueHref = interviewQueueHref(teamId, stage, audience);
 
   useEffect(() => {
     setData(null);
@@ -354,10 +362,10 @@ export default function TeamInterviewScorePage({
   }) => {
     if (json.nextApplicationId) {
       toast.success('Interview score submitted');
-      router.push(`/team/${teamId}/interviews/${stage}/${json.nextApplicationId}`);
+      router.push(interviewAppHref(teamId, stage, json.nextApplicationId, audience));
       return;
     }
-    if (json.advancementHref) {
+    if (json.advancementHref && audience === 'team') {
       const copy = interviewCompleteGuidance(Boolean(json.isDirector));
       toast.success(copy.title);
       router.push(json.advancementHref);
@@ -370,7 +378,7 @@ export default function TeamInterviewScorePage({
           ? 'All final interviews scored — wait for Admin to advance the team.'
           : 'All interviews scored',
     );
-    router.push(`/team/${teamId}/interviews/${stage}`);
+    router.push(queueHref);
   };
 
   const handleSingleSubmit = async () => {
@@ -481,7 +489,7 @@ export default function TeamInterviewScorePage({
         title="Couldn't load interview"
         description={error}
         ctaLabel="Back"
-        onCtaClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}
+        onCtaClick={() => router.push(queueHref)}
       />
     );
   }
@@ -521,7 +529,7 @@ export default function TeamInterviewScorePage({
         <PageContent width="fluid" className="flex items-center">
           <div className="flex-1">
             <button
-              onClick={() => router.push(`/team/${teamId}/interviews/${stage}`)}
+              onClick={() => router.push(queueHref)}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               ← Back
@@ -600,9 +608,11 @@ export default function TeamInterviewScorePage({
                 variant="ghost"
                 size="sm"
                 data-tour="interview-next"
-                onClick={() =>
-                  router.push(`/team/${teamId}/interviews/${stage}/${data.nextApplicationId}`)
-                }
+                onClick={() => {
+                  const nextId = data.nextApplicationId;
+                  if (nextId == null) return;
+                  router.push(interviewAppHref(teamId, stage, nextId, audience));
+                }}
               >
                 Next →
               </Button>

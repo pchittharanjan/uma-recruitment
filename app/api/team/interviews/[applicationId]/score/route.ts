@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, initDb, type AssignmentStage } from '@/lib/db';
 import { forbidden, notFound, unauthorized } from '@/lib/auth';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { INTERVIEWER_ROLES } from '@/lib/roles';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { getRoundSettings } from '@/lib/rounds';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
@@ -165,7 +166,7 @@ export async function POST(
     await initDb();
     const closed = await assertPipelineWritable();
     if (closed) return closed;
-    const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
+    const user = await requireTeamPortalUser(req, { roles: [...INTERVIEWER_ROLES] });
     if (!user) return unauthorized();
 
     const teamId = Number.parseInt(req.nextUrl.searchParams.get('teamId') ?? '', 10);

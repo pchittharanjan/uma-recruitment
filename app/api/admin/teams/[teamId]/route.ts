@@ -40,6 +40,25 @@ export async function GET(
           }
         : null;
 
+    const interviewStageForMine =
+      round?.status === 'final_round'
+        ? 'final_round'
+        : round?.status === 'first_round'
+          ? 'first_round'
+          : null;
+    const myInterviewAssignments =
+      round && interviewStageForMine
+        ? await listGraderAssignments(admin.id, teamId, interviewStageForMine)
+        : [];
+    const myInterviewing =
+      myInterviewAssignments.length > 0
+        ? {
+            stage: interviewStageForMine as 'first_round' | 'final_round',
+            total: myInterviewAssignments.length,
+            completed: myInterviewAssignments.filter((a) => a.status === 'completed').length,
+          }
+        : null;
+
     if (!round) {
       return NextResponse.json({
         team,
@@ -47,6 +66,7 @@ export async function GET(
         dashboard: null,
         interviewStats: null,
         myGrading,
+        myInterviewing,
       });
     }
 
@@ -69,6 +89,7 @@ export async function GET(
         dashboard: null,
         interviewStats,
         myGrading,
+        myInterviewing,
       });
     }
 
@@ -81,6 +102,7 @@ export async function GET(
         dashboard,
         interviewStats: null,
         myGrading,
+        myInterviewing,
       });
     }
 
@@ -90,6 +112,7 @@ export async function GET(
       dashboard: null,
       interviewStats: null,
       myGrading,
+      myInterviewing,
     });
   } catch (e) {
     console.error('GET /api/admin/teams/[teamId] failed:', e);

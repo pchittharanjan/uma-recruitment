@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initDb } from '@/lib/db';
 import { forbidden, unauthorized } from '@/lib/auth';
 import { requireTeamPortalUser } from '@/lib/impersonation';
+import { INTERVIEWER_ROLES } from '@/lib/roles';
 import { runWithRequestCache } from '@/lib/request-cache';
 import { buildTeamInterviewData } from '@/lib/team-interviews-data';
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
 async function handleGet(req: NextRequest) {
   try {
     await initDb();
-    const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
+    const user = await requireTeamPortalUser(req, { roles: [...INTERVIEWER_ROLES] });
     if (!user) return unauthorized();
 
     const teamId = Number.parseInt(req.nextUrl.searchParams.get('teamId') ?? '', 10);

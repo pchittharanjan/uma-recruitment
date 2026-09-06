@@ -13,6 +13,9 @@ export type LoginRole = (typeof LOGIN_ROLES)[number];
 /** Roles that can be assigned application-stage grading work. */
 export const APPLICATION_GRADER_ROLES: UserRole[] = ['admin', 'exec', 'ad_hoc_exec'];
 
+/** Roles that can be assigned interview scoring work. */
+export const INTERVIEWER_ROLES: UserRole[] = ['admin', 'exec', 'ad_hoc_exec'];
+
 export function normalizeUserRole(role: string): UserRole {
   if (role === LEGACY_EXEC_ROLE) return 'exec';
   return role as UserRole;

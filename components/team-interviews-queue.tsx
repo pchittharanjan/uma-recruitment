@@ -10,6 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import StageBadge from '@/components/stage-badge';
 import { sessionKeyForAssignment } from '@/lib/interview-sessions';
 import {
+  interviewAppHref,
+  interviewBackHref,
+  type InterviewAudience,
+} from '@/lib/interview-paths';
+import {
   assignmentWorkStatus,
   resolveWorkStatus,
   WORK_STATUS_DISPLAY,
@@ -74,14 +79,18 @@ export function TeamInterviewsQueue({
   stage,
   data,
   error,
+  audience = 'team',
 }: {
   teamId: string;
   stage: string;
   data: TeamInterviewData | null;
   error?: string;
+  audience?: InterviewAudience;
 }) {
   const { teams } = useShellUser();
-  const hasMultipleTeams = teams.length > 1;
+  const hasMultipleTeams = audience === 'team' && teams.length > 1;
+  const backHref = audience === 'admin' ? interviewBackHref(teamId, audience) : hasMultipleTeams ? '/team' : interviewBackHref(teamId, audience);
+  const backLabel = audience === 'admin' ? '← Team' : hasMultipleTeams ? '← Teams' : '← Overview';
 
   const sessions = useMemo(
     () => (data ? groupIntoSessions(data.assignments) : []),
@@ -93,8 +102,8 @@ export function TeamInterviewsQueue({
       <CenteredMessage
         title="Can't open interviews"
         description={error}
-        ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
-        ctaHref={hasMultipleTeams ? '/team' : `/team/${teamId}`}
+        ctaLabel={backLabel}
+        ctaHref={backHref}
       />
     );
   }
@@ -107,7 +116,7 @@ export function TeamInterviewsQueue({
   );
   const firstPendingIsGroup = (firstPendingSession?.assignments.length ?? 0) > 1;
   const allDone = data.progress.completed === data.progress.total && data.progress.total > 0;
-  const nextStep = data.nextStep;
+  const nextStep = audience === 'team' ? data.nextStep : null;
   const completeCopy = nextStep ? interviewCompleteGuidance(nextStep.isDirector) : null;
   const finalRoundComplete = stage === 'final_round' && allDone;
 
@@ -117,8 +126,8 @@ export function TeamInterviewsQueue({
         icon={MicIcon}
         title="No interviews assigned"
         description="An admin will add you on the schedule grid. Check back once your slots are set."
-        ctaLabel={hasMultipleTeams ? '← Teams' : '← Overview'}
-        ctaHref={hasMultipleTeams ? '/team' : `/team/${teamId}`}
+        ctaLabel={backLabel}
+        ctaHref={backHref}
       />
     );
   }
@@ -130,11 +139,8 @@ export function TeamInterviewsQueue({
           eyebrow="Interview queue"
           title={data.stageLabel}
           actions={
-            <NavLinkButton
-              variant="secondary"
-              href={hasMultipleTeams ? '/team' : `/team/${teamId}`}
-            >
-              {hasMultipleTeams ? '← Teams' : '← Overview'}
+            <NavLinkButton variant="secondary" href={backHref}>
+              {backLabel}
             </NavLinkButton>
           }
         />
@@ -180,7 +186,7 @@ export function TeamInterviewsQueue({
               <div className="mt-3 flex justify-end">
                 <NavLinkButton
                   size="sm"
-                  href={`/team/${teamId}/interviews/${stage}/${firstPending.applicationId}`}
+                  href={interviewAppHref(teamId, stage, firstPending.applicationId, audience)}
                   data-tour="interview-queue-next"
                 >
                   Next Interview →
@@ -267,7 +273,7 @@ export function TeamInterviewsQueue({
                                 <NavLinkButton
                                   variant="ghost"
                                   className="text-sm"
-                                  href={`/team/${teamId}/interviews/${stage}/${a.applicationId}`}
+                                  href={interviewAppHref(teamId, stage, a.applicationId, audience)}
                                 >
                                   Score →
                                 </NavLinkButton>
@@ -286,7 +292,7 @@ export function TeamInterviewsQueue({
                         <div className="flex items-center justify-end gap-3">
                           <NavLinkButton
                             size="sm"
-                            href={`/team/${teamId}/interviews/${stage}/${scoreTargetId}`}
+                            href={interviewAppHref(teamId, stage, scoreTargetId, audience)}
                             data-tour="interview-queue-next"
                           >
                             Score group session →

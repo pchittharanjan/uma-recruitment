@@ -6,6 +6,7 @@ import { forbidden, notFound, unauthorized } from '@/lib/auth';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
 import { requireTeamPortalUser } from '@/lib/impersonation';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
+import { INTERVIEWER_ROLES } from '@/lib/roles';
 import { interviewGuideForApi, interviewScoreFieldsFromGuide } from '@/lib/interview-guide';
 import { getInterviewGuideForRound, getInterviewSlotForApplication, getInterviewGroupMembers } from '@/lib/interview-slots';
 import { getRoundSettings } from '@/lib/rounds';
@@ -32,7 +33,7 @@ async function handleGet(
 ) {
   try {
     await initDb();
-    const user = await requireTeamPortalUser(req, { roles: ['exec', 'ad_hoc_exec'] });
+    const user = await requireTeamPortalUser(req, { roles: [...INTERVIEWER_ROLES] });
     if (!user) return unauthorized();
 
     const teamId = Number.parseInt(req.nextUrl.searchParams.get('teamId') ?? '', 10);
