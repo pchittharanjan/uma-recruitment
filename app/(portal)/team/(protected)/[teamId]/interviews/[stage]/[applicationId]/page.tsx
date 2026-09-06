@@ -289,6 +289,12 @@ export default function TeamInterviewScorePage({
   const notesLocked = interviewNotesLocked(data?.scoringEditLock);
   const notesEditableWhileScoresLocked = scoresLockedNotesEditable(data?.scoringEditLock);
 
+  // Notes-only revisit after advancement: don't leave a blank case panel eating half the screen.
+  useEffect(() => {
+    if (!notesEditableWhileScoresLocked) return;
+    setCaseOpen(false, { persist: false });
+  }, [notesEditableWhileScoresLocked, setCaseOpen]);
+
   const assignmentPending = useMemo(() => {
     if (!data) return false;
     if (isGroupInterview && data.groupEntries) {

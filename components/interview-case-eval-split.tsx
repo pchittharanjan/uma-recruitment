@@ -36,15 +36,19 @@ function persistCollapsedValue(collapsed: boolean) {
   window.localStorage.setItem(STORAGE_COLLAPSED_KEY, collapsed ? '1' : '0');
 }
 
-export function useInterviewCaseOpen(): [boolean, (open: boolean) => void] {
+export function useInterviewCaseOpen(): [
+  boolean,
+  (open: boolean, options?: { persist?: boolean }) => void,
+] {
   const [caseOpen, setCaseOpenState] = useState(true);
 
   useEffect(() => {
     setCaseOpenState(!readStoredCollapsed());
   }, []);
 
-  const setCaseOpen = useCallback((open: boolean) => {
+  const setCaseOpen = useCallback((open: boolean, options?: { persist?: boolean }) => {
     setCaseOpenState(open);
+    if (options?.persist === false) return;
     persistCollapsedValue(!open);
   }, []);
 
@@ -189,10 +193,20 @@ export function InterviewCaseEvalSplit({
   };
 
   const caseVisible = !collapsed;
-  const caseTrack = caseVisible ? `${ratio}%` : '0%';
-  const gutterTrack = caseVisible ? '6px' : '0px';
   const [layoutPulse, setLayoutPulse] = useState(0);
+  // Keep the PDF mounted briefly while the close animation runs, then drop it
+  // out of the grid entirely so a closed case never leaves a blank white hole.
+  const [caseInLayout, setCaseInLayout] = useState(caseVisible);
   const prevFullscreenRef = useRef(fullscreen);
+
+  useEffect(() => {
+    if (caseVisible) {
+      setCaseInLayout(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setCaseInLayout(false), OPEN_MS);
+    return () => window.clearTimeout(timer);
+  }, [caseVisible]);
 
   useEffect(() => {
     if (prevFullscreenRef.current === fullscreen) return;
@@ -206,6 +220,9 @@ export function InterviewCaseEvalSplit({
   const padX = groupNotes ? GROUP_NOTES_PAD_X : SINGLE_NOTES_PAD_X;
   const padTop = groupNotes ? GROUP_NOTES_PAD_TOP : SINGLE_NOTES_PAD_TOP;
   const padBottom = groupNotes ? GROUP_NOTES_PAD_BOTTOM : SINGLE_NOTES_PAD_BOTTOM;
+  const showCaseChrome = caseInLayout;
+  const caseTrack = caseVisible ? `${ratio}%` : '0%';
+  const gutterTrack = caseVisible ? '6px' : '0px';
 
   return (
     <div
@@ -221,48 +238,57 @@ export function InterviewCaseEvalSplit({
         transitionProperty: dragging ? 'none' : 'grid-template-columns, grid-template-rows',
         transitionDuration: dragging ? '0ms' : `${OPEN_MS}ms`,
         transitionTimingFunction: OPEN_EASE,
-        ...(stacked
-          ? {
-              gridTemplateColumns: 'minmax(0, 1fr)',
-              gridTemplateRows: caseVisible ? '42vh minmax(0, 1fr)' : '0vh minmax(0, 1fr)',
-            }
+        ...(showCaseChrome
+          ? stacked
+            ? {
+                gridTemplateColumns: 'minmax(0, 1fr)',
+                gridTemplateRows: caseVisible
+                  ? '42vh minmax(0, 1fr)'
+                  : '0fr minmax(0, 1fr)',
+              }
+            : {
+                gridTemplateColumns: `${caseTrack} ${gutterTrack} minmax(0, 1fr)`,
+                gridTemplateRows: 'minmax(0, 1fr)',
+              }
           : {
-              gridTemplateColumns: `${caseTrack} ${gutterTrack} minmax(0, 1fr)`,
+              gridTemplateColumns: 'minmax(0, 1fr)',
               gridTemplateRows: 'minmax(0, 1fr)',
             }),
       }}
     >
-      <div
-        className={cn(
-          'h-full min-h-0 min-w-0 overflow-hidden',
-          !caseVisible && 'pointer-events-none',
-        )}
-        aria-hidden={!caseVisible}
-      >
-        {/* Keep the PDF at last-open size while the grid track animates to 0 so Chrome never sees a 0× iframe. */}
+      {showCaseChrome ? (
         <div
-          className="h-full min-h-0 overflow-hidden"
-          style={
-            stacked
-              ? { height: '42vh', width: '100%' }
-              : { width: `${ratio}cqw`, height: '100%' }
-          }
+          className={cn(
+            'h-full min-h-0 min-w-0 overflow-hidden',
+            !caseVisible && 'pointer-events-none',
+          )}
+          aria-hidden={!caseVisible}
         >
-          <CasePdfPane
-            url={caseUrl}
-            title={caseTitle}
-            lockFrameSize={!caseVisible}
-            layoutSettleMs={OPEN_MS}
-            layoutPulse={layoutPulse}
-            className={cn(
-              'h-full min-h-0 border-0 lg:border-0',
-              stacked && 'border-b border-border/20',
-            )}
-          />
+          {/* Keep the PDF at last-open size while the grid track animates to 0 so Chrome never sees a 0× iframe. */}
+          <div
+            className="h-full min-h-0 overflow-hidden"
+            style={
+              stacked
+                ? { height: '42vh', width: '100%' }
+                : { width: `${ratio}cqw`, height: '100%' }
+            }
+          >
+            <CasePdfPane
+              url={caseUrl}
+              title={caseTitle}
+              lockFrameSize={!caseVisible}
+              layoutSettleMs={OPEN_MS}
+              layoutPulse={layoutPulse}
+              className={cn(
+                'h-full min-h-0 border-0 lg:border-0',
+                stacked && 'border-b border-border/20',
+              )}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {stacked ? null : (
+      {showCaseChrome && !stacked ? (
         <button
           type="button"
           aria-label="Drag to resize case panel. Double-click to hide."
@@ -294,7 +320,7 @@ export function InterviewCaseEvalSplit({
           onPointerCancel={finishDrag}
           onDoubleClick={hideCase}
         />
-      )}
+      ) : null}
 
       <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         {notesChrome ? (

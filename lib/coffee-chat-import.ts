@@ -43,12 +43,12 @@ export const COFFEE_CHAT_IMPORT_FIELD_LABELS: Record<CoffeeChatImportField, stri
   conflictOfInterest: 'Conflict of interest',
 };
 
+/** Required columns — teamsInterested is optional (defaults to []). */
 const REQUIRED_IMPORT_FIELDS: CoffeeChatImportField[] = [
   'chatDate',
   'applicantName',
   'applicantEmail',
   'applicantGradeLevel',
-  'teamsInterested',
   'vibes',
 ];
 
@@ -71,17 +71,20 @@ const FIELD_HEADER_PATTERNS: Record<CoffeeChatImportField, RegExp[]> = {
     /^member name$/,
     /^your full name$/,
   ],
+  // Prefer dedicated chat-date headers over Google Form "Timestamp".
   chatDate: [
-    /^timestamp$/,
-    /^chat date$/,
+    /^date of chat$/,
     /^date of (the )?coffee chat$/,
+    /^chat date$/,
     /^coffee chat date$/,
-    /^date$/,
     /^when did you (have|meet)/,
+    /^timestamp$/,
+    /^date$/,
   ],
   applicantName: [
+    /^applicant full name$/,
     /^applicant('s)? name$/,
-    /^candidate('s)? name$/,
+    /^candidate('s)? (full )?name$/,
     /^full name of (the )?applicant$/,
     /^name of (the )?applicant$/,
     /^who did you (coffee )?chat with$/,
@@ -142,6 +145,28 @@ export function suggestCoffeeChatColumnMap(headers: string[]): CoffeeChatColumnM
     if (/applicant|candidate/.test(normalized)) {
       map.applicantEmail = submitterHeader;
       delete map.submitterEmail;
+    }
+  }
+
+  // Prefer "Date of Chat" over Timestamp when both were mapped / available.
+  if (map.chatDate) {
+    const currentNorm = normalizeHeaderText(map.chatDate);
+    if (/^timestamp$/.test(currentNorm) || /^date$/.test(currentNorm)) {
+      const preferred = headers.find((header) => {
+        if (used.has(header) && header !== map.chatDate) return false;
+        const normalized = normalizeHeaderText(header);
+        return (
+          /^date of chat$/.test(normalized) ||
+          /^date of (the )?coffee chat$/.test(normalized) ||
+          /^chat date$/.test(normalized) ||
+          /^coffee chat date$/.test(normalized)
+        );
+      });
+      if (preferred && preferred !== map.chatDate) {
+        used.delete(map.chatDate);
+        map.chatDate = preferred;
+        used.add(preferred);
+      }
     }
   }
 
@@ -323,13 +348,17 @@ export function parseCoffeeChatImportRows(
       return;
     }
 
-    const teamsInterested = parseTeamsInterestedCell(teamsRaw);
-    if (teamsInterested.length === 0) {
-      errors.push({
-        rowIndex,
-        message: `Could not parse teams interested from "${teamsRaw}".`,
-      });
-      return;
+    // teamsInterested is optional — empty / unmapped → [].
+    let teamsInterested: TeamName[] = [];
+    if (teamsRaw) {
+      teamsInterested = parseTeamsInterestedCell(teamsRaw);
+      if (teamsInterested.length === 0) {
+        errors.push({
+          rowIndex,
+          message: `Could not parse teams interested from "${teamsRaw}".`,
+        });
+        return;
+      }
     }
 
     if (!vibes) {
@@ -386,8 +415,17 @@ export function parsedRowToCoffeeChatInput(row: ParsedCoffeeChatImportRow): Coff
   };
 }
 
-export type UmaMatchStatus = 'matched' | 'unmatched' | 'ambiguous';
-export type ApplicantMatchStatus = 'matched' | 'unmatched';
+/** Match confidence — exact email is the only auto-suggestable high tier. */
+export type MatchConfidence = 'exact_email' | 'unique_name' | 'ambiguous' | 'unmatched';
+
+export type UmaMatchStatus = 'matched' | 'needs_review' | 'unmatched' | 'ambiguous';
+export type ApplicantMatchStatus = 'matched' | 'needs_review' | 'unmatched' | 'ambiguous';
+
+export interface CoffeeChatImportPersonOption {
+  id: number;
+  name: string;
+  email: string;
+}
 
 export interface CoffeeChatImportMatchPreview {
   rowIndex: number;
@@ -398,16 +436,33 @@ export interface CoffeeChatImportMatchPreview {
   submitterName: string | null;
   uma: {
     status: UmaMatchStatus;
+    confidence: MatchConfidence;
+    /** Suggested / exact match — never silently committed without resolution. */
     userId: number | null;
     userName: string | null;
     detail: string;
+    /** Ambiguous candidates for the picker. */
+    options: CoffeeChatImportPersonOption[];
   };
   applicant: {
     status: ApplicantMatchStatus;
+    confidence: MatchConfidence;
     candidateId: number | null;
     candidateName: string | null;
     detail: string;
+    options: CoffeeChatImportPersonOption[];
   };
-  willImport: boolean;
+  /** True only for exact-email UMA suggestions that are not duplicates (UI still requires confirm). */
+  exactEmailReady: boolean;
+  /** Duplicate of an already-imported chat — auto-skip. */
+  isDuplicate: boolean;
   skipReason: string | null;
+}
+
+/** Explicit per-row resolution sent on non-dry-run import. */
+export interface CoffeeChatImportResolution {
+  rowIndex: number;
+  userId: number | null;
+  candidateId: number | null;
+  skip: boolean;
 }

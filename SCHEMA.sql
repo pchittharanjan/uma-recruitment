@@ -137,6 +137,8 @@ CREATE TABLE IF NOT EXISTS coffee_chats (
   applicant_email TEXT,
   applicant_grade_level TEXT,
   teams_interested TEXT NOT NULL DEFAULT '[]',
+  -- Set only after explicit admin confirm/pick on import; soft-match used when null.
+  candidate_id INTEGER REFERENCES candidates(id) ON DELETE SET NULL,
   vibes TEXT,
   green_flags TEXT,
   red_flags TEXT,
@@ -148,6 +150,9 @@ CREATE TABLE IF NOT EXISTS coffee_chats (
 CREATE INDEX IF NOT EXISTS idx_coffee_chats_round ON coffee_chats(round_id);
 CREATE INDEX IF NOT EXISTS idx_coffee_chats_submitter ON coffee_chats(submitter_id);
 CREATE INDEX IF NOT EXISTS idx_coffee_chats_applicant_norm ON coffee_chats(round_id, applicant_name_normalized);
+-- idx_coffee_chats_candidate is created in lib/db.ts MIGRATIONS after
+-- ALTER TABLE … ADD COLUMN candidate_id, so existing DBs (CREATE TABLE IF NOT
+-- EXISTS no-op) don't fail SCHEMA apply before the column exists.
 
 -- ── Team advancement proposals (exec → admin) ─────────────────
 CREATE TABLE IF NOT EXISTS team_advancement_submissions (

@@ -468,41 +468,62 @@ function parseTeamsInterestedJson(raw: unknown): string[] {
   }
 }
 
-/** Soft-match coffee chats by applicant email (preferred) or unique normalized name. */
+/**
+ * Coffee chats for an applicant: prefer confirmed candidate_id FK,
+ * then soft-match by email / unique normalized name for older unlinked rows.
+ */
 async function loadCoffeeChatsForApplicant(
+  candidateId: number | null,
   email: string,
   name: string,
 ): Promise<DeliberationsCoffeeChat[]> {
   const db = getDb();
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedName = normalizeApplicantName(name);
-  if (!normalizedEmail && !normalizedName) return [];
+  if (candidateId == null && !normalizedEmail && !normalizedName) return [];
 
   const result = await db.execute({
     sql: `SELECT id, chat_date, submitter_name, applicant_name, applicant_email,
                  applicant_grade_level, teams_interested,
                  vibes, green_flags, red_flags, other_comments, conflict_of_interest
           FROM coffee_chats
-          WHERE (? != '' AND lower(trim(coalesce(applicant_email, ''))) = ?)
+          WHERE (? IS NOT NULL AND candidate_id = ?)
+             OR (? != '' AND lower(trim(coalesce(applicant_email, ''))) = ?)
              OR (? != '' AND applicant_name_normalized = ?)
           ORDER BY chat_date DESC, id DESC`,
-    args: [normalizedEmail, normalizedEmail, normalizedName, normalizedName],
+    args: [
+      candidateId,
+      candidateId,
+      normalizedEmail,
+      normalizedEmail,
+      normalizedName,
+      normalizedName,
+    ],
   });
 
-  return result.rows.map((row) => ({
-    id: row.id as number,
-    chatDate: row.chat_date as string,
-    submitterName: (row.submitter_name as string) || 'Unknown',
-    applicantName: row.applicant_name as string,
-    applicantEmail: (row.applicant_email as string | null) ?? null,
-    applicantGradeLevel: (row.applicant_grade_level as string | null) ?? null,
-    teamsInterested: parseTeamsInterestedJson(row.teams_interested),
-    vibes: (row.vibes as string | null) ?? null,
-    greenFlags: (row.green_flags as string | null) ?? null,
-    redFlags: (row.red_flags as string | null) ?? null,
-    otherComments: (row.other_comments as string | null) ?? null,
-    conflictOfInterest: (row.conflict_of_interest as string | null) ?? null,
-  }));
+  // Dedupe if FK + soft-match both hit the same row.
+  const seen = new Set<number>();
+  const chats: DeliberationsCoffeeChat[] = [];
+  for (const row of result.rows) {
+    const id = row.id as number;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    chats.push({
+      id,
+      chatDate: row.chat_date as string,
+      submitterName: (row.submitter_name as string) || 'Unknown',
+      applicantName: row.applicant_name as string,
+      applicantEmail: (row.applicant_email as string | null) ?? null,
+      applicantGradeLevel: (row.applicant_grade_level as string | null) ?? null,
+      teamsInterested: parseTeamsInterestedJson(row.teams_interested),
+      vibes: (row.vibes as string | null) ?? null,
+      greenFlags: (row.green_flags as string | null) ?? null,
+      redFlags: (row.red_flags as string | null) ?? null,
+      otherComments: (row.other_comments as string | null) ?? null,
+      conflictOfInterest: (row.conflict_of_interest as string | null) ?? null,
+    });
+  }
+  return chats;
 }
 
 /** Unified candidate view for deliberations — the allowed merge point. */
@@ -521,7 +542,7 @@ export async function buildDeliberationsCandidateDetail(
 
   const appResult = await db.execute({
     sql: `SELECT app.id, app.row_index, app.stage, app.admin_note, app.fields,
-                 c.name AS candidate_name, c.email AS candidate_email
+                 c.id AS candidate_id, c.name AS candidate_name, c.email AS candidate_email
           FROM applications app
           JOIN candidates c ON c.id = app.candidate_id
           WHERE app.id = ? AND app.team_id = ? AND app.round_id = ?
@@ -547,6 +568,7 @@ export async function buildDeliberationsCandidateDetail(
     fields = {};
   }
 
+  const candidateId = (row.candidate_id as number | null) ?? null;
   const name = (row.candidate_name as string) || `Applicant ${applicationId}`;
   const email = resolveApplicantEmail(fields, (row.candidate_email as string | null) ?? '');
 
@@ -572,7 +594,7 @@ export async function buildDeliberationsCandidateDetail(
       args: [applicationId],
     }),
     getRoundSettings(roundId),
-    loadCoffeeChatsForApplicant(email, name),
+    loadCoffeeChatsForApplicant(candidateId, email, name),
   ]);
 
   const questionLabels = new Map<string, string>();

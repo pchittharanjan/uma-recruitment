@@ -9,6 +9,7 @@ import {
   suggestCoffeeChatColumnMap,
   validateCoffeeChatColumnMap,
   type CoffeeChatColumnMap,
+  type CoffeeChatImportResolution,
 } from '@/lib/coffee-chat-import';
 import { importCoffeeChatsAsMatchedUsers } from '@/lib/coffee-chat-import-server';
 
@@ -17,6 +18,40 @@ interface ImportBody {
   headers?: string[];
   columnMap?: CoffeeChatColumnMap;
   dryRun?: boolean;
+  resolutions?: CoffeeChatImportResolution[];
+}
+
+function parseResolutions(raw: unknown): CoffeeChatImportResolution[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: CoffeeChatImportResolution[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return null;
+    const row = item as Record<string, unknown>;
+    const rowIndex = typeof row.rowIndex === 'number' ? row.rowIndex : Number(row.rowIndex);
+    if (!Number.isFinite(rowIndex)) return null;
+    const skip = row.skip === true;
+    const userId =
+      row.userId == null || row.userId === ''
+        ? null
+        : typeof row.userId === 'number'
+          ? row.userId
+          : Number(row.userId);
+    const candidateId =
+      row.candidateId == null || row.candidateId === ''
+        ? null
+        : typeof row.candidateId === 'number'
+          ? row.candidateId
+          : Number(row.candidateId);
+    if (userId != null && !Number.isFinite(userId)) return null;
+    if (candidateId != null && !Number.isFinite(candidateId)) return null;
+    out.push({
+      rowIndex,
+      skip,
+      userId: userId == null ? null : userId,
+      candidateId: candidateId == null ? null : candidateId,
+    });
+  }
+  return out;
 }
 
 export async function POST(req: NextRequest) {
@@ -41,7 +76,10 @@ export async function POST(req: NextRequest) {
         ? body.columnMap
         : suggestCoffeeChatColumnMap(headers);
 
-    const mapError = validateCoffeeChatColumnMap(columnMap, headers.length > 0 ? headers : Object.keys(rows[0] ?? {}));
+    const mapError = validateCoffeeChatColumnMap(
+      columnMap,
+      headers.length > 0 ? headers : Object.keys(rows[0] ?? {}),
+    );
     if (mapError) {
       return NextResponse.json({ error: mapError, columnMap }, { status: 400 });
     }
@@ -58,7 +96,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await importCoffeeChatsAsMatchedUsers(parsed, { dryRun });
+    let resolutions: CoffeeChatImportResolution[] | undefined;
+    if (!dryRun) {
+      const parsedResolutions = parseResolutions(body.resolutions);
+      if (!parsedResolutions) {
+        return NextResponse.json(
+          { error: 'Import requires an explicit resolutions array for every row.' },
+          { status: 400 },
+        );
+      }
+      const covered = new Set(parsedResolutions.map((r) => r.rowIndex));
+      const missing = parsed.filter((row) => !covered.has(row.rowIndex));
+      if (missing.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Missing resolutions for ${missing.length} row(s). Confirm, pick, or skip each row before importing.`,
+          },
+          { status: 400 },
+        );
+      }
+      const unresolvedInBatch = parsedResolutions.filter((r) => {
+        if (!parsed.some((row) => row.rowIndex === r.rowIndex)) return false;
+        return !r.skip && r.userId == null;
+      });
+      if (unresolvedInBatch.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'Every non-skipped row must include an explicit UMA userId. Confirm matches in the preview first.',
+          },
+          { status: 400 },
+        );
+      }
+      resolutions = parsedResolutions;
+    }
+
+    const result = await importCoffeeChatsAsMatchedUsers(parsed, { dryRun, resolutions });
 
     return NextResponse.json({
       dryRun,
@@ -68,6 +141,7 @@ export async function POST(req: NextRequest) {
       skipped: result.skipped,
       failed: result.failed,
       previews: result.previews,
+      matchOptions: result.matchOptions,
       errors: [...parseErrors, ...result.errors],
     });
   } catch (e) {

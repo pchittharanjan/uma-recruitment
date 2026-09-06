@@ -28,6 +28,8 @@ export interface CoffeeChat {
   applicant_email: string | null;
   applicant_grade_level: CoffeeChatGradeLevel | null;
   teams_interested: TeamName[];
+  /** Confirmed import link only; null until admin confirms/picks an applicant. */
+  candidate_id: number | null;
   vibes: string | null;
   green_flags: string | null;
   red_flags: string | null;

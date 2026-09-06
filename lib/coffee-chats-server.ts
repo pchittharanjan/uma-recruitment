@@ -37,6 +37,7 @@ function rowToCoffeeChat(row: ResultSet['rows'][number]): CoffeeChat {
     applicant_email: (row.applicant_email as string | null) ?? null,
     applicant_grade_level: (row.applicant_grade_level as CoffeeChat['applicant_grade_level']) ?? null,
     teams_interested: parseTeamsInterested(row.teams_interested as string | null | undefined),
+    candidate_id: (row.candidate_id as number | null | undefined) ?? null,
     vibes: (row.vibes as string | null) ?? null,
     green_flags: (row.green_flags as string | null) ?? null,
     red_flags: (row.red_flags as string | null) ?? null,

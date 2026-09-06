@@ -29,9 +29,12 @@ import {
   type CoffeeChatColumnMap,
   type CoffeeChatImportField,
   type CoffeeChatImportMatchPreview,
+  type CoffeeChatImportPersonOption,
+  type CoffeeChatImportResolution,
 } from '@/lib/coffee-chat-import';
 import type { TeamName } from '@/lib/db';
 import { phasePageEyebrow } from '@/lib/stages';
+import { cn } from '@/lib/utils';
 
 interface ApplicantMatch {
   status: 'matched' | 'unmatched';
@@ -58,6 +61,54 @@ interface CoffeeChatRow {
 
 type ImportStep = 'idle' | 'map' | 'preview';
 
+type RowDecision = 'pending' | 'confirmed' | 'picked' | 'skipped';
+
+interface RowResolutionState {
+  decision: RowDecision;
+  userId: number | null;
+  candidateId: number | null;
+  /** True when the admin overrode the suggested UMA / applicant pick. */
+  umaPicked: boolean;
+  applicantPicked: boolean;
+}
+
+function emptyResolution(): RowResolutionState {
+  return {
+    decision: 'pending',
+    userId: null,
+    candidateId: null,
+    umaPicked: false,
+    applicantPicked: false,
+  };
+}
+
+function initResolutionsFromPreviews(
+  previews: CoffeeChatImportMatchPreview[],
+): Record<number, RowResolutionState> {
+  const next: Record<number, RowResolutionState> = {};
+  for (const preview of previews) {
+    if (preview.isDuplicate) {
+      next[preview.rowIndex] = {
+        decision: 'skipped',
+        userId: preview.uma.userId,
+        candidateId: preview.applicant.candidateId,
+        umaPicked: false,
+        applicantPicked: false,
+      };
+      continue;
+    }
+    next[preview.rowIndex] = {
+      decision: 'pending',
+      // Pre-fill suggestions for the picker — not committed until confirmed/picked.
+      userId: preview.uma.userId,
+      candidateId: preview.applicant.candidateId,
+      umaPicked: false,
+      applicantPicked: false,
+    };
+  }
+  return next;
+}
+
 export default function AdminCoffeeChatsPage() {
   const [chats, setChats] = useState<CoffeeChatRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +122,11 @@ export default function AdminCoffeeChatsPage() {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [columnMap, setColumnMap] = useState<CoffeeChatColumnMap>({});
   const [previews, setPreviews] = useState<CoffeeChatImportMatchPreview[]>([]);
+  const [matchOptions, setMatchOptions] = useState<{
+    users: CoffeeChatImportPersonOption[];
+    candidates: CoffeeChatImportPersonOption[];
+  }>({ users: [], candidates: [] });
+  const [resolutions, setResolutions] = useState<Record<number, RowResolutionState>>({});
   const [parseErrors, setParseErrors] = useState<Array<{ rowIndex: number; message: string }>>([]);
   const [importSummary, setImportSummary] = useState<{
     imported: number;
@@ -112,6 +168,8 @@ export default function AdminCoffeeChatsPage() {
     setRows([]);
     setColumnMap({});
     setPreviews([]);
+    setMatchOptions({ users: [], candidates: [] });
+    setResolutions({});
     setParseErrors([]);
     setImportSummary(null);
     setImportError('');
@@ -122,6 +180,7 @@ export default function AdminCoffeeChatsPage() {
     setImportError('');
     setParseErrors([]);
     setPreviews([]);
+    setResolutions({});
     setImportSummary(null);
     setHeaders(result.headers);
     setRows(result.rows);
@@ -138,19 +197,128 @@ export default function AdminCoffeeChatsPage() {
     });
   };
 
+  const reviewCounts = useMemo(() => {
+    let needReview = 0;
+    let confirmed = 0;
+    let skipped = 0;
+    for (const preview of previews) {
+      const res = resolutions[preview.rowIndex] ?? emptyResolution();
+      if (res.decision === 'pending') needReview += 1;
+      else if (res.decision === 'skipped') skipped += 1;
+      else confirmed += 1;
+    }
+    return { needReview, confirmed, skipped };
+  }, [previews, resolutions]);
+
   const importableCount = useMemo(
-    () => previews.filter((preview) => preview.willImport).length,
-    [previews],
+    () =>
+      previews.filter((preview) => {
+        const res = resolutions[preview.rowIndex];
+        return res && (res.decision === 'confirmed' || res.decision === 'picked') && res.userId != null;
+      }).length,
+    [previews, resolutions],
   );
+
+  const canImport = reviewCounts.needReview === 0 && importableCount > 0;
+
+  const updateResolution = (rowIndex: number, patch: Partial<RowResolutionState>) => {
+    setResolutions((prev) => ({
+      ...prev,
+      [rowIndex]: { ...(prev[rowIndex] ?? emptyResolution()), ...patch },
+    }));
+  };
+
+  const confirmRow = (preview: CoffeeChatImportMatchPreview) => {
+    const current = resolutions[preview.rowIndex] ?? emptyResolution();
+    const userId = current.userId ?? preview.uma.userId;
+    if (userId == null) {
+      toast.error('Pick a UMA member before confirming this row.');
+      return;
+    }
+    const suggestedUser = preview.uma.userId;
+    const suggestedCandidate = preview.applicant.candidateId;
+    const umaPicked = current.umaPicked || (suggestedUser != null && userId !== suggestedUser);
+    const candidateId = current.candidateId;
+    const applicantPicked =
+      current.applicantPicked ||
+      (suggestedCandidate != null && candidateId !== suggestedCandidate) ||
+      (suggestedCandidate == null && candidateId != null);
+
+    updateResolution(preview.rowIndex, {
+      decision: umaPicked || applicantPicked ? 'picked' : 'confirmed',
+      userId,
+      candidateId,
+      umaPicked,
+      applicantPicked,
+    });
+  };
+
+  const skipRow = (rowIndex: number) => {
+    updateResolution(rowIndex, { decision: 'skipped' });
+  };
+
+  const confirmAllExactEmail = () => {
+    setResolutions((prev) => {
+      const next = { ...prev };
+      for (const preview of previews) {
+        if (!preview.exactEmailReady) continue;
+        const current = next[preview.rowIndex] ?? emptyResolution();
+        if (current.decision !== 'pending') continue;
+        if (preview.uma.userId == null) continue;
+        // Only commit applicant links that are exact-email; name suggestions stay unlinked.
+        const candidateId =
+          preview.applicant.confidence === 'exact_email' ? preview.applicant.candidateId : null;
+        next[preview.rowIndex] = {
+          decision: 'confirmed',
+          userId: preview.uma.userId,
+          candidateId,
+          umaPicked: false,
+          applicantPicked: false,
+        };
+      }
+      return next;
+    });
+  };
+
+  const buildResolutionsPayload = (): CoffeeChatImportResolution[] =>
+    previews.map((preview) => {
+      const res = resolutions[preview.rowIndex] ?? emptyResolution();
+      if (res.decision === 'skipped' || preview.isDuplicate) {
+        return {
+          rowIndex: preview.rowIndex,
+          skip: true,
+          userId: null,
+          candidateId: null,
+        };
+      }
+      return {
+        rowIndex: preview.rowIndex,
+        skip: false,
+        userId: res.userId,
+        // Only send candidateId when confirmed/picked with an explicit link.
+        candidateId:
+          res.decision === 'confirmed' || res.decision === 'picked' ? res.candidateId : null,
+      };
+    });
 
   const runImport = async (dryRun: boolean) => {
     setImportBusy(true);
     setImportError('');
     try {
+      const body: Record<string, unknown> = { rows, headers, columnMap, dryRun };
+      if (!dryRun) {
+        if (reviewCounts.needReview > 0) {
+          setImportError('Confirm, pick, or skip every row before importing.');
+          setImportBusy(false);
+          return;
+        }
+        body.resolutions = buildResolutionsPayload();
+      }
+
       const res = await fetch('/api/admin/coffee-chats/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows, headers, columnMap, dryRun }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -166,8 +334,15 @@ export default function AdminCoffeeChatsPage() {
         skipped: json.skipped ?? 0,
         failed: json.failed ?? 0,
       });
+      if (json.matchOptions) {
+        setMatchOptions({
+          users: json.matchOptions.users ?? [],
+          candidates: json.matchOptions.candidates ?? [],
+        });
+      }
 
       if (dryRun) {
+        setResolutions(initResolutionsFromPreviews(json.previews ?? []));
         setImportStep('preview');
         return;
       }
@@ -184,6 +359,16 @@ export default function AdminCoffeeChatsPage() {
       setImportBusy(false);
     }
   };
+
+  const exactEmailPendingCount = useMemo(
+    () =>
+      previews.filter((preview) => {
+        if (!preview.exactEmailReady) return false;
+        const res = resolutions[preview.rowIndex];
+        return !res || res.decision === 'pending';
+      }).length,
+    [previews, resolutions],
+  );
 
   return (
     <PageContainer className="space-y-6">
@@ -224,15 +409,17 @@ export default function AdminCoffeeChatsPage() {
                     field === 'applicantName' ||
                     field === 'applicantEmail' ||
                     field === 'applicantGradeLevel' ||
-                    field === 'teamsInterested' ||
-                    field === 'vibes' ||
-                    field === 'submitterEmail';
+                    field === 'vibes';
+                  const submitterPair = field === 'submitterEmail' || field === 'submitterName';
                   return (
                     <div key={field} className="space-y-1.5">
-                      <Label htmlFor={`map-${field}`} required={required && field !== 'submitterEmail'}>
+                      <Label htmlFor={`map-${field}`} required={required}>
                         {COFFEE_CHAT_IMPORT_FIELD_LABELS[field]}
-                        {field === 'submitterEmail' || field === 'submitterName' ? (
+                        {submitterPair ? (
                           <span className="font-normal text-muted-foreground"> (email or name)</span>
+                        ) : null}
+                        {field === 'teamsInterested' ? (
+                          <span className="font-normal text-muted-foreground"> (optional)</span>
                         ) : null}
                       </Label>
                       <NativeSelect
@@ -269,14 +456,14 @@ export default function AdminCoffeeChatsPage() {
 
           {importStep === 'preview' && (
             <div className="space-y-4">
-              {importSummary && (
-                <p className="text-sm text-muted-foreground">
-                  Ready to import {importableCount} of {previews.length} parsed row
-                  {previews.length === 1 ? '' : 's'}
-                  {importSummary.skipped > 0 ? ` · ${importSummary.skipped} will be skipped` : ''}
-                  {importSummary.failed > 0 ? ` · ${importSummary.failed} failed checks` : ''}.
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground">
+                {reviewCounts.needReview} need review · {reviewCounts.confirmed} confirmed ·{' '}
+                {reviewCounts.skipped} skipped
+                {importSummary
+                  ? ` · ${previews.length} parsed row${previews.length === 1 ? '' : 's'}`
+                  : ''}
+                .
+              </p>
 
               {parseErrors.length > 0 && (
                 <StatusBanner
@@ -285,55 +472,172 @@ export default function AdminCoffeeChatsPage() {
                 />
               )}
 
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={importBusy || exactEmailPendingCount === 0}
+                  onClick={confirmAllExactEmail}
+                >
+                  Confirm all exact-email matches
+                  {exactEmailPendingCount > 0 ? ` (${exactEmailPendingCount})` : ''}
+                </Button>
+              </div>
+
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Row</TableHead>
                       <TableHead>Applicant</TableHead>
-                      <TableHead>UMA member</TableHead>
-                      <TableHead>Applicant match</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Suggested UMA</TableHead>
+                      <TableHead>Suggested applicant</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previews.map((preview) => (
-                      <TableRow key={preview.rowIndex}>
-                        <TableCell>{preview.rowIndex}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{preview.applicantName}</div>
-                          <div className="text-xs text-muted-foreground">{preview.applicantEmail}</div>
-                        </TableCell>
-                        <TableCell>
-                          <MatchBadge
-                            status={preview.uma.status === 'matched' ? 'matched' : 'unmatched'}
-                            label={
-                              preview.uma.userName ??
-                              preview.submitterEmail ??
-                              preview.submitterName ??
-                              '—'
-                            }
-                          />
-                          <div className="mt-1 text-xs text-muted-foreground">{preview.uma.detail}</div>
-                        </TableCell>
-                        <TableCell>
-                          <MatchBadge
-                            status={preview.applicant.status}
-                            label={preview.applicant.candidateName ?? 'Pending applications'}
-                          />
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {preview.applicant.detail}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {preview.willImport ? (
-                            <Badge variant="secondary">Will import</Badge>
-                          ) : (
-                            <Badge variant="outline">{preview.skipReason ?? 'Skip'}</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {previews.map((preview) => {
+                      const res = resolutions[preview.rowIndex] ?? emptyResolution();
+                      const rowTone =
+                        res.decision === 'skipped' || preview.isDuplicate
+                          ? 'opacity-60'
+                          : res.decision === 'pending'
+                            ? preview.uma.confidence === 'exact_email' && !preview.isDuplicate
+                              ? 'bg-emerald-500/5'
+                              : 'bg-amber-500/10'
+                            : 'bg-emerald-500/10';
+
+                      const umaSelectOptions = matchOptions.users;
+                      const applicantSelectOptions = matchOptions.candidates;
+
+                      return (
+                        <TableRow key={preview.rowIndex} className={cn(rowTone)}>
+                          <TableCell className="align-top">{preview.rowIndex}</TableCell>
+                          <TableCell className="align-top">
+                            <div className="font-medium">{preview.applicantName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {preview.applicantEmail}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">{preview.chatDate}</div>
+                          </TableCell>
+                          <TableCell className="align-top min-w-[220px]">
+                            <ConfidenceBadge confidence={preview.uma.confidence} />
+                            <div className="mt-1 text-xs text-muted-foreground">{preview.uma.detail}</div>
+                            {res.decision !== 'skipped' && !preview.isDuplicate && (
+                              <NativeSelect
+                                className="mt-2"
+                                aria-label={`UMA member for row ${preview.rowIndex}`}
+                                value={res.userId != null ? String(res.userId) : ''}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  updateResolution(preview.rowIndex, {
+                                    userId: value ? Number(value) : null,
+                                    umaPicked: true,
+                                    decision: 'pending',
+                                  });
+                                }}
+                              >
+                                <option value="">— Pick UMA member —</option>
+                                {umaSelectOptions.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.name} ({user.email})
+                                  </option>
+                                ))}
+                              </NativeSelect>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top min-w-[220px]">
+                            <ConfidenceBadge confidence={preview.applicant.confidence} />
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {preview.applicant.detail}
+                            </div>
+                            {res.decision !== 'skipped' && !preview.isDuplicate && (
+                              <NativeSelect
+                                className="mt-2"
+                                aria-label={`Applicant for row ${preview.rowIndex}`}
+                                value={res.candidateId != null ? String(res.candidateId) : ''}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  updateResolution(preview.rowIndex, {
+                                    candidateId: value ? Number(value) : null,
+                                    applicantPicked: Boolean(value),
+                                    decision: 'pending',
+                                  });
+                                }}
+                              >
+                                <option value="">— Leave unlinked —</option>
+                                {applicantSelectOptions.map((candidate) => (
+                                  <option key={candidate.id} value={candidate.id}>
+                                    {candidate.name} ({candidate.email})
+                                  </option>
+                                ))}
+                              </NativeSelect>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            {preview.isDuplicate ? (
+                              <Badge variant="outline">{preview.skipReason ?? 'Duplicate'}</Badge>
+                            ) : res.decision === 'skipped' ? (
+                              <div className="flex flex-col gap-2">
+                                <Badge variant="outline">Skipped</Badge>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    updateResolution(preview.rowIndex, {
+                                      decision: 'pending',
+                                      userId: preview.uma.userId,
+                                      candidateId: preview.applicant.candidateId,
+                                      umaPicked: false,
+                                      applicantPicked: false,
+                                    })
+                                  }
+                                >
+                                  Undo skip
+                                </Button>
+                              </div>
+                            ) : res.decision === 'confirmed' || res.decision === 'picked' ? (
+                              <div className="flex flex-col gap-2">
+                                <Badge variant="secondary">
+                                  {res.decision === 'picked' ? 'Picked' : 'Confirmed'}
+                                </Badge>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    updateResolution(preview.rowIndex, { decision: 'pending' })
+                                  }
+                                >
+                                  Change
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => confirmRow(preview)}
+                                >
+                                  Confirm
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => skipRow(preview.rowIndex)}
+                                >
+                                  Skip
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -342,7 +646,7 @@ export default function AdminCoffeeChatsPage() {
                 <LoadingButton
                   type="button"
                   loading={importBusy}
-                  disabled={importableCount === 0}
+                  disabled={!canImport}
                   onClick={() => void runImport(false)}
                   className="uma-cta-primary"
                   data-tour="coffee-import-confirm"
@@ -361,6 +665,11 @@ export default function AdminCoffeeChatsPage() {
                   Cancel
                 </Button>
               </div>
+              {reviewCounts.needReview > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Import stays disabled until every row is confirmed, picked, or skipped.
+                </p>
+              )}
             </div>
           )}
         </SpreadsheetUploadPanel>
@@ -510,6 +819,32 @@ export default function AdminCoffeeChatsPage() {
         </PagePanel>
       </PageSection>
     </PageContainer>
+  );
+}
+
+function ConfidenceBadge({
+  confidence,
+}: {
+  confidence: CoffeeChatImportMatchPreview['uma']['confidence'];
+}) {
+  const label =
+    confidence === 'exact_email'
+      ? 'Exact email'
+      : confidence === 'unique_name'
+        ? 'Name suggestion'
+        : confidence === 'ambiguous'
+          ? 'Ambiguous'
+          : 'Unmatched';
+  const variant =
+    confidence === 'exact_email'
+      ? 'secondary'
+      : confidence === 'unique_name'
+        ? 'outline'
+        : 'outline';
+  return (
+    <Badge variant={variant} className="font-normal">
+      {label}
+    </Badge>
   );
 }
 

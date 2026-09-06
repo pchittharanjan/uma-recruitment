@@ -70,7 +70,7 @@ export function initDb(): Promise<void> {
  * Bump to force a full re-init when schema work happens outside SCHEMA.sql and
  * the MIGRATIONS list (e.g. editing a backfill function's logic).
  */
-const INIT_REVISION = 4;
+const INIT_REVISION = 5;
 
 /** Fingerprint of everything initDbOnce runs; changes whenever schema work changes. */
 function computeSchemaFingerprint(): string {
@@ -355,6 +355,8 @@ const MIGRATIONS = [
     `CREATE INDEX IF NOT EXISTS idx_admin_advancement_verdicts_team_round
       ON admin_advancement_verdicts(team_id, round_id, from_stage)`,
     'ALTER TABLE org_over_cap_code ADD COLUMN code_plain TEXT',
+    'ALTER TABLE coffee_chats ADD COLUMN candidate_id INTEGER REFERENCES candidates(id) ON DELETE SET NULL',
+    'CREATE INDEX IF NOT EXISTS idx_coffee_chats_candidate ON coffee_chats(candidate_id)',
 ];
 
 async function scoresNeedsScaleMigration(
@@ -637,6 +639,9 @@ async function migrateCoffeeChatsNullableRoundId(db: ReturnType<typeof getDb>): 
   const roundCol = tableInfo.rows.find((row) => row.name === 'round_id');
   if (!roundCol || (roundCol.notnull as number) === 0) return;
 
+  const colNames = new Set(tableInfo.rows.map((row) => row.name as string));
+  const has = (name: string) => colNames.has(name);
+
   await db.execute('PRAGMA foreign_keys=OFF');
   try {
     await db.execute(`CREATE TABLE coffee_chats_round_nullable (
@@ -647,6 +652,10 @@ async function migrateCoffeeChatsNullableRoundId(db: ReturnType<typeof getDb>): 
       submitter_name TEXT NOT NULL,
       applicant_name TEXT NOT NULL,
       applicant_name_normalized TEXT NOT NULL,
+      applicant_email TEXT,
+      applicant_grade_level TEXT,
+      teams_interested TEXT NOT NULL DEFAULT '[]',
+      candidate_id INTEGER REFERENCES candidates(id) ON DELETE SET NULL,
       vibes TEXT,
       green_flags TEXT,
       red_flags TEXT,
@@ -655,8 +664,25 @@ async function migrateCoffeeChatsNullableRoundId(db: ReturnType<typeof getDb>): 
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`);
-    await db.execute(`INSERT INTO coffee_chats_round_nullable
-      SELECT * FROM coffee_chats`);
+    // Explicit columns so we don't lose fields added via earlier ALTERs, and
+    // so SELECT * column-count mismatches don't break the rebuild.
+    await db.execute(`INSERT INTO coffee_chats_round_nullable (
+      id, round_id, chat_date, submitter_id, submitter_name,
+      applicant_name, applicant_name_normalized,
+      applicant_email, applicant_grade_level, teams_interested, candidate_id,
+      vibes, green_flags, red_flags, other_comments, conflict_of_interest,
+      created_at, updated_at
+    )
+    SELECT
+      id, round_id, chat_date, submitter_id, submitter_name,
+      applicant_name, applicant_name_normalized,
+      ${has('applicant_email') ? 'applicant_email' : 'NULL'},
+      ${has('applicant_grade_level') ? 'applicant_grade_level' : 'NULL'},
+      ${has('teams_interested') ? 'teams_interested' : "'[]'"},
+      ${has('candidate_id') ? 'candidate_id' : 'NULL'},
+      vibes, green_flags, red_flags, other_comments, conflict_of_interest,
+      created_at, updated_at
+    FROM coffee_chats`);
     await db.execute('DROP TABLE coffee_chats');
     await db.execute('ALTER TABLE coffee_chats_round_nullable RENAME TO coffee_chats');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_coffee_chats_round ON coffee_chats(round_id)');
@@ -665,6 +691,9 @@ async function migrateCoffeeChatsNullableRoundId(db: ReturnType<typeof getDb>): 
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_coffee_chats_applicant_norm ON coffee_chats(round_id, applicant_name_normalized)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_coffee_chats_candidate ON coffee_chats(candidate_id)',
     );
   } finally {
     await db.execute('PRAGMA foreign_keys=ON');
