@@ -62,6 +62,17 @@ export interface GradingEditLock {
   message: string;
 }
 
+/** Advancement lock freezes scores but still allows note edits. Pipeline close freezes everything. */
+export function scoresLockedNotesEditable(lock: GradingEditLock | null | undefined): boolean {
+  return Boolean(
+    lock?.locked && (lock.reason === 'submitted' || lock.reason === 'approved'),
+  );
+}
+
+export function interviewNotesLocked(lock: GradingEditLock | null | undefined): boolean {
+  return Boolean(lock?.locked && !scoresLockedNotesEditable(lock));
+}
+
 export function advancementFromStageLabel(
   fromStage: AdvancementFromStage,
   teamName?: string,

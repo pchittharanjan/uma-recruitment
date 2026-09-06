@@ -63,17 +63,29 @@ export type InterviewFormBindings = {
   notes: Record<string, string>;
   scores: Record<string, number>;
   comment: string;
+  /** Fully disable notes + scores (e.g. pipeline closed). */
   disabled?: boolean;
+  /** Disable score selectors while notes stay editable (advancement lock). */
+  scoresDisabled?: boolean;
   onNoteChange: (field: string, value: string) => void;
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
 };
+
+function formNotesDisabled(bindings: { disabled?: boolean }): boolean {
+  return Boolean(bindings.disabled);
+}
+
+function formScoresDisabled(bindings: { disabled?: boolean; scoresDisabled?: boolean }): boolean {
+  return Boolean(bindings.disabled || bindings.scoresDisabled);
+}
 
 export function InterviewQuestionEval({
   question,
   note,
   score,
   disabled,
+  scoresDisabled,
   scaleMax = 5,
   showNotes = true,
   weightPercent,
@@ -88,6 +100,7 @@ export function InterviewQuestionEval({
   note: string;
   score: number | null;
   disabled?: boolean;
+  scoresDisabled?: boolean;
   scaleMax?: number;
   showNotes?: boolean;
   weightPercent?: number;
@@ -98,6 +111,8 @@ export function InterviewQuestionEval({
   onNoteChange: (value: string) => void;
   onScoreChange: (value: number) => void;
 }) {
+  const notesLocked = formNotesDisabled({ disabled });
+  const scoresLocked = formScoresDisabled({ disabled, scoresDisabled });
   return (
     <div className={striped ? questionStripeClass(rowIndex) : 'uma-stack-block'}>
       <div className="flex items-start justify-between gap-3">
@@ -115,7 +130,7 @@ export function InterviewQuestionEval({
         <textarea
           value={note}
           onChange={(e) => onNoteChange(e.target.value)}
-          disabled={disabled}
+          disabled={notesLocked}
           rows={compact ? 3 : 4}
           placeholder="Write notes for this question…"
           className={cn(interviewNoteTextareaClass, 'resize-y')}
@@ -129,7 +144,7 @@ export function InterviewQuestionEval({
         <ScoreSelector
           value={score}
           onChange={onScoreChange}
-          disabled={disabled}
+          disabled={scoresLocked}
           max={scaleMax}
         />
       </div>
@@ -142,6 +157,7 @@ export function InterviewQuestionGroups({
   notes,
   scores,
   disabled,
+  scoresDisabled,
   scaleMax = 5,
   compact = false,
   onNoteChange,
@@ -151,6 +167,7 @@ export function InterviewQuestionGroups({
   notes: Record<string, string>;
   scores: Record<string, number>;
   disabled?: boolean;
+  scoresDisabled?: boolean;
   scaleMax?: number;
   compact?: boolean;
   onNoteChange: (field: string, value: string) => void;
@@ -212,6 +229,7 @@ export function InterviewQuestionGroups({
                         note={notes[field] ?? ''}
                         score={scores[field] ?? null}
                         disabled={disabled}
+                        scoresDisabled={scoresDisabled}
                         scaleMax={scaleMax}
                         showNotes={!scoreOnly}
                         weightPercent={block.fieldWeightPercents[index]}
@@ -447,6 +465,7 @@ export function InterviewNotesAndScoringForm({
   scores,
   comment,
   disabled,
+  scoresDisabled,
   compact = false,
   phase,
   onNoteChange,
@@ -458,6 +477,7 @@ export function InterviewNotesAndScoringForm({
   scores: Record<string, number>;
   comment: string;
   disabled?: boolean;
+  scoresDisabled?: boolean;
   compact?: boolean;
   /** When set, only show fields for this interview phase (case → behavioral). */
   phase?: 'case' | 'behavioral';
@@ -465,6 +485,7 @@ export function InterviewNotesAndScoringForm({
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
 }) {
+  const notesLocked = formNotesDisabled({ disabled });
   const behavioralNoteQuestions =
     phase === 'case' ? [] : interviewBehavioralNoteFieldsFromGuide(guide);
   const caseNoteSections =
@@ -544,7 +565,7 @@ export function InterviewNotesAndScoringForm({
                         <textarea
                           value={notes[question] ?? ''}
                           onChange={(e) => onNoteChange(question, e.target.value)}
-                          disabled={disabled}
+                          disabled={notesLocked}
                           rows={compact ? 3 : 4}
                           placeholder="Write notes for this question…"
                           className={cn(interviewNoteTextareaClass, 'resize-y')}
@@ -563,7 +584,7 @@ export function InterviewNotesAndScoringForm({
         <AdditionalBehavioralNotes
           guide={guide}
           notes={notes}
-          disabled={disabled}
+          disabled={notesLocked}
           compact={compact}
           onNoteChange={onNoteChange}
         />
@@ -574,6 +595,7 @@ export function InterviewNotesAndScoringForm({
         notes={notes}
         scores={scores}
         disabled={disabled}
+        scoresDisabled={scoresDisabled}
         scaleMax={scaleMax}
         compact={compact}
         onNoteChange={onNoteChange}
@@ -588,7 +610,7 @@ export function InterviewNotesAndScoringForm({
           <textarea
             value={comment}
             onChange={(e) => onCommentChange(e.target.value)}
-            disabled={disabled}
+            disabled={notesLocked}
             placeholder="Anything else from the interview (not visible to other stages until deliberations)"
             rows={3}
             className={cn(interviewNoteTextareaClass, 'resize-none')}
@@ -730,7 +752,7 @@ export function InterviewNotesAndScoringColumns({
                     <textarea
                       value={column.notes[row.question] ?? ''}
                       onChange={(e) => column.onNoteChange(row.question, e.target.value)}
-                      disabled={column.disabled}
+                      disabled={formNotesDisabled(column)}
                       rows={compact ? 3 : 4}
                       placeholder="Write notes for this question…"
                       className={cn(interviewNoteTextareaClass, 'resize-y')}
@@ -791,6 +813,7 @@ export function InterviewNotesAndScoringColumns({
                         note={column.notes[field] ?? ''}
                         score={column.scores[field] ?? null}
                         disabled={column.disabled}
+                        scoresDisabled={column.scoresDisabled}
                         scaleMax={scaleMax}
                         showNotes={!scoreOnly}
                         weightPercent={block.fieldWeightPercents[index]}
@@ -818,7 +841,7 @@ export function InterviewNotesAndScoringColumns({
             <textarea
               value={column.comment}
               onChange={(e) => column.onCommentChange(e.target.value)}
-              disabled={column.disabled}
+              disabled={formNotesDisabled(column)}
               placeholder="Anything else from the interview (not visible to other stages until deliberations)"
               rows={3}
               className={cn(interviewNoteTextareaClass, 'resize-none')}

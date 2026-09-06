@@ -314,9 +314,9 @@ function lockMessages(fromStage: AdvancementFromStage): {
   if (fromStage === 'first_round') {
     return {
       approved:
-        "Admin approved your team's advancement list. First Round Interview scores and comments can no longer be changed.",
+        "Admin approved your team's advancement list. First Round Interview scores can no longer be changed — notes are still editable.",
       submitted:
-        "Your team submitted its advancement list for admin review. First Round Interview scores and comments are locked until admin approves or the list is updated.",
+        "Your team submitted its advancement list for admin review. First Round Interview scores are locked until admin approves or the list is updated — notes are still editable.",
     };
   }
   return {
@@ -327,7 +327,7 @@ function lockMessages(fromStage: AdvancementFromStage): {
   };
 }
 
-/** Scores/comments lock once the team submits advancement; stays locked after approval. */
+/** Scores lock once the team submits advancement; stays locked after approval. Notes stay editable for interviews. */
 export async function getGradingEditLock(
   teamId: number,
   roundId: number,

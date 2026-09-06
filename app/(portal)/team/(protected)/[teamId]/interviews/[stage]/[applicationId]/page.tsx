@@ -46,6 +46,10 @@ import {
 } from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
+import {
+  interviewNotesLocked,
+  scoresLockedNotesEditable,
+} from '@/lib/advancement-submissions-types';
 import { formatInterviewProgressLabel } from '@/lib/interview-sessions';
 import { interviewCompleteGuidance, interviewCompleteToast } from '@/lib/next-step-guidance';
 import {
@@ -162,7 +166,8 @@ function serializeGroupDrafts(
 function NotesAndEvaluationForm({
   guide,
   draft,
-  locked,
+  notesLocked,
+  scoresLocked,
   compact,
   phase,
   onNoteChange,
@@ -171,7 +176,8 @@ function NotesAndEvaluationForm({
 }: {
   guide: InterviewGuide | null;
   draft: CandidateDraft;
-  locked: boolean;
+  notesLocked: boolean;
+  scoresLocked: boolean;
   compact?: boolean;
   phase?: 'case' | 'behavioral';
   onNoteChange: (field: string, value: string) => void;
@@ -184,7 +190,8 @@ function NotesAndEvaluationForm({
       notes={draft.notes}
       scores={draft.scores}
       comment={draft.comment}
-      disabled={locked}
+      disabled={notesLocked}
+      scoresDisabled={scoresLocked}
       compact={compact}
       phase={phase}
       onNoteChange={onNoteChange}
@@ -279,6 +286,8 @@ export default function TeamInterviewScorePage({
   }, [data?.groupEntries, drafts, scoreFieldList]);
 
   const scoringLocked = data?.scoringEditLock?.locked ?? false;
+  const notesLocked = interviewNotesLocked(data?.scoringEditLock);
+  const notesEditableWhileScoresLocked = scoresLockedNotesEditable(data?.scoringEditLock);
 
   const assignmentPending = useMemo(() => {
     if (!data) return false;
@@ -343,12 +352,12 @@ export default function TeamInterviewScorePage({
     snapshot: saveSnapshot,
     ready: draftsReady,
     resetKey: applicationId,
-    enabled: draftsReady && !scoringLocked,
+    enabled: draftsReady && !notesLocked,
     persist: persistDraft,
   });
 
   const showAutosaveBanner =
-    !scoringLocked && assignmentPending && hasDraftScores && saveStatus === 'saved';
+    !notesLocked && assignmentPending && hasDraftScores && saveStatus === 'saved';
 
   const switchInterviewPhase = (next: InterviewScoringPhase) => {
     if (next === interviewPhase) return;
@@ -396,21 +405,23 @@ export default function TeamInterviewScorePage({
 
   const handleSingleSubmit = async () => {
     if (!data) return;
-    const missing = scoreFieldList.filter((f) => draft.scores[f] === undefined);
-    if (missing.length > 0) {
-      const message =
-        interviewPhaseScoreFields(data.interviewGuide, 'behavioral').length > 0
-          ? 'Please score all case and behavioral criteria before submitting.'
-          : 'Please score all case criteria before submitting.';
-      setSubmitError(message);
-      toast.error(message);
-      if (isPhasedInterview) {
-        const caseMissing = interviewPhaseScoreFields(data.interviewGuide, 'case').some(
-          (f) => draft.scores[f] === undefined,
-        );
-        switchInterviewPhase(caseMissing ? 'case' : 'behavioral');
+    if (!notesEditableWhileScoresLocked) {
+      const missing = scoreFieldList.filter((f) => draft.scores[f] === undefined);
+      if (missing.length > 0) {
+        const message =
+          interviewPhaseScoreFields(data.interviewGuide, 'behavioral').length > 0
+            ? 'Please score all case and behavioral criteria before submitting.'
+            : 'Please score all case criteria before submitting.';
+        setSubmitError(message);
+        toast.error(message);
+        if (isPhasedInterview) {
+          const caseMissing = interviewPhaseScoreFields(data.interviewGuide, 'case').some(
+            (f) => draft.scores[f] === undefined,
+          );
+          switchInterviewPhase(caseMissing ? 'case' : 'behavioral');
+        }
+        return;
       }
-      return;
     }
     setSubmitting(true);
     setSubmitError('');
@@ -433,6 +444,11 @@ export default function TeamInterviewScorePage({
         toast.error(json.error ?? 'Failed to submit score');
         return;
       }
+      if (json.notesOnly) {
+        toast.success('Notes updated');
+        router.push(queueHref);
+        return;
+      }
       navigateAfterSubmit(json);
     } catch {
       setSubmitError('Network error. Please try again.');
@@ -445,15 +461,17 @@ export default function TeamInterviewScorePage({
   const handleGroupSubmit = async () => {
     if (!data?.groupEntries) return;
 
-    const incomplete = data.groupEntries.filter(
-      (entry) => !isDraftComplete(drafts[entry.applicationId] ?? emptyDraft(), scoreFieldList),
-    );
-    if (incomplete.length > 0) {
-      const message = `Please score all questions for every applicant (${incomplete.length} remaining).`;
-      setSubmitError(message);
-      toast.error(message);
-      setActiveTab(String(incomplete[0].applicationId));
-      return;
+    if (!notesEditableWhileScoresLocked) {
+      const incomplete = data.groupEntries.filter(
+        (entry) => !isDraftComplete(drafts[entry.applicationId] ?? emptyDraft(), scoreFieldList),
+      );
+      if (incomplete.length > 0) {
+        const message = `Please score all questions for every applicant (${incomplete.length} remaining).`;
+        setSubmitError(message);
+        toast.error(message);
+        setActiveTab(String(incomplete[0].applicationId));
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -478,6 +496,11 @@ export default function TeamInterviewScorePage({
       if (!res.ok) {
         setSubmitError(json.error);
         toast.error(json.error ?? 'Failed to submit scores');
+        return;
+      }
+      if (json.notesOnly) {
+        toast.success('Notes updated');
+        router.push(queueHref);
         return;
       }
       toast.success(
@@ -516,9 +539,26 @@ export default function TeamInterviewScorePage({
 
   const lockMessage = data.scoringEditLock?.message ?? '';
   const isReediting = !assignmentPending && !scoringLocked;
-  const saveLabel = isReediting ? 'Save changes →' : 'Submit →';
-  const groupSaveLabel = isReediting ? 'Save scores & notes' : 'Submit all in this session';
-  const editingBanner = isReediting ? (
+  const isNotesOnlyEdit = notesEditableWhileScoresLocked;
+  const saveLabel = isNotesOnlyEdit
+    ? 'Save notes →'
+    : isReediting
+      ? 'Save changes →'
+      : 'Submit →';
+  const groupSaveLabel = isNotesOnlyEdit
+    ? 'Save notes'
+    : isReediting
+      ? 'Save scores & notes'
+      : 'Submit all in this session';
+  const editingBanner = isNotesOnlyEdit ? (
+    <StatusBanner
+      type="info"
+      message={
+        lockMessage ||
+        'Scores are locked after advancement — you can still edit and save notes.'
+      }
+    />
+  ) : isReediting ? (
     <StatusBanner
       type="info"
       message="Already submitted — change scores or notes anytime, then save."
@@ -651,11 +691,13 @@ export default function TeamInterviewScorePage({
   const groupInterviewHeaderContent =
     isGroupInterview &&
     data.groupEntries &&
-    ((scoringLocked && lockMessage) || data.slot?.logisticsNote || showAutosaveBanner || isReediting) ? (
+    ((scoringLocked && lockMessage) || data.slot?.logisticsNote || showAutosaveBanner || isReediting || isNotesOnlyEdit) ? (
       <div className="shrink-0 space-y-1.5">
         {editingBanner}
         {autosaveBanner}
-        {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
+        {scoringLocked && !isNotesOnlyEdit && lockMessage && (
+          <StatusBanner type="info" message={lockMessage} />
+        )}
         {data.slot?.logisticsNote && (
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Logistics: </span>
@@ -692,7 +734,8 @@ export default function TeamInterviewScorePage({
             notes: entryDraft.notes,
             scores: entryDraft.scores,
             comment: entryDraft.comment,
-            disabled: scoringLocked,
+            disabled: notesLocked,
+            scoresDisabled: scoringLocked,
             onNoteChange: (field: string, value: string) =>
               updateDraft(applicationIdForForm, {
                 notes: { ...entryDraft.notes, [field]: value },
@@ -712,7 +755,8 @@ export default function TeamInterviewScorePage({
             <NotesAndEvaluationForm
               guide={data.interviewGuide ?? null}
               draft={entryDraft}
-              locked={scoringLocked}
+              notesLocked={notesLocked}
+              scoresLocked={scoringLocked}
               compact={compact}
               onNoteChange={(field, value) =>
                 updateDraft(applicationIdForForm, {
@@ -742,7 +786,9 @@ export default function TeamInterviewScorePage({
     <div data-tour="interview-scores" className="uma-stack-page">
       {editingBanner}
       {autosaveBanner}
-      {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
+      {scoringLocked && !isNotesOnlyEdit && lockMessage && (
+        <StatusBanner type="info" message={lockMessage} />
+      )}
       {data.slot && (
         <p className="text-sm text-muted-foreground">
           {formatSlotTime(data.slot.scheduledAt)}
@@ -763,7 +809,8 @@ export default function TeamInterviewScorePage({
       <NotesAndEvaluationForm
         guide={data.interviewGuide ?? null}
         draft={draft}
-        locked={scoringLocked}
+        notesLocked={notesLocked}
+        scoresLocked={scoringLocked}
         phase={isPhasedInterview ? interviewPhase : undefined}
         onNoteChange={(field, value) =>
           setDraft((prev) => ({ ...prev, notes: { ...prev.notes, [field]: value } }))
@@ -807,9 +854,9 @@ export default function TeamInterviewScorePage({
       <LoadingButton
         onClick={handleGroupSubmit}
         loading={submitting}
-        disabled={scoringLocked}
+        disabled={notesLocked}
       >
-        {scoringLocked ? 'Editing locked' : groupSaveLabel}
+        {notesLocked ? 'Editing locked' : groupSaveLabel}
       </LoadingButton>
     </div>
   );
@@ -818,7 +865,7 @@ export default function TeamInterviewScorePage({
     ? phasedInterviewPrimaryAction(data?.interviewGuide ?? null, interviewPhase, draft.scores)
     : null;
   const phasedActionLabel =
-    phasedPrimaryAction?.kind === 'submit' && isReediting
+    phasedPrimaryAction?.kind === 'submit' && (isReediting || isNotesOnlyEdit)
       ? saveLabel
       : phasedPrimaryAction?.label;
 
@@ -845,16 +892,22 @@ export default function TeamInterviewScorePage({
         </span>
         <LoadingButton
           onClick={() => {
-            if (phasedPrimaryAction.kind === 'switch') {
+            if (phasedPrimaryAction.kind === 'switch' && !isNotesOnlyEdit) {
               switchInterviewPhase(phasedPrimaryAction.target);
               return;
             }
             void handleSingleSubmit();
           }}
-          loading={phasedPrimaryAction.kind === 'submit' && submitting}
-          disabled={scoringLocked}
+          loading={
+            (phasedPrimaryAction.kind === 'submit' || isNotesOnlyEdit) && submitting
+          }
+          disabled={notesLocked}
         >
-          {scoringLocked ? 'Editing locked' : phasedActionLabel}
+          {notesLocked
+            ? 'Editing locked'
+            : isNotesOnlyEdit
+              ? saveLabel
+              : phasedActionLabel}
         </LoadingButton>
       </div>
     </div>
@@ -866,7 +919,7 @@ export default function TeamInterviewScorePage({
         totalScored={scoreFieldList.length}
         onSubmit={handleSingleSubmit}
         submitting={submitting}
-        locked={scoringLocked}
+        locked={notesLocked}
         submitLabel={saveLabel}
       />
     </div>

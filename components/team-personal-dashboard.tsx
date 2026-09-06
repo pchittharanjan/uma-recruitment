@@ -186,7 +186,7 @@ function dashboardNotices(data: TeamOverviewData, teamId: string): DashboardNoti
       {
         dismissKey: `${prefix}:advancement-approved`,
         type: 'success',
-        message: `Advancement list approved (${adv.topN} applicant${adv.topN === 1 ? '' : 's'}). Scores and comments are locked.`,
+        message: `Advancement list approved (${adv.topN} applicant${adv.topN === 1 ? '' : 's'}). Scores are locked — notes are still editable.`,
       },
     ];
   }

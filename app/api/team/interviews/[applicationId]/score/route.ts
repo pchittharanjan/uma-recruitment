@@ -8,6 +8,7 @@ import { INTERVIEWER_ROLES } from '@/lib/roles';
 import { canUserAccessTeamStage } from '@/lib/stage-access';
 import { getRoundSettings } from '@/lib/rounds';
 import { getGradingEditLock } from '@/lib/advancement-submissions';
+import { scoresLockedNotesEditable } from '@/lib/advancement-submissions-types';
 import { isTeamDirector } from '@/lib/directors';
 import { getGraderAssignmentForUser } from '@/lib/team-dashboard';
 import { getInterviewGroupMembers, getInterviewGuideForRound } from '@/lib/interview-slots';
@@ -158,6 +159,35 @@ async function saveInterviewScore(
   );
 }
 
+/** Update notes/comments without changing numeric scores (advancement lock). */
+async function saveInterviewNotesOnly(
+  assignmentId: number,
+  userId: number,
+  scoreFields: string[],
+  noteFields: string[],
+  notes: Record<string, string> | undefined,
+  comment: string,
+): Promise<void> {
+  const db = getDb();
+  const fields = [...new Set([...scoreFields, ...noteFields])];
+  await db.batch(
+    [
+      ...fields.map((field) => ({
+        // Preserve existing score on conflict; only refresh the note column.
+        sql: `INSERT INTO scores (assignment_id, field_name, score, note) VALUES (?, ?, NULL, ?)
+              ON CONFLICT(assignment_id, field_name) DO UPDATE SET
+                note = excluded.note`,
+        args: [assignmentId, field, noteForField(notes, field)],
+      })),
+      {
+        sql: `UPDATE assignments SET comment = ? WHERE id = ? AND user_id = ?`,
+        args: [comment || null, assignmentId, userId],
+      },
+    ],
+    'write',
+  );
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ applicationId: string }> },
@@ -192,10 +222,15 @@ export async function POST(
     const assignment = await getGraderAssignmentForUser(user.id, applicationId, teamId, stage);
     if (!assignment) return notFound('Assignment not found');
 
+    let notesOnly = false;
     if (stage === 'first_round') {
       const scoringEditLock = await getGradingEditLock(teamId, assignment.roundId, 'first_round');
       if (scoringEditLock.locked) {
-        return forbidden(scoringEditLock.message);
+        if (scoresLockedNotesEditable(scoringEditLock)) {
+          notesOnly = true;
+        } else {
+          return forbidden(scoringEditLock.message);
+        }
       }
     } else {
       const closedLock = await pipelineClosedEditLock();
@@ -216,6 +251,36 @@ export async function POST(
     const body = await req.json();
     const noteFieldsFromBody = (notes: Record<string, string> | undefined) =>
       interviewPersistableNoteFieldsFromGuide(interviewGuide, Object.keys(notes ?? {}));
+
+    const persistEntry = async (
+      entryAssignmentId: number,
+      scores: Record<string, number>,
+      notes: Record<string, string> | undefined,
+      comment: string,
+      options?: { complete?: boolean },
+    ) => {
+      if (notesOnly) {
+        await saveInterviewNotesOnly(
+          entryAssignmentId,
+          user.id,
+          scoreFields,
+          noteFieldsFromBody(notes),
+          notes,
+          comment,
+        );
+        return;
+      }
+      await saveInterviewScore(
+        entryAssignmentId,
+        user.id,
+        scoreFields,
+        scores,
+        noteFieldsFromBody(notes),
+        notes,
+        comment,
+        options,
+      );
+    };
 
     if (body.draft === true) {
       if (Array.isArray(body.entries)) {
@@ -240,11 +305,13 @@ export async function POST(
           if (!groupAppIds.has(entry.applicationId)) {
             return NextResponse.json({ error: 'Invalid application in batch.' }, { status: 400 });
           }
-          const validationError = validatePartialScores(entry.scores ?? {}, scoreFields, scaleMax);
-          if (validationError) {
-            const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
-            const label = member?.candidateName ?? `application ${entry.applicationId}`;
-            return NextResponse.json({ error: `${label}: ${validationError}` }, { status: 400 });
+          if (!notesOnly) {
+            const validationError = validatePartialScores(entry.scores ?? {}, scoreFields, scaleMax);
+            if (validationError) {
+              const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
+              const label = member?.candidateName ?? `application ${entry.applicationId}`;
+              return NextResponse.json({ error: `${label}: ${validationError}` }, { status: 400 });
+            }
           }
         }
 
@@ -258,41 +325,31 @@ export async function POST(
           if (!entryAssignment) {
             return notFound(`Assignment not found for application ${entry.applicationId}`);
           }
-          await saveInterviewScore(
+          await persistEntry(
             entryAssignment.assignmentId,
-            user.id,
-            scoreFields,
             entry.scores ?? {},
-            noteFieldsFromBody(entry.notes),
             entry.notes,
             (entry.comment as string | undefined) ?? '',
             { complete: false },
           );
         }
 
-        return NextResponse.json({ success: true, draft: true });
+        return NextResponse.json({ success: true, draft: true, notesOnly });
       }
 
       const scores = (body.scores as Record<string, number> | undefined) ?? {};
       const notes = (body.notes as Record<string, string> | undefined) ?? {};
       const comment = (body.comment as string | undefined) ?? '';
-      const validationError = validatePartialScores(scores, scoreFields, scaleMax);
-      if (validationError) {
-        return NextResponse.json({ error: validationError }, { status: 400 });
+      if (!notesOnly) {
+        const validationError = validatePartialScores(scores, scoreFields, scaleMax);
+        if (validationError) {
+          return NextResponse.json({ error: validationError }, { status: 400 });
+        }
       }
 
-      await saveInterviewScore(
-        assignment.assignmentId,
-        user.id,
-        scoreFields,
-        scores,
-        noteFieldsFromBody(notes),
-        notes,
-        comment,
-        { complete: false },
-      );
+      await persistEntry(assignment.assignmentId, scores, notes, comment, { complete: false });
 
-      return NextResponse.json({ success: true, draft: true });
+      return NextResponse.json({ success: true, draft: true, notesOnly });
     }
 
     if (Array.isArray(body.entries)) {
@@ -315,11 +372,13 @@ export async function POST(
       const groupAppIds = new Set(groupMembers.map((m) => m.applicationId));
       const entryAppIds = new Set(entries.map((e) => e.applicationId));
 
-      if (entryAppIds.size !== groupMembers.length || groupMembers.length !== entries.length) {
-        return NextResponse.json(
-          { error: 'Must score all applicants in the group.' },
-          { status: 400 },
-        );
+      if (!notesOnly) {
+        if (entryAppIds.size !== groupMembers.length || groupMembers.length !== entries.length) {
+          return NextResponse.json(
+            { error: 'Must score all applicants in the group.' },
+            { status: 400 },
+          );
+        }
       }
 
       for (const entry of entries) {
@@ -337,14 +396,16 @@ export async function POST(
           return notFound(`Assignment not found for application ${entry.applicationId}`);
         }
 
-        const validationError = validateScores(entry.scores ?? {}, scoreFields, scaleMax);
-        if (validationError) {
-          const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
-          const label = member?.candidateName ?? `application ${entry.applicationId}`;
-          return NextResponse.json(
-            { error: `${label}: ${validationError}` },
-            { status: 400 },
-          );
+        if (!notesOnly) {
+          const validationError = validateScores(entry.scores ?? {}, scoreFields, scaleMax);
+          if (validationError) {
+            const member = groupMembers.find((m) => m.applicationId === entry.applicationId);
+            const label = member?.candidateName ?? `application ${entry.applicationId}`;
+            return NextResponse.json(
+              { error: `${label}: ${validationError}` },
+              { status: 400 },
+            );
+          }
         }
       }
 
@@ -357,15 +418,16 @@ export async function POST(
         );
         if (!entryAssignment) continue;
 
-        await saveInterviewScore(
+        await persistEntry(
           entryAssignment.assignmentId,
-          user.id,
-          scoreFields,
-          entry.scores,
-          noteFieldsFromBody(entry.notes),
+          entry.scores ?? {},
           entry.notes,
           (entry.comment as string | undefined) ?? '',
         );
+      }
+
+      if (notesOnly) {
+        return NextResponse.json({ success: true, notesOnly: true });
       }
 
       const submitResult = await buildInterviewSubmitResponse(
@@ -382,24 +444,22 @@ export async function POST(
       });
     }
 
-    const scores = body.scores as Record<string, number>;
+    const scores = (body.scores as Record<string, number> | undefined) ?? {};
     const notes = (body.notes as Record<string, string> | undefined) ?? {};
     const comment = (body.comment as string | undefined) ?? '';
 
-    const validationError = validateScores(scores, scoreFields, scaleMax);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
+    if (!notesOnly) {
+      const validationError = validateScores(scores, scoreFields, scaleMax);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
     }
 
-    await saveInterviewScore(
-      assignment.assignmentId,
-      user.id,
-      scoreFields,
-      scores,
-      noteFieldsFromBody(notes),
-      notes,
-      comment,
-    );
+    await persistEntry(assignment.assignmentId, scores, notes, comment);
+
+    if (notesOnly) {
+      return NextResponse.json({ success: true, notesOnly: true });
+    }
 
     const submitResult = await buildInterviewSubmitResponse(
       user.id,

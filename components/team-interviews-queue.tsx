@@ -24,6 +24,10 @@ import {
 } from '@/lib/stages';
 import { useShellUser } from '@/components/shell-user-provider';
 import { interviewCompleteGuidance } from '@/lib/next-step-guidance';
+import {
+  interviewNotesLocked,
+  scoresLockedNotesEditable,
+} from '@/lib/advancement-submissions-types';
 import type { TeamInterviewAssignment, TeamInterviewData } from '@/lib/team-interviews-types';
 
 interface InterviewSession {
@@ -124,7 +128,10 @@ export function TeamInterviewsQueue({
   const firstPendingIsGroup = (firstPendingSession?.assignments.length ?? 0) > 1;
   const allDone = data.progress.completed === data.progress.total && data.progress.total > 0;
   const scoringLocked = data.scoringEditLock?.locked ?? false;
+  const notesLocked = interviewNotesLocked(data.scoringEditLock);
+  const notesEditableWhileScoresLocked = scoresLockedNotesEditable(data.scoringEditLock);
   const lockMessage = data.scoringEditLock?.message ?? '';
+  const editLabel = notesEditableWhileScoresLocked ? 'Edit notes' : 'Edit scores & notes';
   const nextStep = audience === 'team' ? data.nextStep : null;
   const completeCopy = nextStep ? interviewCompleteGuidance(nextStep.isDirector) : null;
   const finalRoundComplete = stage === 'final_round' && allDone;
@@ -291,7 +298,7 @@ export function TeamInterviewsQueue({
                                 >
                                   Score →
                                 </NavLinkButton>
-                              ) : scoringLocked ? (
+                              ) : notesLocked ? (
                                 <InterviewEditControl
                                   teamId={teamId}
                                   stage={stage}
@@ -299,7 +306,7 @@ export function TeamInterviewsQueue({
                                   locked
                                   lockMessage={lockMessage}
                                   audience={audience}
-                                  label="Edit scores & notes"
+                                  label={editLabel}
                                 />
                               ) : (
                                 <NavLinkButton
@@ -308,7 +315,7 @@ export function TeamInterviewsQueue({
                                   href={interviewAppHref(teamId, stage, a.applicationId, audience)}
                                   data-tour="interview-queue-edit"
                                 >
-                                  Edit scores & notes
+                                  {editLabel}
                                 </NavLinkButton>
                               )}
                             </div>
@@ -333,7 +340,7 @@ export function TeamInterviewsQueue({
                             >
                               Score group session →
                             </NavLinkButton>
-                          ) : scoringLocked ? (
+                          ) : notesLocked ? (
                             <InterviewEditControl
                               teamId={teamId}
                               stage={stage}
@@ -341,7 +348,7 @@ export function TeamInterviewsQueue({
                               locked
                               lockMessage={lockMessage}
                               audience={audience}
-                              label="Edit scores & notes"
+                              label={editLabel}
                             />
                           ) : (
                             <NavLinkButton
@@ -351,7 +358,7 @@ export function TeamInterviewsQueue({
                               href={interviewAppHref(teamId, stage, openApplicationId, audience)}
                               data-tour="interview-queue-edit"
                             >
-                              Edit scores & notes
+                              {editLabel}
                             </NavLinkButton>
                           )}
                         </div>
