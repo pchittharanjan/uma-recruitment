@@ -115,7 +115,12 @@ function formatDayHeader(scheduledAt: string): string {
 function dayKeyForSession(scheduledAt: string): string {
   const date = new Date(scheduledAt);
   if (Number.isNaN(date.getTime())) return scheduledAt;
-  return date.toISOString().slice(0, 10);
+  // Local calendar day — must match formatDayHeader (toLocaleDateString), not UTC.
+  // Otherwise evening slots after UTC midnight get a duplicate same-looking day header.
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function groupSlotsIntoSessions(slots: SlotProgress[]): SessionGroup[] {
