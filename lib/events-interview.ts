@@ -26,9 +26,12 @@ export const EVENTS_BEHAVIORAL_QUESTIONS = [
   'Teach us something in 1 minute. (1 min to brainstorm, 1 min to teach) 2 min',
 ];
 
-/** Warm-up case (~3 min) — Part of final-round case discussion points. */
+export const EVENTS_WARMUP_SECTION_TITLE = 'Warm Up Case (3 mins)';
+export const EVENTS_STUDYSYNC_SECTION_TITLE = '3-Part Case "StudySync"';
+
+/** Warm-up case (~3 min) — note prompt under the warm-up section header. */
 export const EVENTS_WARMUP_QUESTIONS = [
-  'Warm-Up Case (Boba Launch, 3 mins): A campus boba shop is launching a limited-edition drink and wants buzz before it launches. You\'re asked to feature it in an unconventional, high-traffic spot to catch students\' attention. What kind of location would you look for (examples include: time of day, foot traffic pattern, what students are doing there), and why would that generate the most excitement and curiosity?',
+  'A campus boba shop is launching a limited-edition drink and wants buzz before it launches. You\'re asked to feature it in an unconventional, high-traffic spot to catch students\' attention. What kind of location would you look for (examples include: time of day, foot traffic pattern, what students are doing there), and why would that generate the most excitement and curiosity?',
 ];
 
 /** Full 3-part StudySync case — after warm-up. */
@@ -40,6 +43,13 @@ export const EVENTS_STUDYSYNC_CASE_QUESTIONS = [
 
 export const EVENTS_FINAL_CASE_PROMPT =
   'StudySync is a productivity and study app. Candidates get ~2 minutes to read the packet, then complete a warm-up (boba launch location) and a 3-part case: trend & competitor research, design a campus activation promoting StudySync\'s AI feature (brand awareness), and post-event measurement / transferability.';
+
+export const EVENTS_FINAL_INTRO =
+  'Individual interview: Behavioral (~10 min), warm-up case (~3 min), then StudySync 3-part case. Score each criterion 1–5.';
+
+/** Previous default copy — still stored on some saved guides / preview drafts. */
+export const EVENTS_FINAL_INTRO_LEGACY =
+  'Individual interview: behavioral & fit (~5 min), warm-up case, RESET case, then overall communication. Score each criterion 1–5.';
 
 export function eventsDefaultGuides(): InterviewGuidesRecord {
   const firstRound: InterviewGuide = {
@@ -63,15 +73,24 @@ export function eventsDefaultGuides(): InterviewGuidesRecord {
   };
 
   // Final individual: (1) Behavioral → (2) Warm-up case → (3) Full StudySync case.
-  // Modeled as case_and_behavioral: required questions = behavioral; discussionPoints = warm-up + case.
+  // Modeled as case_and_behavioral: required questions = behavioral; discussionSections = warm-up + case.
   const finalRound: InterviewGuide = {
     format: 'case_and_behavioral',
     casePdfUrl: EVENTS_FINAL_CASE_PDF,
-    intro:
-      'Individual interview: Behavioral (~10 min), warm-up case (~3 min), then StudySync 3-part case. Score each criterion 1–5.',
+    intro: EVENTS_FINAL_INTRO,
     caseStudy: {
       title: 'StudySync — Productivity and Study App',
       prompt: EVENTS_FINAL_CASE_PROMPT,
+      discussionSections: [
+        {
+          title: EVENTS_WARMUP_SECTION_TITLE,
+          points: [...EVENTS_WARMUP_QUESTIONS],
+        },
+        {
+          title: EVENTS_STUDYSYNC_SECTION_TITLE,
+          points: [...EVENTS_STUDYSYNC_CASE_QUESTIONS],
+        },
+      ],
       discussionPoints: [...EVENTS_WARMUP_QUESTIONS, ...EVENTS_STUDYSYNC_CASE_QUESTIONS],
     },
     questions: [...EVENTS_BEHAVIORAL_QUESTIONS],

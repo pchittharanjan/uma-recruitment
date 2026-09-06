@@ -34,10 +34,12 @@ import {
 import { useAutosaveStatus } from '@/hooks/use-autosave-status';
 import { useElapsedTimer } from '@/hooks/use-elapsed-timer';
 import {
+  interviewPhaseScoreFields,
   interviewScaleMax,
   interviewScoreFieldGroups,
   interviewStageSetupCopy,
   isPhasedCaseAndBehavioralInterview,
+  phasedInterviewPrimaryAction,
   type InterviewGuide,
   type InterviewGuideStage,
 } from '@/lib/interview-guide';
@@ -195,7 +197,23 @@ export function InterviewScoringPreview({
       ? undefined
       : guide.casePdfUrl;
 
+  const activePhaseFields = isPhasedInterview
+    ? interviewPhaseScoreFields(guide, interviewPhase)
+    : scoreFieldList;
+  const phasedPrimaryAction = isPhasedInterview
+    ? phasedInterviewPrimaryAction(guide, interviewPhase, draft.scores)
+    : null;
+
   const disabled = !interactive;
+
+  const switchInterviewPhase = (next: InterviewScoringPhase) => {
+    if (next === interviewPhase) return;
+    setInterviewPhase(next);
+    if (stage !== 'final_round') {
+      setCaseOpen(next === 'case');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const saveSnapshot = useMemo(
     () => (showGroupSample ? serializePreviewDrafts(drafts) : serializePreviewDraft(draft)),
@@ -264,13 +282,49 @@ export function InterviewScoringPreview({
   };
 
   const singleSubmitFooter = interactive ? (
-    <GradingSubmitFooter
-      variant="embedded"
-      scoredCount={scoreFieldList.filter((field) => draft.scores[field] !== undefined).length}
-      totalScored={scoreFieldList.length}
-      onSubmit={handlePreviewSubmit}
-      submitting={submitting}
-    />
+    isPhasedInterview && phasedPrimaryAction ? (
+      <div
+        data-tour="interview-submit"
+        className={
+          casePdfUrl
+            ? 'flex shrink-0 items-center justify-between gap-4 border-t border-border/25 bg-muted/35 px-6 py-3.5 sm:px-7 lg:px-8'
+            : 'flex items-center justify-between gap-4 pt-2'
+        }
+      >
+        <InterviewPhaseToggle
+          value={interviewPhase}
+          onValueChange={switchInterviewPhase}
+        />
+        <div className="flex items-center gap-3">
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {activePhaseFields.filter((f) => draft.scores[f] !== undefined).length}/
+            {activePhaseFields.length} this part ·{' '}
+            {scoreFieldList.filter((f) => draft.scores[f] !== undefined).length}/
+            {scoreFieldList.length} total
+          </span>
+          <LoadingButton
+            onClick={() => {
+              if (phasedPrimaryAction.kind === 'switch') {
+                switchInterviewPhase(phasedPrimaryAction.target);
+                return;
+              }
+              void handlePreviewSubmit();
+            }}
+            loading={phasedPrimaryAction.kind === 'submit' && submitting}
+          >
+            {phasedPrimaryAction.label}
+          </LoadingButton>
+        </div>
+      </div>
+    ) : (
+      <GradingSubmitFooter
+        variant="embedded"
+        scoredCount={scoreFieldList.filter((field) => draft.scores[field] !== undefined).length}
+        totalScored={scoreFieldList.length}
+        onSubmit={handlePreviewSubmit}
+        submitting={submitting}
+      />
+    )
   ) : (
     <ReadOnlySubmitPlaceholder
       fieldCount={scoreFieldList.length}
@@ -459,12 +513,7 @@ export function InterviewScoringPreview({
           <div className="mt-2">
             <InterviewPhaseToggle
               value={interviewPhase}
-              onValueChange={(next) => {
-                setInterviewPhase(next);
-                if (stage !== 'final_round') {
-                  setCaseOpen(next === 'case');
-                }
-              }}
+              onValueChange={switchInterviewPhase}
             />
           </div>
         ) : null}

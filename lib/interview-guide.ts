@@ -5,6 +5,12 @@ import { eventsDefaultGuides } from '@/lib/events-interview';
 export type InterviewGuideFormat = 'questions' | 'case_study' | 'case_and_behavioral';
 export type InterviewGuideStage = 'first_round' | 'final_round';
 
+/** Labeled group of case-packet note prompts (warm-up vs full case, etc.). */
+export type InterviewDiscussionSection = {
+  title: string;
+  points: string[];
+};
+
 export type InterviewRubricCriterion = {
   name: string;
   /** Share within its category (or of the whole rubric when flat). */
@@ -52,6 +58,12 @@ export interface InterviewGuide {
     prompt: string;
     /** Case-packet questions. Interviewers take notes only — they do not score these. */
     discussionPoints?: string[];
+    /**
+     * Optional labeled groups for interviewer notes (e.g. warm-up vs full case).
+     * When set, the notes UI shows section headers; note keys remain the point strings.
+     * Flattened into `discussionPoints` on normalize when that list is empty.
+     */
+    discussionSections?: InterviewDiscussionSection[];
   };
   /** Scored evaluation for the case portion (Part 1). */
   rubric?: InterviewRubric;
@@ -348,16 +360,44 @@ export function normalizeInterviewRubric(raw: unknown): InterviewRubric | undefi
   return { scaleMax, criteria };
 }
 
+function normalizeDiscussionSections(raw: unknown): InterviewDiscussionSection[] {
+  if (!Array.isArray(raw)) return [];
+  const sections: InterviewDiscussionSection[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as { title?: unknown; points?: unknown };
+    const title = typeof obj.title === 'string' ? obj.title.trim() : '';
+    const points = trimList(obj.points);
+    if (!title || points.length === 0) continue;
+    sections.push({ title, points });
+  }
+  return sections;
+}
+
+function flattenDiscussionSections(sections: InterviewDiscussionSection[]): string[] {
+  return sections.flatMap((section) => section.points);
+}
+
 function normalizeCaseStudy(raw: unknown): InterviewGuide['caseStudy'] | null {
   if (!raw || typeof raw !== 'object') return null;
-  const obj = raw as { title?: unknown; prompt?: unknown; discussionPoints?: unknown };
+  const obj = raw as {
+    title?: unknown;
+    prompt?: unknown;
+    discussionPoints?: unknown;
+    discussionSections?: unknown;
+  };
   const prompt = typeof obj.prompt === 'string' ? obj.prompt.trim() : '';
   if (!prompt) return null;
-  const discussionPoints = trimList(obj.discussionPoints);
+  const discussionSections = normalizeDiscussionSections(obj.discussionSections);
+  let discussionPoints = trimList(obj.discussionPoints);
+  if (discussionPoints.length === 0 && discussionSections.length > 0) {
+    discussionPoints = flattenDiscussionSections(discussionSections);
+  }
   return {
     title: trimOptional(typeof obj.title === 'string' ? obj.title : undefined),
     prompt,
     discussionPoints: discussionPoints.length > 0 ? discussionPoints : undefined,
+    discussionSections: discussionSections.length > 0 ? discussionSections : undefined,
   };
 }
 
@@ -487,11 +527,18 @@ function formatCaseStudyLines(guide: InterviewGuide): string[] {
     lines.push('');
   }
   lines.push(cs.prompt.trim());
-  if (cs.discussionPoints && cs.discussionPoints.length > 0) {
+  const noteSections = interviewNoteSectionsFromGuide(guide);
+  if (noteSections.length > 0) {
     lines.push('');
     lines.push('Case questions:');
-    for (const point of cs.discussionPoints) {
-      if (point.trim()) lines.push(`• ${point.trim()}`);
+    for (const section of noteSections) {
+      if (section.title) {
+        lines.push('');
+        lines.push(section.title);
+      }
+      for (const point of section.points) {
+        if (point.trim()) lines.push(`• ${point.trim()}`);
+      }
     }
   }
   const rubric = normalizeInterviewRubric(guide.rubric);
@@ -574,22 +621,41 @@ export function interviewGuideForApi(
 export function interviewNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide) return [];
   if (guide.format !== 'case_study' && guide.format !== 'case_and_behavioral') return [];
+  const sections = guide.caseStudy?.discussionSections;
+  if (sections && sections.length > 0) {
+    return flattenDiscussionSections(sections);
+  }
   return (guide.caseStudy?.discussionPoints ?? []).map((p) => p.trim()).filter(Boolean);
 }
 
 /**
+ * Case-packet note prompts grouped into labeled sections when the guide defines them.
+ * Falls back to a single untitled section so callers can always map over sections.
+ */
+export function interviewNoteSectionsFromGuide(
+  guide: InterviewGuide | null,
+): InterviewDiscussionSection[] {
+  if (!guide) return [];
+  if (guide.format !== 'case_study' && guide.format !== 'case_and_behavioral') return [];
+  const sections = normalizeDiscussionSections(guide.caseStudy?.discussionSections);
+  if (sections.length > 0) return sections;
+  const points = interviewNoteFieldsFromGuide(guide);
+  if (points.length === 0) return [];
+  return [{ title: '', points }];
+}
+
+/**
  * Behavioral questions shown as notes-only prompts during Part 2.
- * Only when a separate behavioral rubric is scored — otherwise the questions
- * themselves are the scored fields (with notes) via interviewScoreFieldGroups,
- * and repeating them as notes-only duplicates the UI.
  *
- * Also drops any prompt that is already a scored behavioral field so the same
- * text never appears once as notes-only and again with a rating scale.
+ * - With a behavioral rubric: required questions are notes; criteria are scored.
+ * - Without a behavioral rubric (e.g. Strategy final): required questions are
+ *   notes-only — they are not turned into 1–5 score fields.
+ *
+ * Drops any prompt that is already a scored behavioral field so the same text
+ * never appears once as notes-only and again with a rating scale.
  */
 export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide || guide.format !== 'case_and_behavioral') return [];
-  const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
-  if (!behavioralRubric || behavioralRubric.criteria.length === 0) return [];
   const scored = new Set(
     interviewScoreFieldGroups(guide)
       .filter((group) => group.key === 'behavioral' || group.key === 'questions')
@@ -598,6 +664,27 @@ export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | n
   return (guide.questions ?? [])
     .map((q) => q.trim())
     .filter((q) => Boolean(q) && !scored.has(q));
+}
+
+/** Case packet + behavioral prompts that persist as note-only score rows. */
+export function interviewPersistableNoteFieldsFromGuide(
+  guide: InterviewGuide | null,
+  extraNoteKeys: string[] = [],
+): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const scored = new Set(interviewScoreFieldsFromGuide(guide));
+  const push = (field: string) => {
+    const trimmed = field.trim();
+    if (!trimmed || seen.has(trimmed) || scored.has(trimmed)) return;
+    seen.add(trimmed);
+    keys.push(trimmed);
+  };
+  for (const field of interviewNoteFieldsFromGuide(guide)) push(field);
+  for (const field of interviewBehavioralNoteFieldsFromGuide(guide)) push(field);
+  for (const field of interviewQuestionBankFromGuide(guide)) push(field);
+  for (const field of extraNoteKeys) push(field);
+  return keys;
 }
 
 /** Optional bank prompts interviewers can pick from (notes only). */
@@ -609,11 +696,17 @@ export function interviewQuestionBankFromGuide(guide: InterviewGuide | null): st
     .filter((q) => Boolean(q) && !required.has(q));
 }
 
-/** True when case and behavioral are separate scored parts the interviewer can switch between. */
+/** True when case | behavioral tabs make sense (scored case + scored or notes-only behavioral). */
 export function isPhasedCaseAndBehavioralInterview(guide: InterviewGuide | null): boolean {
   if (!guide || guide.format !== 'case_and_behavioral') return false;
   const groups = interviewScoreFieldGroups(guide);
-  return groups.some((g) => g.key === 'case') && groups.some((g) => g.key === 'behavioral');
+  if (!groups.some((g) => g.key === 'case')) return false;
+  if (groups.some((g) => g.key === 'behavioral')) return true;
+  // Notes-only behavioral: still show the Case | Behavioral toggle.
+  return (
+    interviewBehavioralNoteFieldsFromGuide(guide).length > 0 ||
+    interviewQuestionBankFromGuide(guide).length > 0
+  );
 }
 
 export function interviewPhaseScoreFields(
@@ -623,6 +716,48 @@ export function interviewPhaseScoreFields(
   const groups = interviewScoreFieldGroups(guide);
   const key = phase === 'case' ? 'case' : 'behavioral';
   return groups.find((g) => g.key === key)?.fields ?? [];
+}
+
+export function isInterviewPhaseFullyScored(
+  scores: Record<string, number | undefined>,
+  fields: string[],
+): boolean {
+  return fields.length > 0 && fields.every((field) => scores[field] !== undefined);
+}
+
+/** Primary footer CTA for phased case/behavioral interviews: switch unfinished side, else submit. */
+export type PhasedInterviewPrimaryAction =
+  | { kind: 'submit'; label: 'Submit →' }
+  | { kind: 'switch'; target: 'case' | 'behavioral'; label: string };
+
+export function phasedInterviewPrimaryAction(
+  guide: InterviewGuide | null,
+  phase: 'case' | 'behavioral',
+  scores: Record<string, number | undefined>,
+): PhasedInterviewPrimaryAction {
+  const caseFields = interviewPhaseScoreFields(guide, 'case');
+  const behavioralFields = interviewPhaseScoreFields(guide, 'behavioral');
+  const caseDone = isInterviewPhaseFullyScored(scores, caseFields);
+  // Notes-only behavioral has no score fields — treat as complete so case scores alone unlock submit.
+  const behavioralDone =
+    behavioralFields.length === 0 || isInterviewPhaseFullyScored(scores, behavioralFields);
+
+  if (caseDone && behavioralDone) {
+    return { kind: 'submit', label: 'Submit →' };
+  }
+  if (caseDone && !behavioralDone) {
+    return phase === 'behavioral'
+      ? { kind: 'submit', label: 'Submit →' }
+      : { kind: 'switch', target: 'behavioral', label: 'Switch to Behavioral' };
+  }
+  if (behavioralDone && !caseDone) {
+    return phase === 'case'
+      ? { kind: 'submit', label: 'Submit →' }
+      : { kind: 'switch', target: 'case', label: 'Switch to Case' };
+  }
+  return phase === 'case'
+    ? { kind: 'switch', target: 'behavioral', label: 'Switch to Behavioral' }
+    : { kind: 'switch', target: 'case', label: 'Switch to Case' };
 }
 
 export function interviewScaleMax(guide: InterviewGuide | null): number {
@@ -691,7 +826,21 @@ function scoreBlocksFromRubric(rubric: InterviewRubric): {
     };
   }
 
-  return { fields, weights };
+  // Flat rubrics: still expose a single untitled block so criterion descriptions
+  // and within-rubric weight percents render in the interviewer UI.
+  return {
+    fields,
+    weights,
+    categories: [
+      {
+        name: '',
+        weightPercent: 100,
+        fields,
+        fieldWeightPercents: interviewWeightPercents(rubric.criteria),
+        descriptions: rubric.criteria.map((c) => c.description),
+      },
+    ],
+  };
 }
 
 function rubricScoreFields(guide: InterviewGuide): {
@@ -706,24 +855,6 @@ function rubricScoreFields(guide: InterviewGuide): {
 function questionScoreFields(questions: string[] | undefined, fallback: string): string[] {
   const list = (questions ?? []).map((q) => q.trim()).filter(Boolean);
   return list.length > 0 ? list : [fallback];
-}
-
-function uniquifyAgainst(existing: string[], fields: string[]): string[] {
-  const taken = new Set(existing);
-  return fields.map((field) => {
-    if (!taken.has(field)) {
-      taken.add(field);
-      return field;
-    }
-    let suffix = 2;
-    let next = `${field} (${suffix})`;
-    while (taken.has(next)) {
-      suffix += 1;
-      next = `${field} (${suffix})`;
-    }
-    taken.add(next);
-    return next;
-  });
 }
 
 export function interviewScoreFieldGroups(
@@ -764,20 +895,14 @@ export function interviewScoreFieldGroups(
     ];
   }
 
-  const behavioralFields = uniquifyAgainst(
-    caseFields,
-    questionScoreFields(guide.questions, 'Behavioral assessment'),
-  );
-  const behavioralWeights: Record<string, number> = {};
-  for (const field of behavioralFields) behavioralWeights[field] = 1;
-
+  // No behavioral rubric: case is the only scored part; questions are notes-only.
   return [
-    { key: 'case', label: 'Part 1: Evaluation', fields: caseFields, weights },
     {
-      key: 'behavioral',
-      label: 'Part 2: Behavioral',
-      fields: behavioralFields,
-      weights: behavioralWeights,
+      key: 'case',
+      label: 'Part 1: Case evaluation',
+      fields: caseFields,
+      weights,
+      categories,
     },
   ];
 }
@@ -844,10 +969,32 @@ export function applyTeamInterviewGuideDefaults(
   if (teamName !== 'Strategy') return guides;
 
   const defaults = strategyDefaultGuides();
+  const firstRound = mergeGuideWithDefault(guides.first_round, defaults.first_round);
+  let finalRound = mergeGuideWithDefault(guides.final_round, defaults.final_round);
+
+  // Hard upgrade path for Strategy final_round: never leave the old HeyTea
+  // 3-criterion case rubric or a scored behavioral rubric in the served guide.
+  if (finalRound && defaults.final_round) {
+    const finalRubric =
+      normalizeInterviewRubric(finalRound.rubric) ?? finalRound.rubric;
+    if (
+      defaults.final_round.rubric &&
+      isLegacyStrategyFinalCaseRubric(finalRubric)
+    ) {
+      finalRound = { ...finalRound, rubric: defaults.final_round.rubric };
+    }
+    if (
+      !normalizeInterviewRubric(defaults.final_round.behavioralRubric) &&
+      normalizeInterviewRubric(finalRound.behavioralRubric)
+    ) {
+      finalRound = { ...finalRound };
+      delete finalRound.behavioralRubric;
+    }
+  }
 
   return {
-    first_round: mergeGuideWithDefault(guides.first_round, defaults.first_round),
-    final_round: mergeGuideWithDefault(guides.final_round, defaults.final_round),
+    first_round: firstRound,
+    final_round: finalRound,
   };
 }
 
@@ -864,6 +1011,80 @@ function isLegacyFlatStrategyCaseRubric(rubric: InterviewGuide['rubric']): boole
     joined.includes('market sizing') &&
     (joined.includes('gen z') || joined.includes('recommendation'))
   );
+}
+
+/** Leaf criterion names from flat criteria, or category leaves when flat list is empty. */
+function rubricLeafNames(rubric: InterviewGuide['rubric']): string[] {
+  if (!rubric) return [];
+  const fromCriteria = (rubric.criteria ?? [])
+    .map((c) => c.name.trim())
+    .filter(Boolean);
+  if (fromCriteria.length > 0) return fromCriteria;
+  const fromCategories: string[] = [];
+  for (const category of rubric.categories ?? []) {
+    for (const criterion of category.criteria ?? []) {
+      const name = criterion.name.trim();
+      if (name) fromCategories.push(name);
+    }
+  }
+  return fromCategories;
+}
+
+/**
+ * Prior Strategy final-round case defaults: Campaign Math / Retention / In-Store vs Delivery.
+ * Aggressive: any old HeyTea criterion name is enough to force an upgrade.
+ */
+function isLegacyStrategyFinalCaseRubric(rubric: InterviewGuide['rubric']): boolean {
+  if (!rubric) return false;
+  const names = rubricLeafNames(rubric).map((n) => n.toLowerCase());
+  if (names.length === 0) return false;
+  const joined = names.join(' | ');
+
+  // Explicit retired HeyTea criterion titles (substring match on full name).
+  if (
+    joined.includes('retention without discounting') ||
+    joined.includes('in-store vs') ||
+    (joined.includes('in-store') && joined.includes('delivery'))
+  ) {
+    return true;
+  }
+
+  // Old 3-criterion Campaign Math set (even if titles were lightly edited).
+  if (
+    names.length === 3 &&
+    joined.includes('campaign math') &&
+    (joined.includes('retention') ||
+      joined.includes('in-store') ||
+      joined.includes('delivery'))
+  ) {
+    return true;
+  }
+
+  // First-round Supreme criteria mistakenly on final (Market Sizing instead of Campaign Math).
+  if (joined.includes('market sizing')) return true;
+
+  return false;
+}
+
+function criterionNamesKey(rubric: InterviewGuide['rubric']): string {
+  return rubricLeafNames(rubric)
+    .map((c) => c.toLowerCase())
+    .join(' | ');
+}
+
+/** Old Events final-round defaults used a RESET resale case before StudySync. */
+function isLegacyEventsResetGuide(saved: InterviewGuide): boolean {
+  const title = saved.caseStudy?.title ?? '';
+  const prompt = saved.caseStudy?.prompt ?? '';
+  const intro = saved.intro ?? '';
+  const points = (saved.caseStudy?.discussionPoints ?? []).join('\n');
+  const blob = `${title}\n${prompt}\n${intro}\n${points}`;
+  return /\bRESET\b/i.test(blob);
+}
+
+function listsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, i) => item === b[i]);
 }
 
 function mergeGuideWithDefault(
@@ -887,15 +1108,27 @@ function mergeGuideWithDefault(
     fallback.format === 'case_and_behavioral' &&
     !normalizeInterviewRubric(saved.behavioralRubric) &&
     Boolean(normalizeInterviewRubric(fallback.behavioralRubric));
+  const dropBehavioralRubric =
+    fallback.format === 'case_and_behavioral' &&
+    !normalizeInterviewRubric(fallback.behavioralRubric) &&
+    Boolean(normalizeInterviewRubric(saved.behavioralRubric));
   const missingQuestionBank =
     fallback.format === 'case_and_behavioral' &&
     (fallback.questionBank?.length ?? 0) > 0 &&
     (saved.questionBank?.length ?? 0) === 0;
+  const savedRubricNormalized = normalizeInterviewRubric(saved.rubric);
+  const fallbackRubricNormalized = normalizeInterviewRubric(fallback.rubric);
   const missingRubricCategories =
     Boolean(fallback.rubric?.categories?.length) &&
-    Boolean(normalizeInterviewRubric(saved.rubric)) &&
+    Boolean(savedRubricNormalized) &&
     !(saved.rubric?.categories && saved.rubric.categories.length > 0) &&
     isLegacyFlatStrategyCaseRubric(saved.rubric);
+  const legacyStrategyFinalCaseRubric =
+    Boolean(savedRubricNormalized) &&
+    Boolean(fallbackRubricNormalized) &&
+    isLegacyStrategyFinalCaseRubric(savedRubricNormalized ?? saved.rubric) &&
+    criterionNamesKey(savedRubricNormalized ?? saved.rubric) !==
+      criterionNamesKey(fallbackRubricNormalized ?? fallback.rubric);
 
   // Older Strategy defaults baked optional bank prompts into required questions.
   const fallbackBank = (fallback.questionBank ?? []).map((q) => q.trim()).filter(Boolean);
@@ -906,15 +1139,25 @@ function mergeGuideWithDefault(
     savedQuestions.some((q) => fallbackBankSet.has(q.trim()));
 
   if (missingCaseQuestions || missingBehavioral) {
+    let rubric = savedRubricNormalized ?? fallback.rubric;
+    if (
+      rubric &&
+      fallback.rubric &&
+      isLegacyStrategyFinalCaseRubric(rubric) &&
+      criterionNamesKey(rubric) !== criterionNamesKey(fallback.rubric)
+    ) {
+      rubric = fallback.rubric;
+    }
     return {
       ...fallback,
       intro: !saved.intro?.trim()
         ? fallback.intro
         : rewriteLegacyInterviewIntro(saved.intro),
       casePdfUrl: saved.casePdfUrl ?? fallback.casePdfUrl,
-      rubric: normalizeInterviewRubric(saved.rubric) ?? fallback.rubric,
-      behavioralRubric:
-        normalizeInterviewRubric(saved.behavioralRubric) ?? fallback.behavioralRubric,
+      rubric,
+      behavioralRubric: dropBehavioralRubric
+        ? undefined
+        : normalizeInterviewRubric(saved.behavioralRubric) ?? fallback.behavioralRubric,
     };
   }
 
@@ -927,8 +1170,15 @@ function mergeGuideWithDefault(
   } else if (missingRubricCategories && fallback.rubric) {
     // Upgrade flat Strategy defaults to nested categories without wiping custom case copy.
     next = { ...next, rubric: fallback.rubric };
+  } else if (legacyStrategyFinalCaseRubric && fallback.rubric) {
+    // Upgrade old HeyTea 3-criterion (or Market Sizing) case rubric to Supreme-aligned categories.
+    next = { ...next, rubric: fallback.rubric };
   }
-  if (missingBehavioralRubric && fallback.behavioralRubric) {
+  if (dropBehavioralRubric) {
+    // Strategy final: drop scored behavioral rubric; questions stay notes-only.
+    next = { ...next };
+    delete next.behavioralRubric;
+  } else if (missingBehavioralRubric && fallback.behavioralRubric) {
     next = { ...next, behavioralRubric: fallback.behavioralRubric };
   }
   if (legacyEmbeddedBank) {
@@ -968,11 +1218,58 @@ function mergeGuideWithDefault(
       }
     }
   }
+
+  // Events: replace legacy RESET case packet with StudySync defaults.
+  if (
+    isLegacyEventsResetGuide(next) &&
+    fallback.caseStudy &&
+    /StudySync/i.test(fallback.caseStudy.title ?? fallback.caseStudy.prompt)
+  ) {
+    next = {
+      ...next,
+      intro: fallback.intro ?? next.intro,
+      caseStudy: fallback.caseStudy,
+      questions:
+        (fallback.questions?.length ?? 0) > 0 ? [...(fallback.questions ?? [])] : next.questions,
+      rubric: fallback.rubric ?? next.rubric,
+      behavioralRubric: fallback.behavioralRubric ?? next.behavioralRubric,
+    };
+  } else if (
+    fallback.caseStudy?.discussionSections &&
+    fallback.caseStudy.discussionSections.length > 0 &&
+    !(next.caseStudy?.discussionSections && next.caseStudy.discussionSections.length > 0) &&
+    next.caseStudy
+  ) {
+    // Attach section labels when saved points still match (or are the prior flat StudySync packet).
+    const fallbackFlat = flattenDiscussionSections(fallback.caseStudy.discussionSections);
+    const nextFlat = (next.caseStudy.discussionPoints ?? []).map((p) => p.trim()).filter(Boolean);
+    const looksLikeStudySyncFlat =
+      nextFlat.some((p) => /^Warm-Up Case \(Boba Launch/i.test(p)) &&
+      nextFlat.some((p) => /^Task 1 — Trend/i.test(p)) &&
+      nextFlat.some((p) => /^Task 2 — The Activation/i.test(p));
+    if (listsEqual(nextFlat, fallbackFlat) || looksLikeStudySyncFlat) {
+      next = {
+        ...next,
+        caseStudy: {
+          ...next.caseStudy,
+          title: next.caseStudy.title?.includes('StudySync')
+            ? next.caseStudy.title
+            : fallback.caseStudy.title ?? next.caseStudy.title,
+          prompt: /StudySync/i.test(next.caseStudy.prompt)
+            ? next.caseStudy.prompt
+            : fallback.caseStudy.prompt,
+          discussionSections: fallback.caseStudy.discussionSections,
+          discussionPoints: fallbackFlat,
+        },
+      };
+    }
+  }
+
   if (fallback.intro && !saved.intro?.trim()) {
     next = { ...next, intro: fallback.intro };
-  } else if (saved.intro?.trim()) {
-    const rewritten = rewriteLegacyInterviewIntro(saved.intro);
-    if (rewritten !== saved.intro.trim()) {
+  } else if (next.intro?.trim()) {
+    const rewritten = rewriteLegacyInterviewIntro(next.intro);
+    if (rewritten !== next.intro.trim()) {
       next = { ...next, intro: rewritten };
     }
   }

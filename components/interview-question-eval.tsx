@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { RequiredAsterisk } from '@/components/ui/label';
 import {
   interviewNoteFieldsFromGuide,
+  interviewNoteSectionsFromGuide,
   interviewBehavioralNoteFieldsFromGuide,
   interviewQuestionBankFromGuide,
   interviewScaleMax,
@@ -464,15 +465,23 @@ export function InterviewNotesAndScoringForm({
   onScoreChange: (field: string, value: number) => void;
   onCommentChange: (value: string) => void;
 }) {
-  const noteQuestions =
+  const behavioralNoteQuestions =
+    phase === 'case' ? [] : interviewBehavioralNoteFieldsFromGuide(guide);
+  const caseNoteSections =
+    phase === 'behavioral' ? [] : interviewNoteSectionsFromGuide(guide);
+  const displayNoteSections =
     phase === 'behavioral'
-      ? interviewBehavioralNoteFieldsFromGuide(guide)
+      ? behavioralNoteQuestions.length > 0
+        ? [{ title: '', points: behavioralNoteQuestions }]
+        : []
       : phase === 'case'
-        ? interviewNoteFieldsFromGuide(guide)
-        : [
-            ...interviewNoteFieldsFromGuide(guide),
-            ...interviewBehavioralNoteFieldsFromGuide(guide),
-          ];
+        ? caseNoteSections
+        : behavioralNoteQuestions.length > 0
+          ? [
+              ...caseNoteSections,
+              { title: 'Behavioral questions', points: behavioralNoteQuestions },
+            ]
+          : caseNoteSections;
   const allGroups = interviewScoreFieldGroups(guide);
   const fieldGroups =
     phase != null
@@ -489,30 +498,58 @@ export function InterviewNotesAndScoringForm({
 
   return (
     <div className="uma-stack-page">
-      {noteQuestions.length > 0 ? (
+      {displayNoteSections.length > 0 ? (
         <section className="uma-stack-section">
           {noteSectionLabel ? (
             <p className="uma-section-label font-normal text-muted-foreground/75">
               {noteSectionLabel}
             </p>
           ) : null}
-          <div className="flex flex-col">
-            {noteQuestions.map((question, index) => (
-              <div
-                key={`${index}-${question.slice(0, 32)}`}
-                className={questionStripeClass(index)}
-              >
-                <p className="text-sm leading-relaxed text-foreground/90">{question}</p>
-                <textarea
-                  value={notes[question] ?? ''}
-                  onChange={(e) => onNoteChange(question, e.target.value)}
-                  disabled={disabled}
-                  rows={compact ? 3 : 4}
-                  placeholder="Write notes for this question…"
-                  className={cn(interviewNoteTextareaClass, 'resize-y')}
-                />
-              </div>
-            ))}
+          <div className="space-y-5">
+            {displayNoteSections.map((section, sectionIndex) => {
+              const showSectionTitle = Boolean(section.title);
+              let rowIndex = 0;
+              // Offset stripe index across prior sections for continuity.
+              for (let i = 0; i < sectionIndex; i++) {
+                rowIndex += displayNoteSections[i].points.length;
+              }
+              return (
+                <div
+                  key={`${sectionIndex}-${section.title || 'notes'}`}
+                  className={
+                    showSectionTitle
+                      ? 'rounded-xl border border-foreground/10 bg-background/40'
+                      : undefined
+                  }
+                >
+                  {showSectionTitle ? (
+                    <div className="border-b border-foreground/10 px-5 py-3 sm:px-6">
+                      <p className="text-sm font-semibold tracking-wide text-foreground">
+                        {section.title}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-col">
+                    {section.points.map((question, index) => (
+                      <div
+                        key={`${sectionIndex}-${index}-${question.slice(0, 32)}`}
+                        className={questionStripeClass(rowIndex + index)}
+                      >
+                        <p className="text-sm leading-relaxed text-foreground/90">{question}</p>
+                        <textarea
+                          value={notes[question] ?? ''}
+                          onChange={(e) => onNoteChange(question, e.target.value)}
+                          disabled={disabled}
+                          rows={compact ? 3 : 4}
+                          placeholder="Write notes for this question…"
+                          className={cn(interviewNoteTextareaClass, 'resize-y')}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -602,32 +639,66 @@ export function InterviewNotesAndScoringColumns({
   columns: InterviewFormBindings[];
   compact?: boolean;
 }) {
-  const noteQuestions = interviewNoteFieldsFromGuide(guide);
+  const noteSections = interviewNoteSectionsFromGuide(guide);
   const fieldGroups = interviewScoreFieldGroups(guide);
   const scaleMax = interviewScaleMax(guide);
-  const hasNoteQuestions = noteQuestions.length > 0;
+  const hasNoteQuestions = noteSections.some((section) => section.points.length > 0);
   const caseLabel = caseQuestionsLabel(guide);
   const columnCount = Math.max(columns.length, 1);
+
+  const noteRows: Array<{
+    question: string;
+    rowIndex: number;
+    sectionLabel?: string;
+    blockTitle?: string;
+  }> = [];
+  let rowIndex = 0;
+  for (let sectionIndex = 0; sectionIndex < noteSections.length; sectionIndex++) {
+    const section = noteSections[sectionIndex];
+    for (let i = 0; i < section.points.length; i++) {
+      const isFirstOverall = noteRows.length === 0;
+      const isFirstInSection = i === 0;
+      let sectionLabel: string | undefined;
+      let blockTitle: string | undefined;
+      if (isFirstOverall) {
+        sectionLabel = caseLabel;
+        if (section.title) blockTitle = section.title;
+      } else if (isFirstInSection && section.title) {
+        sectionLabel = section.title;
+      }
+      noteRows.push({
+        question: section.points[i],
+        rowIndex: rowIndex++,
+        sectionLabel,
+        blockTitle,
+      });
+    }
+  }
 
   return (
     <div className="space-y-3 overflow-x-auto">
       {hasNoteQuestions
-        ? noteQuestions.map((question, index) => (
+        ? noteRows.map((row) => (
             <ColumnsQuestionRow
-              key={`${index}-${question.slice(0, 32)}`}
+              key={`${row.rowIndex}-${row.question.slice(0, 32)}`}
               columnCount={columnCount}
             >
               {columns.map((column, columnIndex) => (
                 <ColumnsQuestionCell
                   key={column.id ?? columnIndex}
-                  rowIndex={index}
-                  sectionLabel={index === 0 ? caseLabel : undefined}
+                  rowIndex={row.rowIndex}
+                  sectionLabel={row.sectionLabel}
                 >
                   <div className="uma-stack-block">
-                    <p className="text-sm leading-relaxed text-foreground/90">{question}</p>
+                    {row.blockTitle ? (
+                      <p className="text-sm font-semibold tracking-wide text-foreground">
+                        {row.blockTitle}
+                      </p>
+                    ) : null}
+                    <p className="text-sm leading-relaxed text-foreground/90">{row.question}</p>
                     <textarea
-                      value={column.notes[question] ?? ''}
-                      onChange={(e) => column.onNoteChange(question, e.target.value)}
+                      value={column.notes[row.question] ?? ''}
+                      onChange={(e) => column.onNoteChange(row.question, e.target.value)}
                       disabled={column.disabled}
                       rows={compact ? 3 : 4}
                       placeholder="Write notes for this question…"

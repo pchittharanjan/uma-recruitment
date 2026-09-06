@@ -37,7 +37,14 @@ export function InterviewPhaseToggle({
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          className="cursor-pointer normal-case"
+          className={cn(
+            'cursor-pointer normal-case text-muted-foreground',
+            'hover:bg-muted/70 hover:text-foreground',
+            'aria-pressed:bg-primary aria-pressed:text-primary-foreground',
+            'data-[state=on]:bg-primary data-[state=on]:text-primary-foreground',
+            'data-[state=on]:hover:bg-primary-hover data-[state=on]:hover:text-primary-foreground',
+            'data-[state=on]:border-primary',
+          )}
         >
           {option.label}
         </ToggleGroupItem>

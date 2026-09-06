@@ -42,6 +42,7 @@ import { type InterviewGuide } from '@/lib/interview-guide';
 import {
   interviewPhaseScoreFields,
   isPhasedCaseAndBehavioralInterview,
+  phasedInterviewPrimaryAction,
 } from '@/lib/interview-guide';
 import type { AssignmentStage } from '@/lib/db';
 import type { GradingEditLock } from '@/lib/advancement-submissions-types';
@@ -391,7 +392,10 @@ export default function TeamInterviewScorePage({
     if (!data) return;
     const missing = scoreFieldList.filter((f) => draft.scores[f] === undefined);
     if (missing.length > 0) {
-      const message = 'Please score all case and behavioral criteria before submitting.';
+      const message =
+        interviewPhaseScoreFields(data.interviewGuide, 'behavioral').length > 0
+          ? 'Please score all case and behavioral criteria before submitting.'
+          : 'Please score all case criteria before submitting.';
       setSubmitError(message);
       toast.error(message);
       if (isPhasedInterview) {
@@ -791,7 +795,11 @@ export default function TeamInterviewScorePage({
     </div>
   );
 
-  const singleFooter = isPhasedInterview ? (
+  const phasedPrimaryAction = isPhasedInterview
+    ? phasedInterviewPrimaryAction(data?.interviewGuide ?? null, interviewPhase, draft.scores)
+    : null;
+
+  const singleFooter = isPhasedInterview && phasedPrimaryAction ? (
     <div
       data-tour="interview-submit"
       className={cn(
@@ -813,11 +821,19 @@ export default function TeamInterviewScorePage({
           {scoreFieldList.length} total
         </span>
         <LoadingButton
-          onClick={handleSingleSubmit}
-          loading={submitting}
+          onClick={() => {
+            if (phasedPrimaryAction.kind === 'switch') {
+              switchInterviewPhase(phasedPrimaryAction.target);
+              return;
+            }
+            void handleSingleSubmit();
+          }}
+          loading={phasedPrimaryAction.kind === 'submit' && submitting}
           disabled={scoringLocked}
         >
-          {scoringLocked ? 'Editing locked' : 'Submit interview →'}
+          {scoringLocked
+            ? 'Editing locked'
+            : phasedPrimaryAction.label}
         </LoadingButton>
       </div>
     </div>

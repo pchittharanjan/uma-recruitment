@@ -13,7 +13,7 @@ import { getGraderAssignmentForUser } from '@/lib/team-dashboard';
 import { getInterviewGroupMembers, getInterviewGuideForRound } from '@/lib/interview-slots';
 import {
   interviewGuideForApi,
-  interviewNoteFieldsFromGuide,
+  interviewPersistableNoteFieldsFromGuide,
   interviewScaleMax,
   interviewScoreFieldsFromGuide,
 } from '@/lib/interview-guide';
@@ -211,10 +211,11 @@ export async function POST(
       await getInterviewGuideForRound(assignment.roundId, stage as 'first_round' | 'final_round'),
     );
     const scoreFields = interviewScoreFieldsFromGuide(interviewGuide);
-    const noteFields = interviewNoteFieldsFromGuide(interviewGuide);
     const scaleMax = interviewScaleMax(interviewGuide);
 
     const body = await req.json();
+    const noteFieldsFromBody = (notes: Record<string, string> | undefined) =>
+      interviewPersistableNoteFieldsFromGuide(interviewGuide, Object.keys(notes ?? {}));
 
     if (body.draft === true) {
       if (Array.isArray(body.entries)) {
@@ -262,7 +263,7 @@ export async function POST(
             user.id,
             scoreFields,
             entry.scores ?? {},
-            noteFields,
+            noteFieldsFromBody(entry.notes),
             entry.notes,
             (entry.comment as string | undefined) ?? '',
             { complete: false },
@@ -285,7 +286,7 @@ export async function POST(
         user.id,
         scoreFields,
         scores,
-        noteFields,
+        noteFieldsFromBody(notes),
         notes,
         comment,
         { complete: false },
@@ -361,7 +362,7 @@ export async function POST(
           user.id,
           scoreFields,
           entry.scores,
-          noteFields,
+          noteFieldsFromBody(entry.notes),
           entry.notes,
           (entry.comment as string | undefined) ?? '',
         );
@@ -395,7 +396,7 @@ export async function POST(
       user.id,
       scoreFields,
       scores,
-      noteFields,
+      noteFieldsFromBody(notes),
       notes,
       comment,
     );

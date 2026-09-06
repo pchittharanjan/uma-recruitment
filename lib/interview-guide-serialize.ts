@@ -17,12 +17,20 @@ export function serializeInterviewGuidePayload(guide: InterviewGuide): string {
     });
   }
 
+  const discussionPoints = (guide.caseStudy?.discussionPoints ?? [])
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const discussionSections = (guide.caseStudy?.discussionSections ?? [])
+    .map((section) => ({
+      title: section.title.trim(),
+      points: section.points.map((p) => p.trim()).filter(Boolean),
+    }))
+    .filter((section) => section.title && section.points.length > 0);
   const caseStudy = {
     title: guide.caseStudy?.title?.trim() || undefined,
     prompt: guide.caseStudy?.prompt?.trim() ?? '',
-    discussionPoints: (guide.caseStudy?.discussionPoints ?? [])
-      .map((p) => p.trim())
-      .filter(Boolean),
+    discussionPoints,
+    ...(discussionSections.length > 0 ? { discussionSections } : {}),
   };
   const rubric = normalizeInterviewRubric(guide.rubric);
 

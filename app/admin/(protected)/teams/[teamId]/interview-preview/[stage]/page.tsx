@@ -10,6 +10,7 @@ import StatusBanner from '@/components/status-banner';
 import { Button } from '@/components/ui/button';
 import { InterviewScoringPreview } from '@/components/interview-scoring-preview';
 import type { InterviewGuide, InterviewGuideStage } from '@/lib/interview-guide';
+import { applyTeamInterviewGuideDefaults } from '@/lib/interview-guide';
 import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 import {
   clearInterviewPreviewGuide,
@@ -45,10 +46,18 @@ export default function AdminInterviewPreviewPage({
       setHydrated(true);
       return;
     }
+    // Team name may not be known yet; re-read with merge once data loads.
     const staged = readInterviewPreviewGuide(teamId, stageRaw);
     setDraftGuide(staged);
     setHydrated(true);
   }, [teamId, stageRaw]);
+
+  useEffect(() => {
+    if (!data?.team.name || !isInterviewGuideStage(stageRaw)) return;
+    // Re-merge / upgrade any stashed draft now that we know the team.
+    const staged = readInterviewPreviewGuide(teamId, stageRaw, data.team.name);
+    if (staged) setDraftGuide(staged);
+  }, [data?.team.name, teamId, stageRaw]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +69,7 @@ export default function AdminInterviewPreviewPage({
 
     cachedJsonFetch<PreviewPageData & { error?: string }>(
       `/api/admin/teams/${teamId}/interview-preview/${stageRaw}`,
+      { force: true },
     )
       .then(({ ok, json }) => {
         if (cancelled) return;
@@ -78,7 +88,18 @@ export default function AdminInterviewPreviewPage({
     };
   }, [teamId, stageRaw]);
 
-  const guide = useMemo(() => draftGuide ?? data?.guide ?? null, [draftGuide, data?.guide]);
+  const guide = useMemo(() => {
+    const raw = draftGuide ?? data?.guide ?? null;
+    if (!raw || !data?.team.name || !isInterviewGuideStage(stageRaw)) return raw;
+    // Re-merge defaults so stashed/localStorage previews pick up rubric upgrades
+    // (e.g. Strategy final case categories) instead of freezing an old draft.
+    return (
+      applyTeamInterviewGuideDefaults(data.team.name, {
+        first_round: stageRaw === 'first_round' ? raw : null,
+        final_round: stageRaw === 'final_round' ? raw : null,
+      })[stageRaw] ?? raw
+    );
+  }, [draftGuide, data?.guide, data?.team.name, stageRaw]);
 
   const showGroupSample = stageRaw === 'first_round';
 

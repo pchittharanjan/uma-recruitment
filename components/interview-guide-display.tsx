@@ -1,4 +1,5 @@
 import {
+  interviewNoteSectionsFromGuide,
   interviewScaleMax,
   interviewWeightPercents,
   normalizeInterviewRubric,
@@ -8,6 +9,7 @@ import {
 function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel?: string }) {
   const rubric = normalizeInterviewRubric(guide.rubric);
   const percents = rubric ? interviewWeightPercents(rubric.criteria) : [];
+  const noteSections = interviewNoteSectionsFromGuide(guide);
 
   return (
     <div className="space-y-3 text-sm text-amber-900 dark:text-amber-100">
@@ -20,18 +22,25 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
         <p className="font-semibold">{guide.caseStudy.title.trim()}</p>
       )}
       <p className="whitespace-pre-wrap">{guide.caseStudy?.prompt}</p>
-      {guide.caseStudy?.discussionPoints && guide.caseStudy.discussionPoints.length > 0 && (
-        <div>
+      {noteSections.length > 0 && (
+        <div className="space-y-3">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
             Case questions
           </p>
-          <ul className="list-disc space-y-1 pl-5">
-            {guide.caseStudy.discussionPoints.map((point, i) => (
-              <li key={i} className="whitespace-pre-wrap">
-                {point}
-              </li>
-            ))}
-          </ul>
+          {noteSections.map((section, sectionIndex) => (
+            <div key={`${sectionIndex}-${section.title || 'points'}`}>
+              {section.title ? (
+                <p className="mb-1 text-sm font-semibold">{section.title}</p>
+              ) : null}
+              <ul className="list-disc space-y-1 pl-5">
+                {section.points.map((point, i) => (
+                  <li key={i} className="whitespace-pre-wrap">
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
       {rubric ? (

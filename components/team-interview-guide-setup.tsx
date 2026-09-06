@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   defaultInterviewGuideFormat,
   emptyInterviewRubric,
+  interviewBehavioralNoteFieldsFromGuide,
   interviewNoteFieldsFromGuide,
   interviewScaleMax,
   interviewScoreFieldGroups,
@@ -176,6 +177,7 @@ function withFilledCase(guide: InterviewGuide): NonNullable<InterviewGuide['case
       guide.caseStudy?.discussionPoints && guide.caseStudy.discussionPoints.length > 0
         ? guide.caseStudy.discussionPoints
         : [''],
+    discussionSections: guide.caseStudy?.discussionSections,
   };
 }
 
@@ -243,12 +245,24 @@ function payloadFromGuide(guide: InterviewGuide): InterviewGuide {
     };
   }
 
+  const discussionPoints = (guide.caseStudy?.discussionPoints ?? [])
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const discussionSections = (guide.caseStudy?.discussionSections ?? [])
+    .map((section) => ({
+      title: section.title.trim(),
+      points: section.points.map((p) => p.trim()).filter(Boolean),
+    }))
+    .filter((section) => section.title && section.points.length > 0);
+  // Drop stale section labels if the flat question list no longer matches.
+  const sectionsMatchFlat =
+    discussionSections.length > 0 &&
+    discussionSections.flatMap((s) => s.points).join('\0') === discussionPoints.join('\0');
   const caseStudy = {
     title: guide.caseStudy?.title?.trim() || undefined,
     prompt: guide.caseStudy?.prompt?.trim() ?? '',
-    discussionPoints: (guide.caseStudy?.discussionPoints ?? [])
-      .map((p) => p.trim())
-      .filter(Boolean),
+    discussionPoints,
+    ...(sectionsMatchFlat ? { discussionSections } : {}),
   };
   const rubric = normalizeInterviewRubric(guide.rubric) ?? {
     scaleMax: guide.rubric?.scaleMax ?? 5,
@@ -275,12 +289,13 @@ function payloadFromGuide(guide: InterviewGuide): InterviewGuide {
 
 function RubricPreview({ guide }: { guide: InterviewGuide }) {
   const noteFields = interviewNoteFieldsFromGuide(guide);
+  const behavioralNotes = interviewBehavioralNoteFieldsFromGuide(guide);
   const groups = interviewScoreFieldGroups(guide);
   const scaleMax = interviewScaleMax(guide);
   const scoredFields = groups.flatMap((g) => g.fields);
   const isCase = guide.format === 'case_study' || guide.format === 'case_and_behavioral';
 
-  if (noteFields.length === 0 && scoredFields.length === 0) {
+  if (noteFields.length === 0 && behavioralNotes.length === 0 && scoredFields.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         Add case questions and evaluation criteria below.
@@ -297,6 +312,24 @@ function RubricPreview({ guide }: { guide: InterviewGuide }) {
             {noteFields.map((field, index) => (
               <li
                 key={`note-${index}`}
+                className="rounded-md border bg-background/80 px-3 py-2 text-sm"
+              >
+                {field}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {behavioralNotes.length > 0 ? (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">
+            Behavioral questions (notes only — not scored)
+          </p>
+          <ul className="space-y-1">
+            {behavioralNotes.map((field, index) => (
+              <li
+                key={`behavioral-note-${index}`}
                 className="rounded-md border bg-background/80 px-3 py-2 text-sm"
               >
                 {field}
@@ -988,6 +1021,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
     try {
       const { ok, json } = await cachedJsonFetch<GuideData & { error?: string }>(
         `/api/admin/teams/${teamId}/interview-guide`,
+        { force: true },
       );
       if (!ok || !json?.guides) {
         setError(json?.error ?? 'Failed to load interview setup.');
@@ -1293,14 +1327,25 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                         }
                         description="Questions from the packet. Interviewers see each one on the right with a notes box, and they do not score the questions themselves."
                         items={guide.caseStudy?.discussionPoints ?? ['']}
-                        onChange={(discussionPoints) =>
+                        onChange={(discussionPoints) => {
+                          const filled = withFilledCase(guide);
+                          const sectionFlat = (filled.discussionSections ?? []).flatMap((section) =>
+                            section.points.map((p) => p.trim()).filter(Boolean),
+                          );
+                          const nextFlat = discussionPoints.map((p) => p.trim()).filter(Boolean);
+                          const keepSections =
+                            sectionFlat.length > 0 &&
+                            sectionFlat.join('\0') === nextFlat.join('\0');
                           patchGuide(s, {
                             caseStudy: {
-                              ...withFilledCase(guide),
+                              ...filled,
                               discussionPoints,
+                              discussionSections: keepSections
+                                ? filled.discussionSections
+                                : undefined,
                             },
-                          })
-                        }
+                          });
+                        }}
                         placeholder={(i) => `Case question ${i + 1}`}
                         addLabel="Add Question"
                       />
@@ -1324,7 +1369,9 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                       }
                       description={
                         guide.format === 'case_and_behavioral'
-                          ? 'Always asked. Interviewers take notes here; scores use the behavioral evaluation criteria.'
+                          ? normalizeInterviewRubric(guide.behavioralRubric)
+                            ? 'Always asked. Interviewers take notes here; scores use the behavioral evaluation criteria.'
+                            : 'Always asked. Interviewers take notes only — no 1–5 score for behavioral questions.'
                           : 'Each question becomes a rubric item interviewers score 1–5.'
                       }
                       items={guide.questions ?? ['']}
@@ -1350,7 +1397,7 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
 
                   <GuideSection
                     title="Rubric Preview"
-                    description="What interviewers see on the right: notes for packet questions, then scored criteria."
+                    description="What interviewers see: packet/behavioral notes, then scored case criteria (behavioral is notes-only when no behavioral rubric)."
                   >
                     <Card>
                       <CardContent>

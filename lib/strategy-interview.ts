@@ -20,6 +20,14 @@ export function rewriteLegacyInterviewIntro(intro: string | undefined): string |
   ) {
     return STRATEGY_GROUP_INTRO;
   }
+  // Events final-round: RESET case → StudySync (inlined to avoid circular imports).
+  if (
+    trimmed ===
+      'Individual interview: behavioral & fit (~5 min), warm-up case, RESET case, then overall communication. Score each criterion 1–5.' ||
+    /RESET case/i.test(trimmed)
+  ) {
+    return 'Individual interview: Behavioral (~10 min), warm-up case (~3 min), then StudySync 3-part case. Score each criterion 1–5.';
+  }
   return trimmed;
 }
 
@@ -148,22 +156,36 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
     questionBank: [...STRATEGY_BEHAVIORAL_QUESTION_BANK],
     rubric: {
       scaleMax: 5,
+      // Same case-side categories as first_round (Supreme), minus Market Sizing →
+      // Campaign Math & ROI, and without Group Contribution (individual only).
+      // Weights match first_round within-case shares, renormalized to 100.
       criteria: [
-        { name: 'Q1. Campaign Math & ROI Reasoning', weight: 34 },
-        { name: 'Q2. Retention Without Discounting', weight: 33 },
-        { name: 'Q3. In-Store vs. Delivery', weight: 33 },
+        {
+          name: 'Q1. Campaign Math & ROI Reasoning',
+          weight: 15,
+          description:
+            'Can they structure campaign conversion/ROI math and sanity-check whether it pays for itself?',
+        },
+        {
+          name: 'Q2. Gen Z Insight & Campaign Idea',
+          weight: 30,
+          description:
+            'Do they understand Gen Z behavior and turn it into one real, specific campaign idea?',
+        },
+        {
+          name: 'Q3. Growth vs. Scarcity Tradeoff',
+          weight: 30,
+          description:
+            'Do they see both the real risk (dilution) and real upside (a fresh cohort)?',
+        },
+        {
+          name: 'Q4. Recommendation & Summary',
+          weight: 25,
+          description: 'Do they land on one clear recommendation instead of listing everything?',
+        },
       ],
     },
-    behavioralRubric: {
-      scaleMax: 5,
-      criteria: [
-        { name: 'Communication (incl. tell me about yourself)', weight: 27 },
-        { name: 'Trend Awareness', weight: 18 },
-        { name: 'Motivation & Fit', weight: 18 },
-        { name: 'Persuasion & Influence', weight: 18 },
-        { name: 'Initiative & Process Improvement', weight: 19 },
-      ],
-    },
+    // Behavioral is notes-only for Strategy final — no 1–5 behavioral rubric.
   };
 
   return { first_round: firstRound, final_round: finalRound };
