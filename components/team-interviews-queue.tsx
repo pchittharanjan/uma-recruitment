@@ -2,12 +2,14 @@
 
 import { useMemo } from 'react';
 import { MicIcon } from 'lucide-react';
+import { InterviewEditControl } from '@/components/interview-edit-control';
 import { NavLinkButton } from '@/components/nav-link-button';
 import ProgressBar from '@/components/progress-bar';
 import { CenteredMessage } from '@/components/centered-message';
 import { PageContainer, PageHeader, PageSection } from '@/components/page-shell';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import StageBadge from '@/components/stage-badge';
+import StatusBanner from '@/components/status-banner';
 import { sessionKeyForAssignment } from '@/lib/interview-sessions';
 import {
   interviewAppHref,
@@ -74,6 +76,11 @@ function firstPendingApplicationId(assignments: TeamInterviewAssignment[]): numb
   return assignments.find((a) => a.status === 'pending')?.applicationId ?? null;
 }
 
+/** Prefer an unfinished candidate; otherwise reopen the first person in the session. */
+function sessionOpenApplicationId(assignments: TeamInterviewAssignment[]): number | null {
+  return firstPendingApplicationId(assignments) ?? assignments[0]?.applicationId ?? null;
+}
+
 export function TeamInterviewsQueue({
   teamId,
   stage,
@@ -116,6 +123,8 @@ export function TeamInterviewsQueue({
   );
   const firstPendingIsGroup = (firstPendingSession?.assignments.length ?? 0) > 1;
   const allDone = data.progress.completed === data.progress.total && data.progress.total > 0;
+  const scoringLocked = data.scoringEditLock?.locked ?? false;
+  const lockMessage = data.scoringEditLock?.message ?? '';
   const nextStep = audience === 'team' ? data.nextStep : null;
   const completeCopy = nextStep ? interviewCompleteGuidance(nextStep.isDirector) : null;
   const finalRoundComplete = stage === 'final_round' && allDone;
@@ -144,6 +153,10 @@ export function TeamInterviewsQueue({
             </NavLinkButton>
           }
         />
+
+        {scoringLocked && lockMessage ? (
+          <StatusBanner type="info" message={lockMessage} />
+        ) : null}
 
         {finalRoundComplete && (
           <Card className="gap-4 border-primary/25 bg-primary/[0.04] p-5 sm:p-6">
@@ -182,7 +195,7 @@ export function TeamInterviewsQueue({
               max={data.progress.total}
             />
 
-            {!allDone && firstPending && !firstPendingIsGroup && (
+            {!allDone && !scoringLocked && firstPending && !firstPendingIsGroup && (
               <div className="mt-3 flex justify-end">
                 <NavLinkButton
                   size="sm"
@@ -204,8 +217,9 @@ export function TeamInterviewsQueue({
               {sessions.map((session) => {
                 const timeLabel = formatSlotTime(session.scheduledAt);
                 const isGroup = session.assignments.length > 1;
-                const scoreTargetId = firstPendingApplicationId(session.assignments);
+                const openApplicationId = sessionOpenApplicationId(session.assignments);
                 const pendingCount = session.assignments.filter((a) => a.status === 'pending').length;
+                const sessionFullyDone = pendingCount === 0;
                 const sessionStatus = resolveWorkStatus(
                   pendingCount,
                   session.assignments.length,
@@ -269,7 +283,7 @@ export function TeamInterviewsQueue({
                                 color={workStatusBadgeColor(workStatus)}
                                 size="compact"
                               />
-                              {a.status === 'pending' && (
+                              {a.status === 'pending' && !scoringLocked ? (
                                 <NavLinkButton
                                   variant="ghost"
                                   className="text-sm"
@@ -277,6 +291,16 @@ export function TeamInterviewsQueue({
                                 >
                                   Score →
                                 </NavLinkButton>
+                              ) : (
+                                <InterviewEditControl
+                                  teamId={teamId}
+                                  stage={stage}
+                                  applicationId={a.applicationId}
+                                  locked={scoringLocked}
+                                  lockMessage={lockMessage}
+                                  audience={audience}
+                                  label={a.status === 'completed' ? 'Edit interview' : 'Open interview'}
+                                />
                               )}
                             </div>
                           </li>
@@ -284,19 +308,43 @@ export function TeamInterviewsQueue({
                       })}
                     </ul>
 
-                    {isGroup && scoreTargetId !== null && (
+                    {isGroup && openApplicationId !== null && (
                       <div className="mt-3 space-y-1">
-                        <p className="text-xs text-muted-foreground">
-                          Scores auto-save — submit the whole session when every candidate is scored.
-                        </p>
+                        {!sessionFullyDone && !scoringLocked ? (
+                          <p className="text-xs text-muted-foreground">
+                            Scores auto-save — submit the whole session when every candidate is scored.
+                          </p>
+                        ) : null}
                         <div className="flex items-center justify-end gap-3">
-                          <NavLinkButton
-                            size="sm"
-                            href={interviewAppHref(teamId, stage, scoreTargetId, audience)}
-                            data-tour="interview-queue-next"
-                          >
-                            Score group session →
-                          </NavLinkButton>
+                          {!sessionFullyDone && !scoringLocked ? (
+                            <NavLinkButton
+                              size="sm"
+                              href={interviewAppHref(teamId, stage, openApplicationId, audience)}
+                              data-tour="interview-queue-next"
+                            >
+                              Score group session →
+                            </NavLinkButton>
+                          ) : scoringLocked ? (
+                            <InterviewEditControl
+                              teamId={teamId}
+                              stage={stage}
+                              applicationId={openApplicationId}
+                              locked
+                              lockMessage={lockMessage}
+                              audience={audience}
+                              label="Edit session"
+                            />
+                          ) : (
+                            <NavLinkButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-sm"
+                              href={interviewAppHref(teamId, stage, openApplicationId, audience)}
+                              data-tour="interview-queue-edit"
+                            >
+                              Edit session
+                            </NavLinkButton>
+                          )}
                         </div>
                       </div>
                     )}

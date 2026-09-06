@@ -1,4 +1,5 @@
 import type { AssignmentStage } from '@/lib/db';
+import type { GradingEditLock } from '@/lib/advancement-submissions-types';
 
 export type InterviewNextStep = {
   kind: 'color_recommendations';
@@ -24,6 +25,7 @@ export type TeamInterviewData = {
   stageLabel: string;
   assignments: TeamInterviewAssignment[];
   progress: { completed: number; total: number };
+  scoringEditLock: GradingEditLock;
   isDirector: boolean;
   nextStep: InterviewNextStep | null;
 };
