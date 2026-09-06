@@ -536,97 +536,97 @@ export default function TeamInterviewScorePage({
   const header = (
     <div data-interview-header="" className="mb-3 shrink-0 pb-2">
       <PageContainer className="py-3 sm:py-3 lg:py-3">
-        <PageContent width="fluid" className="flex items-center">
-          <div className="flex-1">
-            <button
-              onClick={() => router.push(queueHref)}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← Back
-            </button>
-          </div>
-          <div className="text-center">
-            {isGroupInterview ? (
-              <>
-                <p className="font-heading text-base font-medium tracking-tight sm:text-lg">
-                  Group interview
-                </p>
-                {data.slot ? (
-                  <p className="text-sm text-muted-foreground">
-                    {[formatSlotHeader(data.slot.scheduledAt), data.slot.location]
-                      .filter(Boolean)
-                      .join(' · ')}
+        <PageContent width="fluid" className="flex flex-col gap-2">
+          <button
+            onClick={() => router.push(queueHref)}
+            className="w-fit text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back
+          </button>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              {isGroupInterview ? (
+                <>
+                  <p className="font-heading text-base font-medium tracking-tight sm:text-lg">
+                    Group interview
                   </p>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <span className="font-heading text-base font-medium tracking-tight">
-                  {data.candidateName}
-                </span>
-                {isPhasedInterview ? (
-                  <div className="mt-1 flex flex-col items-center gap-1.5">
-                    <InterviewPhaseToggle
-                      value={interviewPhase}
-                      onValueChange={switchInterviewPhase}
-                    />
-                    {data.interviewProgress ? (
-                      <p className="text-sm text-muted-foreground">
-                        {formatInterviewProgressLabel(data.interviewProgress)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : data.interviewProgress ? (
-                  <p className="text-sm text-muted-foreground">
-                    {formatInterviewProgressLabel(data.interviewProgress)}
+                  {data.slot ? (
+                    <p className="text-sm text-muted-foreground">
+                      {[formatSlotHeader(data.slot.scheduledAt), data.slot.location]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="font-heading text-base font-medium tracking-tight sm:text-lg">
+                    {data.candidateName}
                   </p>
-                ) : null}
-              </>
-            )}
-          </div>
-          <div className="flex flex-1 items-center justify-end gap-3">
-            <PageTourHelpButton />
-            <InterviewElapsedTimer {...elapsedTimer} />
-            {layoutToggle}
-            <span data-tour="interview-autosave">
-              <DocumentSaveStatusLine
-                status={saveStatus}
-                errorMessage={saveError}
-                savedLabel="Auto-saved"
-              />
-            </span>
-            {casePdfUrl ? (
-              <>
-                <InterviewWorkspaceFullscreenButton
-                  fullscreen={fullscreen}
-                  onToggle={toggleFullscreen}
+                  {isPhasedInterview ? (
+                    <div className="mt-1.5 flex flex-col items-start gap-1.5">
+                      <InterviewPhaseToggle
+                        value={interviewPhase}
+                        onValueChange={switchInterviewPhase}
+                      />
+                      {data.interviewProgress ? (
+                        <p className="text-sm text-muted-foreground">
+                          {formatInterviewProgressLabel(data.interviewProgress)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : data.interviewProgress ? (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {formatInterviewProgressLabel(data.interviewProgress)}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 pt-0.5">
+              <PageTourHelpButton />
+              <InterviewElapsedTimer {...elapsedTimer} />
+              {layoutToggle}
+              <span data-tour="interview-autosave">
+                <DocumentSaveStatusLine
+                  status={saveStatus}
+                  errorMessage={saveError}
+                  savedLabel="Auto-saved"
                 />
+              </span>
+              {casePdfUrl ? (
+                <>
+                  <InterviewWorkspaceFullscreenButton
+                    fullscreen={fullscreen}
+                    onToggle={toggleFullscreen}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-tour="interview-case"
+                    className="h-8 normal-case border-foreground/25 bg-background font-medium"
+                    onClick={() => setCaseOpen(!caseOpen)}
+                  >
+                    {caseOpen ? 'Close case' : 'Open case'}
+                  </Button>
+                </>
+              ) : null}
+              {data.nextApplicationId ? (
                 <Button
-                  type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  data-tour="interview-case"
-                  className="h-8 normal-case border-foreground/25 bg-background font-medium"
-                  onClick={() => setCaseOpen(!caseOpen)}
+                  data-tour="interview-next"
+                  onClick={() => {
+                    const nextId = data.nextApplicationId;
+                    if (nextId == null) return;
+                    router.push(interviewAppHref(teamId, stage, nextId, audience));
+                  }}
                 >
-                  {caseOpen ? 'Close case' : 'Open case'}
+                  Next →
                 </Button>
-              </>
-            ) : null}
-            {data.nextApplicationId ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                data-tour="interview-next"
-                onClick={() => {
-                  const nextId = data.nextApplicationId;
-                  if (nextId == null) return;
-                  router.push(interviewAppHref(teamId, stage, nextId, audience));
-                }}
-              >
-                Next →
-              </Button>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </PageContent>
       </PageContainer>
