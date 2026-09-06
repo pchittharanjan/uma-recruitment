@@ -1,11 +1,13 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import ScoreSelector from '@/components/ScoreSelector';
+import { Button } from '@/components/ui/button';
 import { RequiredAsterisk } from '@/components/ui/label';
 import {
   interviewNoteFieldsFromGuide,
   interviewBehavioralNoteFieldsFromGuide,
+  interviewQuestionBankFromGuide,
   interviewScaleMax,
   interviewScoreFieldGroups,
   interviewWeightPercents,
@@ -13,6 +15,7 @@ import {
   type InterviewScoreFieldGroup,
 } from '@/lib/interview-guide';
 import { cn } from '@/lib/utils';
+import { Plus, X } from 'lucide-react';
 
 const interviewNoteTextareaClass =
   'interview-note-textarea block min-h-[7.5rem] w-full overflow-y-auto rounded-lg border border-foreground/20 bg-background px-3 py-3 font-heading text-sm leading-[1.75] ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60';
@@ -228,6 +231,207 @@ export function InterviewQuestionGroups({
   );
 }
 
+function reservedNoteKeys(guide: InterviewGuide | null): Set<string> {
+  const keys = new Set<string>();
+  for (const q of interviewNoteFieldsFromGuide(guide)) keys.add(q);
+  for (const q of interviewBehavioralNoteFieldsFromGuide(guide)) keys.add(q);
+  for (const field of interviewScoreFieldGroups(guide).flatMap((g) => g.fields)) {
+    keys.add(field);
+  }
+  return keys;
+}
+
+type AdditionalBehavioralSlot = { id: string; question: string };
+
+function slotsFromNotes(
+  notes: Record<string, string>,
+  guide: InterviewGuide | null,
+  idPrefix: string,
+): AdditionalBehavioralSlot[] {
+  const reserved = reservedNoteKeys(guide);
+  const bank = new Set(interviewQuestionBankFromGuide(guide));
+  const slots: AdditionalBehavioralSlot[] = [];
+  let i = 0;
+  for (const [key, value] of Object.entries(notes)) {
+    const question = key.trim();
+    if (!question || reserved.has(question)) continue;
+    if (!bank.has(question) && !value?.trim()) continue;
+    slots.push({ id: `${idPrefix}-${i++}`, question });
+  }
+  return slots;
+}
+
+function AdditionalBehavioralNotes({
+  guide,
+  notes,
+  disabled,
+  compact = false,
+  onNoteChange,
+}: {
+  guide: InterviewGuide | null;
+  notes: Record<string, string>;
+  disabled?: boolean;
+  compact?: boolean;
+  onNoteChange: (field: string, value: string) => void;
+}) {
+  const idPrefix = useId();
+  const bank = interviewQuestionBankFromGuide(guide);
+  const [slots, setSlots] = useState<AdditionalBehavioralSlot[]>(() =>
+    slotsFromNotes(notes, guide, idPrefix),
+  );
+
+  useEffect(() => {
+    setSlots((prev) => {
+      const fromNotes = slotsFromNotes(notes, guide, idPrefix);
+      if (fromNotes.length === 0) return prev;
+      const existingQuestions = new Set(prev.map((s) => s.question.trim()).filter(Boolean));
+      const missing = fromNotes.filter((s) => !existingQuestions.has(s.question));
+      return missing.length > 0 ? [...prev, ...missing] : prev;
+    });
+  }, [notes, guide, idPrefix]);
+
+  if (bank.length === 0 && slots.length === 0) return null;
+
+  const usedQuestions = new Set(slots.map((s) => s.question.trim()).filter(Boolean));
+  const unusedBank = bank.filter((q) => !usedQuestions.has(q));
+
+  const addSlot = (question = '') => {
+    setSlots((prev) => [...prev, { id: `${idPrefix}-${prev.length}-${Date.now()}`, question }]);
+  };
+
+  const updateSlotQuestion = (id: string, nextQuestion: string) => {
+    setSlots((prev) => {
+      const current = prev.find((s) => s.id === id);
+      if (!current) return prev;
+      const prevQ = current.question.trim();
+      const nextQ = nextQuestion.trim();
+      if (prevQ && prevQ !== nextQ) {
+        const existing = notes[prevQ] ?? '';
+        if (existing) {
+          onNoteChange(nextQ || prevQ, existing);
+          if (nextQ) onNoteChange(prevQ, '');
+        }
+      }
+      return prev.map((s) => (s.id === id ? { ...s, question: nextQuestion } : s));
+    });
+  };
+
+  const removeSlot = (id: string) => {
+    setSlots((prev) => {
+      const current = prev.find((s) => s.id === id);
+      if (current?.question.trim()) onNoteChange(current.question.trim(), '');
+      return prev.filter((s) => s.id !== id);
+    });
+  };
+
+  return (
+    <section className="uma-stack-section">
+      <p className="uma-section-label font-normal text-muted-foreground/75">
+        Additional behavioral (optional)
+      </p>
+      <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+        Pick from the bank or type your own. Notes only — score the fixed criteria below.
+      </p>
+
+      {bank.length > 0 ? (
+        <div className="mb-4 rounded-lg border border-foreground/10 bg-muted/25 px-4 py-3">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Question bank</p>
+          <ul className="space-y-2">
+            {bank.map((question) => {
+              const used = usedQuestions.has(question);
+              return (
+                <li key={question} className="flex items-start gap-2">
+                  <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/85">
+                    {question}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 normal-case"
+                    disabled={disabled || used}
+                    onClick={() => addSlot(question)}
+                  >
+                    {used ? 'Added' : 'Use'}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col">
+        {slots.map((slot, index) => {
+          const noteKey = slot.question.trim();
+          return (
+            <div key={slot.id} className={questionStripeClass(index)}>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Extra question {index + 1}</p>
+                {!disabled ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0"
+                    onClick={() => removeSlot(slot.id)}
+                    aria-label={`Remove extra question ${index + 1}`}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+              <textarea
+                value={slot.question}
+                onChange={(e) => updateSlotQuestion(slot.id, e.target.value)}
+                disabled={disabled}
+                rows={2}
+                placeholder="Paste or type the question you asked…"
+                className={cn(interviewNoteTextareaClass, 'mb-2 min-h-[3.5rem] resize-y')}
+              />
+              <textarea
+                value={noteKey ? (notes[noteKey] ?? '') : ''}
+                onChange={(e) => {
+                  if (!noteKey) return;
+                  onNoteChange(noteKey, e.target.value);
+                }}
+                disabled={disabled || !noteKey}
+                rows={compact ? 3 : 4}
+                placeholder={
+                  noteKey
+                    ? 'Write notes for this question…'
+                    : 'Add the question above first, then take notes…'
+                }
+                className={cn(interviewNoteTextareaClass, 'resize-y')}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {!disabled ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="normal-case"
+            onClick={() => addSlot('')}
+          >
+            <Plus className="mr-1 size-4" />
+            Add additional behavioral
+          </Button>
+          {unusedBank.length > 0 && slots.length === 0 ? (
+            <span className="self-center text-xs text-muted-foreground">
+              or tap Use on a bank question
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function InterviewNotesAndScoringForm({
   guide,
   notes,
@@ -273,6 +477,7 @@ export function InterviewNotesAndScoringForm({
       : phase === 'case'
         ? caseQuestionsLabel(guide)
         : null;
+  const showAdditionalBehavioral = phase == null || phase === 'behavioral';
 
   return (
     <div className="uma-stack-page">
@@ -302,6 +507,16 @@ export function InterviewNotesAndScoringForm({
             ))}
           </div>
         </section>
+      ) : null}
+
+      {showAdditionalBehavioral ? (
+        <AdditionalBehavioralNotes
+          guide={guide}
+          notes={notes}
+          disabled={disabled}
+          compact={compact}
+          onNoteChange={onNoteChange}
+        />
       ) : null}
 
       <InterviewQuestionGroups

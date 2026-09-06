@@ -163,6 +163,7 @@ function emptyGuide(format: InterviewGuideFormat): InterviewGuide {
     intro: '',
     caseStudy: emptyCaseStudy(),
     questions: [''],
+    questionBank: [],
     rubric: emptyInterviewRubric(),
   };
 }
@@ -188,7 +189,9 @@ function guideFromApi(guide: InterviewGuide | null, format: InterviewGuideFormat
       casePdfUrl: guide.casePdfUrl,
       caseStudy: withFilledCase(guide),
       questions: guide.questions && guide.questions.length > 0 ? guide.questions : [''],
+      questionBank: guide.questionBank ?? [],
       rubric: withFilledRubric(guide),
+      behavioralRubric: guide.behavioralRubric,
     };
   }
   if (guide.format === 'case_study') {
@@ -220,6 +223,10 @@ function convertGuide(current: InterviewGuide, format: InterviewGuideFormat): In
   if (format !== 'case_study') {
     next.questions =
       current.questions && current.questions.length > 0 ? current.questions : [''];
+  }
+  if (format === 'case_and_behavioral') {
+    next.questionBank = current.questionBank ?? [];
+    next.behavioralRubric = current.behavioralRubric;
   }
   return next;
 }
@@ -260,7 +267,9 @@ function payloadFromGuide(guide: InterviewGuide): InterviewGuide {
     casePdfUrl,
     caseStudy,
     questions: (guide.questions ?? []).map((q) => q.trim()).filter(Boolean),
+    questionBank: (guide.questionBank ?? []).map((q) => q.trim()).filter(Boolean),
     rubric,
+    behavioralRubric: normalizeInterviewRubric(guide.behavioralRubric) ?? undefined,
   };
 }
 
@@ -364,6 +373,7 @@ function StringListEditor({
   onChange,
   placeholder,
   addLabel,
+  required = true,
 }: {
   stage: InterviewGuideStage;
   idPrefix: string;
@@ -373,6 +383,7 @@ function StringListEditor({
   onChange: (items: string[]) => void;
   placeholder: (index: number) => string;
   addLabel: string;
+  required?: boolean;
 }) {
   const rows = items.length > 0 ? items : [''];
 
@@ -380,7 +391,7 @@ function StringListEditor({
     <GuideSection
       title={title}
       description={description}
-      required
+      required={required}
       action={
         <Button
           type="button"
@@ -410,14 +421,14 @@ function StringListEditor({
                 rows={2}
                 className="field-textarea min-h-[4.5rem] flex-1 resize-y"
               />
-              {rows.length > 1 && (
+              {(rows.length > 1 || !required) && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => {
                     const next = rows.filter((_, j) => j !== i);
-                    onChange(next.length ? next : ['']);
+                    onChange(next.length ? next : required ? [''] : []);
                   }}
                   aria-label={`Remove ${title.toLowerCase()} ${i + 1}`}
                 >
@@ -1308,18 +1319,32 @@ export function TeamInterviewGuideSetup({ teamId, onSaved }: TeamInterviewGuideS
                       idPrefix="questions"
                       title={
                         guide.format === 'case_and_behavioral'
-                          ? 'Part 2: Behavioral Questions'
+                          ? 'Part 2: Required Behavioral Questions'
                           : 'Interview Questions'
                       }
                       description={
                         guide.format === 'case_and_behavioral'
-                          ? `Each question is scored 1–${withFilledRubric(guide).scaleMax} after the case evaluation.`
+                          ? 'Always asked. Interviewers take notes here; scores use the behavioral evaluation criteria.'
                           : 'Each question becomes a rubric item interviewers score 1–5.'
                       }
                       items={guide.questions ?? ['']}
                       onChange={(questions) => patchGuide(s, { questions })}
                       placeholder={(i) => `Question ${i + 1}`}
                       addLabel="Add Question"
+                    />
+                  )}
+
+                  {guide.format === 'case_and_behavioral' && (
+                    <StringListEditor
+                      stage={s}
+                      idPrefix="question-bank"
+                      title="Optional Question Bank"
+                      description="Interviewers can pick from these at random during the interview. Notes only — not scored separately."
+                      items={guide.questionBank ?? []}
+                      onChange={(questionBank) => patchGuide(s, { questionBank })}
+                      placeholder={(i) => `Bank question ${i + 1}`}
+                      addLabel="Add Bank Question"
+                      required={false}
                     />
                   )}
 

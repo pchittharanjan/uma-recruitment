@@ -40,7 +40,13 @@ export interface InterviewGuide {
   intro?: string;
   /** Public path to the case PDF shown during scoring, e.g. `/interview-cases/strategy-group.pdf`. */
   casePdfUrl?: string;
+  /** Required / always-asked interview questions (behavioral or standalone). */
   questions?: string[];
+  /**
+   * Optional question bank for case_and_behavioral interviews.
+   * Interviewers pick from these at random — notes only, not scored.
+   */
+  questionBank?: string[];
   caseStudy?: {
     title?: string;
     prompt: string;
@@ -392,12 +398,14 @@ function normalizeGuide(raw: unknown): InterviewGuide | null {
   }
 
   const questions = trimList(obj.questions);
+  const questionBank = trimList(obj.questionBank);
   return withDefaultCaseRubric({
     format: 'case_and_behavioral',
     intro,
     casePdfUrl,
     caseStudy,
     questions,
+    questionBank: questionBank.length > 0 ? questionBank : undefined,
     rubric,
     behavioralRubric: behavioralRubric ?? undefined,
   });
@@ -535,6 +543,13 @@ export function formatInterviewGuideForDisplay(guide: InterviewGuide): string {
     lines.push('Part 2: Behavioral');
     lines.push('');
     lines.push(...formatQuestionLines(guide.questions));
+    const bank = interviewQuestionBankFromGuide(guide);
+    if (bank.length > 0) {
+      lines.push('');
+      lines.push('Optional question bank');
+      lines.push('');
+      lines.push(...formatQuestionLines(bank));
+    }
     return lines.join('\n').trim();
   }
 
@@ -573,6 +588,12 @@ export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | n
   const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
   if (!behavioralRubric || behavioralRubric.criteria.length === 0) return [];
   return (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
+}
+
+/** Optional bank prompts interviewers can pick from (notes only). */
+export function interviewQuestionBankFromGuide(guide: InterviewGuide | null): string[] {
+  if (!guide || guide.format !== 'case_and_behavioral') return [];
+  return (guide.questionBank ?? []).map((q) => q.trim()).filter(Boolean);
 }
 
 /** True when case and behavioral are separate scored parts the interviewer can switch between. */
@@ -853,11 +874,23 @@ function mergeGuideWithDefault(
     fallback.format === 'case_and_behavioral' &&
     !normalizeInterviewRubric(saved.behavioralRubric) &&
     Boolean(normalizeInterviewRubric(fallback.behavioralRubric));
+  const missingQuestionBank =
+    fallback.format === 'case_and_behavioral' &&
+    (fallback.questionBank?.length ?? 0) > 0 &&
+    (saved.questionBank?.length ?? 0) === 0;
   const missingRubricCategories =
     Boolean(fallback.rubric?.categories?.length) &&
     Boolean(normalizeInterviewRubric(saved.rubric)) &&
     !(saved.rubric?.categories && saved.rubric.categories.length > 0) &&
     isLegacyFlatStrategyCaseRubric(saved.rubric);
+
+  // Older Strategy defaults baked optional bank prompts into required questions.
+  const fallbackBank = (fallback.questionBank ?? []).map((q) => q.trim()).filter(Boolean);
+  const fallbackBankSet = new Set(fallbackBank);
+  const legacyEmbeddedBank =
+    fallback.format === 'case_and_behavioral' &&
+    fallbackBank.length > 0 &&
+    savedQuestions.some((q) => fallbackBankSet.has(q.trim()));
 
   if (missingCaseQuestions || missingBehavioral) {
     return {
@@ -884,6 +917,26 @@ function mergeGuideWithDefault(
   }
   if (missingBehavioralRubric && fallback.behavioralRubric) {
     next = { ...next, behavioralRubric: fallback.behavioralRubric };
+  }
+  if (legacyEmbeddedBank) {
+    const stripped = savedQuestions.filter((q) => !fallbackBankSet.has(q.trim()));
+    const OLD_UMA_MOTIVATION =
+      "Considering yesterday's social round, what motivates you to be part of UMA beyond your professional goals?";
+    const NEW_UMA_MOTIVATION =
+      'What motivates you to be part of UMA beyond your professional goals?';
+    const questions = (stripped.length > 0 ? stripped : fallback.questions ?? []).map((q) =>
+      q.trim() === OLD_UMA_MOTIVATION ? NEW_UMA_MOTIVATION : q,
+    );
+    next = {
+      ...next,
+      questions,
+      questionBank:
+        (saved.questionBank?.length ?? 0) > 0
+          ? saved.questionBank
+          : [...fallbackBank],
+    };
+  } else if (missingQuestionBank && fallback.questionBank) {
+    next = { ...next, questionBank: [...fallback.questionBank] };
   }
   if (fallback.intro && !saved.intro?.trim()) {
     next = { ...next, intro: fallback.intro };

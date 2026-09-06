@@ -36,6 +36,8 @@ export function serializeInterviewGuidePayload(guide: InterviewGuide): string {
     casePdfUrl,
     caseStudy,
     questions: (guide.questions ?? []).map((q) => q.trim()).filter(Boolean),
+    questionBank: (guide.questionBank ?? []).map((q) => q.trim()).filter(Boolean),
     rubric,
+    behavioralRubric: normalizeInterviewRubric(guide.behavioralRubric) ?? undefined,
   });
 }

@@ -54,12 +54,22 @@ export const STRATEGY_INDIV_CASE_QUESTIONS = [
 export const STRATEGY_INDIV_INTRO =
   'Individual interview: HeyTea case (15 minutes, part 1), then behavioral & fit questions (part 2). Score each criterion 1–5.';
 
+/** Always asked in the final-round individual interview. */
 export const STRATEGY_BEHAVIORAL_QUESTIONS = [
   'Tell me about yourself.',
   'What marketing strategy in the past 12 months captured your attention? It could be anything, ranging from a product, service, to event. Why do you think it was effective?',
-  'Considering yesterday\'s social round, what motivates you to be part of UMA beyond your professional goals?',
+  'What motivates you to be part of UMA beyond your professional goals?',
+];
+
+/** Optional prompts — interviewers pick from these at random (notes only, not scored). */
+export const STRATEGY_BEHAVIORAL_QUESTION_BANK = [
   'Can you give an example of a time when you had to persuade a group to see things your way? What strategies did you use, and were you successful?',
   'Tell me about a time when you identified an opportunity for improvement within a process or system. What steps did you take to implement change?',
+  'What are your strengths and what are your weaknesses?',
+  'Tell me about a time you had to make a decision or move forward on a project with incomplete information. What did you do, and how did you know when you had enough to act?',
+  'What is one of your favorite brands that you use every day? (wait for an answer) Market it to us.',
+  'What is your Roman Empire?',
+  'Teach us something in 1 minute',
 ];
 
 export function strategyDefaultGuides(): InterviewGuidesRecord {
@@ -135,6 +145,7 @@ export function strategyDefaultGuides(): InterviewGuidesRecord {
       discussionPoints: [...STRATEGY_INDIV_CASE_QUESTIONS],
     },
     questions: [...STRATEGY_BEHAVIORAL_QUESTIONS],
+    questionBank: [...STRATEGY_BEHAVIORAL_QUESTION_BANK],
     rubric: {
       scaleMax: 5,
       criteria: [

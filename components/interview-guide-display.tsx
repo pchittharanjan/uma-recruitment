@@ -130,6 +130,12 @@ export function InterviewGuideDisplay({ guide }: { guide: InterviewGuide }) {
             questions={guide.questions ?? []}
             partLabel="Part 2: Behavioral"
           />
+          {(guide.questionBank?.length ?? 0) > 0 ? (
+            <QuestionsBlock
+              questions={guide.questionBank ?? []}
+              partLabel="Optional question bank"
+            />
+          ) : null}
         </div>
       )}
     </div>
