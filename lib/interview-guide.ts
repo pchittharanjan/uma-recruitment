@@ -582,18 +582,31 @@ export function interviewNoteFieldsFromGuide(guide: InterviewGuide | null): stri
  * Only when a separate behavioral rubric is scored — otherwise the questions
  * themselves are the scored fields (with notes) via interviewScoreFieldGroups,
  * and repeating them as notes-only duplicates the UI.
+ *
+ * Also drops any prompt that is already a scored behavioral field so the same
+ * text never appears once as notes-only and again with a rating scale.
  */
 export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide || guide.format !== 'case_and_behavioral') return [];
   const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
   if (!behavioralRubric || behavioralRubric.criteria.length === 0) return [];
-  return (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
+  const scored = new Set(
+    interviewScoreFieldGroups(guide)
+      .filter((group) => group.key === 'behavioral' || group.key === 'questions')
+      .flatMap((group) => group.fields),
+  );
+  return (guide.questions ?? [])
+    .map((q) => q.trim())
+    .filter((q) => Boolean(q) && !scored.has(q));
 }
 
 /** Optional bank prompts interviewers can pick from (notes only). */
 export function interviewQuestionBankFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide || guide.format !== 'case_and_behavioral') return [];
-  return (guide.questionBank ?? []).map((q) => q.trim()).filter(Boolean);
+  const required = new Set((guide.questions ?? []).map((q) => q.trim()).filter(Boolean));
+  return (guide.questionBank ?? [])
+    .map((q) => q.trim())
+    .filter((q) => Boolean(q) && !required.has(q));
 }
 
 /** True when case and behavioral are separate scored parts the interviewer can switch between. */
@@ -937,6 +950,23 @@ function mergeGuideWithDefault(
     };
   } else if (missingQuestionBank && fallback.questionBank) {
     next = { ...next, questionBank: [...fallback.questionBank] };
+  }
+
+  // Keep required prompts and the optional bank disjoint even if an admin saved overlap.
+  if (next.format === 'case_and_behavioral') {
+    const bankSet = new Set((next.questionBank ?? []).map((q) => q.trim()).filter(Boolean));
+    if (bankSet.size > 0) {
+      const dedupedQuestions = (next.questions ?? [])
+        .map((q) => q.trim())
+        .filter((q) => Boolean(q) && !bankSet.has(q));
+      if (dedupedQuestions.length !== (next.questions ?? []).length) {
+        next = {
+          ...next,
+          questions:
+            dedupedQuestions.length > 0 ? dedupedQuestions : fallback.questions ?? dedupedQuestions,
+        };
+      }
+    }
   }
   if (fallback.intro && !saved.intro?.trim()) {
     next = { ...next, intro: fallback.intro };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import ScoreSelector from '@/components/ScoreSelector';
 import { Button } from '@/components/ui/button';
 import { RequiredAsterisk } from '@/components/ui/label';
@@ -247,15 +247,18 @@ function slotsFromNotes(
   notes: Record<string, string>,
   guide: InterviewGuide | null,
   idPrefix: string,
+  suppressed: ReadonlySet<string> = new Set(),
 ): AdditionalBehavioralSlot[] {
   const reserved = reservedNoteKeys(guide);
-  const bank = new Set(interviewQuestionBankFromGuide(guide));
   const slots: AdditionalBehavioralSlot[] = [];
   let i = 0;
   for (const [key, value] of Object.entries(notes)) {
     const question = key.trim();
-    if (!question || reserved.has(question)) continue;
-    if (!bank.has(question) && !value?.trim()) continue;
+    // Only hydrate extras that still have note text. Bank membership alone must not
+    // recreate a slot after remove (clear leaves an empty string key in `notes`).
+    if (!question || reserved.has(question) || suppressed.has(question) || !value?.trim()) {
+      continue;
+    }
     slots.push({ id: `${idPrefix}-${i++}`, question });
   }
   return slots;
@@ -276,13 +279,14 @@ function AdditionalBehavioralNotes({
 }) {
   const idPrefix = useId();
   const bank = interviewQuestionBankFromGuide(guide);
+  const suppressedRef = useRef<Set<string>>(new Set());
   const [slots, setSlots] = useState<AdditionalBehavioralSlot[]>(() =>
-    slotsFromNotes(notes, guide, idPrefix),
+    slotsFromNotes(notes, guide, idPrefix, suppressedRef.current),
   );
 
   useEffect(() => {
     setSlots((prev) => {
-      const fromNotes = slotsFromNotes(notes, guide, idPrefix);
+      const fromNotes = slotsFromNotes(notes, guide, idPrefix, suppressedRef.current);
       if (fromNotes.length === 0) return prev;
       const existingQuestions = new Set(prev.map((s) => s.question.trim()).filter(Boolean));
       const missing = fromNotes.filter((s) => !existingQuestions.has(s.question));
@@ -296,6 +300,8 @@ function AdditionalBehavioralNotes({
   const unusedBank = bank.filter((q) => !usedQuestions.has(q));
 
   const addSlot = (question = '') => {
+    const trimmed = question.trim();
+    if (trimmed) suppressedRef.current.delete(trimmed);
     setSlots((prev) => [...prev, { id: `${idPrefix}-${prev.length}-${Date.now()}`, question }]);
   };
 
@@ -306,6 +312,8 @@ function AdditionalBehavioralNotes({
       const prevQ = current.question.trim();
       const nextQ = nextQuestion.trim();
       if (prevQ && prevQ !== nextQ) {
+        suppressedRef.current.delete(prevQ);
+        if (nextQ) suppressedRef.current.delete(nextQ);
         const existing = notes[prevQ] ?? '';
         if (existing) {
           onNoteChange(nextQ || prevQ, existing);
@@ -317,11 +325,11 @@ function AdditionalBehavioralNotes({
   };
 
   const removeSlot = (id: string) => {
-    setSlots((prev) => {
-      const current = prev.find((s) => s.id === id);
-      if (current?.question.trim()) onNoteChange(current.question.trim(), '');
-      return prev.filter((s) => s.id !== id);
-    });
+    const current = slots.find((s) => s.id === id);
+    const question = current?.question.trim() ?? '';
+    if (question) suppressedRef.current.add(question);
+    setSlots((prev) => prev.filter((s) => s.id !== id));
+    if (question) onNoteChange(question, '');
   };
 
   return (
