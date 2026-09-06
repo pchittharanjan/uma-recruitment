@@ -738,14 +738,19 @@ export function phasedInterviewPrimaryAction(
   const caseFields = interviewPhaseScoreFields(guide, 'case');
   const behavioralFields = interviewPhaseScoreFields(guide, 'behavioral');
   const caseDone = isInterviewPhaseFullyScored(scores, caseFields);
-  // Notes-only behavioral has no score fields — treat as complete so case scores alone unlock submit.
-  const behavioralDone =
-    behavioralFields.length === 0 || isInterviewPhaseFullyScored(scores, behavioralFields);
+  // Notes-only behavioral (no score fields) is never “done” for CTA purposes — keep
+  // Switch to Behavioral while on Case, and only unlock Submit on the Behavioral tab
+  // once case criteria are scored. isInterviewPhaseFullyScored already rejects empty lists.
+  const behavioralHasScores = behavioralFields.length > 0;
+  const behavioralDone = behavioralHasScores
+    ? isInterviewPhaseFullyScored(scores, behavioralFields)
+    : false;
 
   if (caseDone && behavioralDone) {
     return { kind: 'submit', label: 'Submit →' };
   }
   if (caseDone && !behavioralDone) {
+    // Scored behavioral incomplete, or notes-only behavioral: submit only from Behavioral.
     return phase === 'behavioral'
       ? { kind: 'submit', label: 'Submit →' }
       : { kind: 'switch', target: 'behavioral', label: 'Switch to Behavioral' };
@@ -755,6 +760,7 @@ export function phasedInterviewPrimaryAction(
       ? { kind: 'submit', label: 'Submit →' }
       : { kind: 'switch', target: 'case', label: 'Switch to Case' };
   }
+  // Neither side fully scored (includes notes-only behavioral + incomplete case).
   return phase === 'case'
     ? { kind: 'switch', target: 'behavioral', label: 'Switch to Behavioral' }
     : { kind: 'switch', target: 'case', label: 'Switch to Case' };
