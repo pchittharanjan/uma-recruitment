@@ -13,6 +13,8 @@ interface GradingSubmitFooterProps {
   submitting?: boolean;
   locked?: boolean;
   lockedLabel?: string;
+  /** Button label when unlocked (default: Submit →). */
+  submitLabel?: string;
   /** Navigate to next pending without submitting. Omitting hides the control. */
   onSkip?: () => void;
   skipping?: boolean;
@@ -28,6 +30,7 @@ export function GradingSubmitFooter({
   submitting = false,
   locked = false,
   lockedLabel = 'Editing locked',
+  submitLabel = 'Submit →',
   onSkip,
   skipping = false,
   variant = 'sticky',
@@ -81,7 +84,7 @@ export function GradingSubmitFooter({
             variant="primary"
             className="min-w-28 shrink-0"
           >
-            {locked ? lockedLabel : 'Submit →'}
+            {locked ? lockedLabel : submitLabel}
           </LoadingButton>
         </div>
       </div>

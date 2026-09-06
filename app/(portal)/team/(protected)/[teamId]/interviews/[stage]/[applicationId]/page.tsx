@@ -367,15 +367,21 @@ export default function TeamInterviewScorePage({
     advancementHref?: string | null;
     isDirector?: boolean;
   }) => {
+    const wasReedit = !assignmentPending;
     if (json.nextApplicationId) {
-      toast.success('Interview score submitted');
+      toast.success(wasReedit ? 'Scores & notes updated' : 'Interview score submitted');
       router.push(interviewAppHref(teamId, stage, json.nextApplicationId, audience));
       return;
     }
     if (json.advancementHref && audience === 'team') {
       const copy = interviewCompleteGuidance(Boolean(json.isDirector));
-      toast.success(copy.title);
+      toast.success(wasReedit ? 'Scores & notes updated' : copy.title);
       router.push(json.advancementHref);
+      return;
+    }
+    if (wasReedit) {
+      toast.success('Scores & notes updated');
+      router.push(queueHref);
       return;
     }
     toast.success(
@@ -509,6 +515,15 @@ export default function TeamInterviewScorePage({
   }
 
   const lockMessage = data.scoringEditLock?.message ?? '';
+  const isReediting = !assignmentPending && !scoringLocked;
+  const saveLabel = isReediting ? 'Save changes →' : 'Submit →';
+  const groupSaveLabel = isReediting ? 'Save scores & notes' : 'Submit all in this session';
+  const editingBanner = isReediting ? (
+    <StatusBanner
+      type="info"
+      message="Already submitted — change scores or notes anytime, then save."
+    />
+  ) : null;
   const autosaveBanner = showAutosaveBanner ? (
     <StatusBanner
       type="warning"
@@ -634,8 +649,11 @@ export default function TeamInterviewScorePage({
   );
 
   const groupInterviewHeaderContent =
-    isGroupInterview && data.groupEntries && ((scoringLocked && lockMessage) || data.slot?.logisticsNote || showAutosaveBanner) ? (
+    isGroupInterview &&
+    data.groupEntries &&
+    ((scoringLocked && lockMessage) || data.slot?.logisticsNote || showAutosaveBanner || isReediting) ? (
       <div className="shrink-0 space-y-1.5">
+        {editingBanner}
         {autosaveBanner}
         {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
         {data.slot?.logisticsNote && (
@@ -722,6 +740,7 @@ export default function TeamInterviewScorePage({
     </div>
   ) : (
     <div data-tour="interview-scores" className="uma-stack-page">
+      {editingBanner}
       {autosaveBanner}
       {scoringLocked && lockMessage && <StatusBanner type="info" message={lockMessage} />}
       {data.slot && (
@@ -790,7 +809,7 @@ export default function TeamInterviewScorePage({
         loading={submitting}
         disabled={scoringLocked}
       >
-        {scoringLocked ? 'Editing locked' : 'Submit all in this session'}
+        {scoringLocked ? 'Editing locked' : groupSaveLabel}
       </LoadingButton>
     </div>
   );
@@ -798,6 +817,10 @@ export default function TeamInterviewScorePage({
   const phasedPrimaryAction = isPhasedInterview
     ? phasedInterviewPrimaryAction(data?.interviewGuide ?? null, interviewPhase, draft.scores)
     : null;
+  const phasedActionLabel =
+    phasedPrimaryAction?.kind === 'submit' && isReediting
+      ? saveLabel
+      : phasedPrimaryAction?.label;
 
   const singleFooter = isPhasedInterview && phasedPrimaryAction ? (
     <div
@@ -831,9 +854,7 @@ export default function TeamInterviewScorePage({
           loading={phasedPrimaryAction.kind === 'submit' && submitting}
           disabled={scoringLocked}
         >
-          {scoringLocked
-            ? 'Editing locked'
-            : phasedPrimaryAction.label}
+          {scoringLocked ? 'Editing locked' : phasedActionLabel}
         </LoadingButton>
       </div>
     </div>
@@ -846,6 +867,7 @@ export default function TeamInterviewScorePage({
         onSubmit={handleSingleSubmit}
         submitting={submitting}
         locked={scoringLocked}
+        submitLabel={saveLabel}
       />
     </div>
   );

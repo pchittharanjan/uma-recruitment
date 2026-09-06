@@ -11,7 +11,7 @@ export function InterviewEditControl({
   applicationId,
   locked,
   lockMessage,
-  label = 'Edit interview',
+  label = 'Edit scores & notes',
   audience = 'team',
 }: {
   teamId: string;

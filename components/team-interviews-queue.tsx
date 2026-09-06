@@ -291,16 +291,25 @@ export function TeamInterviewsQueue({
                                 >
                                   Score →
                                 </NavLinkButton>
-                              ) : (
+                              ) : scoringLocked ? (
                                 <InterviewEditControl
                                   teamId={teamId}
                                   stage={stage}
                                   applicationId={a.applicationId}
-                                  locked={scoringLocked}
+                                  locked
                                   lockMessage={lockMessage}
                                   audience={audience}
-                                  label={a.status === 'completed' ? 'Edit interview' : 'Open interview'}
+                                  label="Edit scores & notes"
                                 />
+                              ) : (
+                                <NavLinkButton
+                                  variant="ghost"
+                                  className="text-sm"
+                                  href={interviewAppHref(teamId, stage, a.applicationId, audience)}
+                                  data-tour="interview-queue-edit"
+                                >
+                                  Edit scores & notes
+                                </NavLinkButton>
                               )}
                             </div>
                           </li>
@@ -332,7 +341,7 @@ export function TeamInterviewsQueue({
                               locked
                               lockMessage={lockMessage}
                               audience={audience}
-                              label="Edit session"
+                              label="Edit scores & notes"
                             />
                           ) : (
                             <NavLinkButton
@@ -342,7 +351,7 @@ export function TeamInterviewsQueue({
                               href={interviewAppHref(teamId, stage, openApplicationId, audience)}
                               data-tour="interview-queue-edit"
                             >
-                              Edit session
+                              Edit scores & notes
                             </NavLinkButton>
                           )}
                         </div>
