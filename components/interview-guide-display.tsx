@@ -28,9 +28,21 @@ function CaseStudyBlock({ guide, partLabel }: { guide: InterviewGuide; partLabel
             Case questions
           </p>
           {noteSections.map((section, sectionIndex) => (
-            <div key={`${sectionIndex}-${section.title || 'points'}`}>
+            <div
+              key={`${sectionIndex}-${section.title || 'points'}`}
+              className={
+                section.title
+                  ? 'rounded-lg border border-amber-200/80 bg-amber-50/50 p-3 dark:border-amber-800/60 dark:bg-amber-950/20'
+                  : undefined
+              }
+            >
               {section.title ? (
                 <p className="mb-1 text-sm font-semibold">{section.title}</p>
+              ) : null}
+              {section.description?.trim() ? (
+                <p className="mb-2 whitespace-pre-wrap text-sm opacity-90">
+                  {section.description.trim()}
+                </p>
               ) : null}
               <ul className="list-disc space-y-1 pl-5">
                 {section.points.map((point, i) => (

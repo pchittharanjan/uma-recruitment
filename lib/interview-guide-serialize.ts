@@ -21,10 +21,14 @@ export function serializeInterviewGuidePayload(guide: InterviewGuide): string {
     .map((p) => p.trim())
     .filter(Boolean);
   const discussionSections = (guide.caseStudy?.discussionSections ?? [])
-    .map((section) => ({
-      title: section.title.trim(),
-      points: section.points.map((p) => p.trim()).filter(Boolean),
-    }))
+    .map((section) => {
+      const description = section.description?.trim();
+      return {
+        title: section.title.trim(),
+        points: section.points.map((p) => p.trim()).filter(Boolean),
+        ...(description ? { description } : {}),
+      };
+    })
     .filter((section) => section.title && section.points.length > 0);
   const caseStudy = {
     title: guide.caseStudy?.title?.trim() || undefined,

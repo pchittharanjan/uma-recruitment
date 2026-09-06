@@ -8,6 +8,8 @@ export type InterviewGuideStage = 'first_round' | 'final_round';
 /** Labeled group of case-packet note prompts (warm-up vs full case, etc.). */
 export type InterviewDiscussionSection = {
   title: string;
+  /** Optional framing shown under the section title in Case notes (e.g. case brief). */
+  description?: string;
   points: string[];
 };
 
@@ -365,11 +367,15 @@ function normalizeDiscussionSections(raw: unknown): InterviewDiscussionSection[]
   const sections: InterviewDiscussionSection[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
-    const obj = item as { title?: unknown; points?: unknown };
+    const obj = item as { title?: unknown; description?: unknown; points?: unknown };
     const title = typeof obj.title === 'string' ? obj.title.trim() : '';
     const points = trimList(obj.points);
     if (!title || points.length === 0) continue;
-    sections.push({ title, points });
+    const description =
+      typeof obj.description === 'string' && obj.description.trim()
+        ? obj.description.trim()
+        : undefined;
+    sections.push({ title, points, ...(description ? { description } : {}) });
   }
   return sections;
 }
@@ -1088,6 +1094,35 @@ function isLegacyEventsResetGuide(saved: InterviewGuide): boolean {
   return /\bRESET\b/i.test(blob);
 }
 
+/** Prior interviewer-facing meta summary before the candidate-facing StudySync brief. */
+function isLegacyEventsStudySyncMetaPrompt(prompt: string): boolean {
+  return /Candidates get ~2 minutes to read the packet/i.test(prompt);
+}
+
+function isEventsWarmupPoint(point: string): boolean {
+  const trimmed = point.trim();
+  return (
+    /^Warm-Up Case \(Boba Launch/i.test(trimmed) || /campus boba shop is launching/i.test(trimmed)
+  );
+}
+
+function discussionHasEventsWarmup(
+  sections: InterviewDiscussionSection[] | undefined,
+  points: string[] | undefined,
+): boolean {
+  if (sections?.some((section) => /warm\s*-?\s*up/i.test(section.title))) return true;
+  if (sections?.some((section) => section.points.some(isEventsWarmupPoint))) return true;
+  return (points ?? []).some(isEventsWarmupPoint);
+}
+
+function looksLikeEventsStudySyncPacket(points: string[]): boolean {
+  return (
+    points.some((p) => /^Task 1 — Trend/i.test(p.trim())) &&
+    points.some((p) => /^Task 2 — The Activation/i.test(p.trim())) &&
+    points.some((p) => /^Task 3 — Post Event/i.test(p.trim()))
+  );
+}
+
 function listsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   return a.every((item, i) => item === b[i]);
@@ -1250,9 +1285,10 @@ function mergeGuideWithDefault(
     const fallbackFlat = flattenDiscussionSections(fallback.caseStudy.discussionSections);
     const nextFlat = (next.caseStudy.discussionPoints ?? []).map((p) => p.trim()).filter(Boolean);
     const looksLikeStudySyncFlat =
-      nextFlat.some((p) => /^Warm-Up Case \(Boba Launch/i.test(p)) &&
-      nextFlat.some((p) => /^Task 1 — Trend/i.test(p)) &&
-      nextFlat.some((p) => /^Task 2 — The Activation/i.test(p));
+      looksLikeEventsStudySyncPacket(nextFlat) &&
+      (discussionHasEventsWarmup(undefined, nextFlat) ||
+        // Flat list is only the three StudySync tasks (warm-up dropped).
+        nextFlat.every((p) => /^Task [123] —/.test(p.trim())));
     if (listsEqual(nextFlat, fallbackFlat) || looksLikeStudySyncFlat) {
       next = {
         ...next,
@@ -1261,13 +1297,73 @@ function mergeGuideWithDefault(
           title: next.caseStudy.title?.includes('StudySync')
             ? next.caseStudy.title
             : fallback.caseStudy.title ?? next.caseStudy.title,
-          prompt: /StudySync/i.test(next.caseStudy.prompt)
-            ? next.caseStudy.prompt
-            : fallback.caseStudy.prompt,
+          prompt:
+            isLegacyEventsStudySyncMetaPrompt(next.caseStudy.prompt) ||
+            !/StudySync/i.test(next.caseStudy.prompt)
+              ? fallback.caseStudy.prompt
+              : next.caseStudy.prompt,
           discussionSections: fallback.caseStudy.discussionSections,
           discussionPoints: fallbackFlat,
         },
       };
+    }
+  } else if (
+    next.caseStudy &&
+    fallback.caseStudy?.discussionSections &&
+    next.caseStudy.discussionSections &&
+    next.caseStudy.discussionSections.length > 0
+  ) {
+    // Upgrade StudySync brief / restore missing warm-up onto existing sectioned Events guides.
+    const needsPromptUpgrade = isLegacyEventsStudySyncMetaPrompt(next.caseStudy.prompt);
+    const nextSections = normalizeDiscussionSections(next.caseStudy.discussionSections);
+    const fallbackSections = normalizeDiscussionSections(fallback.caseStudy.discussionSections);
+    const nextFlat = flattenDiscussionSections(nextSections);
+    const fallbackHasWarmup = discussionHasEventsWarmup(fallbackSections, undefined);
+    const nextMissingWarmup =
+      fallbackHasWarmup &&
+      looksLikeEventsStudySyncPacket(nextFlat) &&
+      !discussionHasEventsWarmup(nextSections, next.caseStudy.discussionPoints);
+
+    if (nextMissingWarmup) {
+      const fallbackFlat = flattenDiscussionSections(fallbackSections);
+      next = {
+        ...next,
+        caseStudy: {
+          ...next.caseStudy,
+          prompt:
+            needsPromptUpgrade || !/StudySync/i.test(next.caseStudy.prompt)
+              ? fallback.caseStudy.prompt
+              : next.caseStudy.prompt,
+          discussionSections: fallbackSections,
+          discussionPoints: fallbackFlat,
+        },
+      };
+    } else {
+      const mergedSections = nextSections.map((section) => {
+        if (section.description?.trim()) return section;
+        const match = fallbackSections.find(
+          (fallbackSection) =>
+            fallbackSection.title === section.title &&
+            listsEqual(fallbackSection.points, section.points),
+        );
+        if (!match?.description) return section;
+        return { ...section, description: match.description };
+      });
+      const attachedDescription = mergedSections.some(
+        (section, i) =>
+          Boolean(section.description?.trim()) &&
+          !Boolean(nextSections[i]?.description?.trim()),
+      );
+      if (needsPromptUpgrade || attachedDescription) {
+        next = {
+          ...next,
+          caseStudy: {
+            ...next.caseStudy,
+            ...(needsPromptUpgrade ? { prompt: fallback.caseStudy.prompt } : {}),
+            discussionSections: mergedSections,
+          },
+        };
+      }
     }
   }
 

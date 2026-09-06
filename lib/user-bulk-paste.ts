@@ -1,3 +1,5 @@
+import { MAX_DIRECTORS_PER_TEAM } from '@/lib/director-limits';
+
 export interface BulkPasteTeamOption {
   id: number;
   name: string;
@@ -272,9 +274,11 @@ export function validateBulkPasteRows(
     if (!row.prepared || row.errors.length > 0) continue;
     for (const teamId of row.prepared.directorTeamIds) {
       projectedDirectorCounts.set(teamId, (projectedDirectorCounts.get(teamId) ?? 0) + 1);
-      if ((projectedDirectorCounts.get(teamId) ?? 0) > 2) {
+      if ((projectedDirectorCounts.get(teamId) ?? 0) > MAX_DIRECTORS_PER_TEAM) {
         const teamName = teams.find((team) => team.id === teamId)?.name ?? `#${teamId}`;
-        row.errors.push(`Director limit reached for ${teamName} (max 2).`);
+        row.errors.push(
+          `Director limit reached for ${teamName} (max ${MAX_DIRECTORS_PER_TEAM}).`,
+        );
       }
     }
   }

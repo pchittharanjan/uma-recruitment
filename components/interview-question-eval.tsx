@@ -507,7 +507,7 @@ export function InterviewNotesAndScoringForm({
           ) : null}
           <div className="space-y-5">
             {displayNoteSections.map((section, sectionIndex) => {
-              const showSectionTitle = Boolean(section.title);
+              const showSectionChrome = Boolean(section.title);
               let rowIndex = 0;
               // Offset stripe index across prior sections for continuity.
               for (let i = 0; i < sectionIndex; i++) {
@@ -517,16 +517,21 @@ export function InterviewNotesAndScoringForm({
                 <div
                   key={`${sectionIndex}-${section.title || 'notes'}`}
                   className={
-                    showSectionTitle
-                      ? 'rounded-xl border border-foreground/10 bg-background/40'
+                    showSectionChrome
+                      ? 'overflow-hidden rounded-xl border border-foreground/10 bg-background/40 shadow-sm'
                       : undefined
                   }
                 >
-                  {showSectionTitle ? (
-                    <div className="border-b border-foreground/10 px-5 py-3 sm:px-6">
+                  {showSectionChrome ? (
+                    <div className="border-b border-foreground/10 bg-background/60 px-5 py-3.5 sm:px-6">
                       <p className="text-sm font-semibold tracking-wide text-foreground">
                         {section.title}
                       </p>
+                      {section.description?.trim() ? (
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
+                          {section.description.trim()}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="flex flex-col">
@@ -646,11 +651,18 @@ export function InterviewNotesAndScoringColumns({
   const caseLabel = caseQuestionsLabel(guide);
   const columnCount = Math.max(columns.length, 1);
 
+  // Build rows so every titled case section is a peer (semibold blockTitle),
+  // and only the overall Part 1 label uses uma-section-label. Previously the
+  // first titled section (warm-up) got blockTitle under "Part 1", while later
+  // sections (StudySync) promoted their title into sectionLabel — so after the
+  // StudySync brief landed, StudySync looked like a top-level case block and
+  // warm-up looked like a plain nested question.
   const noteRows: Array<{
     question: string;
     rowIndex: number;
     sectionLabel?: string;
     blockTitle?: string;
+    blockDescription?: string;
   }> = [];
   let rowIndex = 0;
   for (let sectionIndex = 0; sectionIndex < noteSections.length; sectionIndex++) {
@@ -660,17 +672,22 @@ export function InterviewNotesAndScoringColumns({
       const isFirstInSection = i === 0;
       let sectionLabel: string | undefined;
       let blockTitle: string | undefined;
+      let blockDescription: string | undefined;
       if (isFirstOverall) {
         sectionLabel = caseLabel;
-        if (section.title) blockTitle = section.title;
-      } else if (isFirstInSection && section.title) {
-        sectionLabel = section.title;
+      }
+      if (isFirstInSection && section.title) {
+        blockTitle = section.title;
+        if (section.description?.trim()) {
+          blockDescription = section.description.trim();
+        }
       }
       noteRows.push({
         question: section.points[i],
         rowIndex: rowIndex++,
         sectionLabel,
         blockTitle,
+        blockDescription,
       });
     }
   }
@@ -690,10 +707,24 @@ export function InterviewNotesAndScoringColumns({
                   sectionLabel={row.sectionLabel}
                 >
                   <div className="uma-stack-block">
-                    {row.blockTitle ? (
-                      <p className="text-sm font-semibold tracking-wide text-foreground">
-                        {row.blockTitle}
-                      </p>
+                    {row.blockTitle || row.blockDescription ? (
+                      <div className="rounded-lg border border-foreground/10 bg-background/50 px-3 py-2.5">
+                        {row.blockTitle ? (
+                          <p className="text-sm font-semibold tracking-wide text-foreground">
+                            {row.blockTitle}
+                          </p>
+                        ) : null}
+                        {row.blockDescription ? (
+                          <p
+                            className={cn(
+                              'whitespace-pre-wrap text-sm leading-relaxed text-foreground/80',
+                              row.blockTitle ? 'mt-2' : null,
+                            )}
+                          >
+                            {row.blockDescription}
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                     <p className="text-sm leading-relaxed text-foreground/90">{row.question}</p>
                     <textarea

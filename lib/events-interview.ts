@@ -41,8 +41,12 @@ export const EVENTS_STUDYSYNC_CASE_QUESTIONS = [
   'Task 3 — Post Event (4 mins brainstorm, 2 to present): You\'ve designed the activation, and StudySync wants to know if it actually drove awareness of the AI feature. What data or signals would tell you that? You\'ve determined from this that this event was a success at UC Berkeley. StudySync recreates this exactly at a different university, and it is not as effective. Ideate reasons why this activation could have flopped and how would you have prevented this?',
 ];
 
-export const EVENTS_FINAL_CASE_PROMPT =
-  'StudySync is a productivity and study app. Candidates get ~2 minutes to read the packet, then complete a warm-up (boba launch location) and a 3-part case: trend & competitor research, design a campus activation promoting StudySync\'s AI feature (brand awareness), and post-event measurement / transferability.';
+/** StudySync case background (~2 min read) — shown in materials + StudySync notes section. */
+export const EVENTS_STUDYSYNC_CASE_BRIEF =
+  'StudySync is a study productivity app for college students. It helps students plan sessions, block distractions, and stay focused. It just launched an AI feature that builds a personalized study plan and adapts it as you go.\n\n' +
+  'StudySync wants to break onto college campuses. The goal is brand awareness and getting students to try the AI feature. They\'ve asked you to design a campus activation, starting at UC Berkeley.';
+
+export const EVENTS_FINAL_CASE_PROMPT = EVENTS_STUDYSYNC_CASE_BRIEF;
 
 export const EVENTS_FINAL_INTRO =
   'Individual interview: Behavioral (~10 min), warm-up case (~3 min), then StudySync 3-part case. Score each criterion 1–5.';
@@ -88,6 +92,7 @@ export function eventsDefaultGuides(): InterviewGuidesRecord {
         },
         {
           title: EVENTS_STUDYSYNC_SECTION_TITLE,
+          description: EVENTS_STUDYSYNC_CASE_BRIEF,
           points: [...EVENTS_STUDYSYNC_CASE_QUESTIONS],
         },
       ],

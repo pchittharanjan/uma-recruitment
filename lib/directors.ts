@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
+import { MAX_DIRECTORS_PER_TEAM } from '@/lib/director-limits';
 
-export const MAX_DIRECTORS_PER_TEAM = 2;
+export { MAX_DIRECTORS_PER_TEAM } from '@/lib/director-limits';
 
 /** Whether this user is a team director for the given team (query-layer check). */
 export async function isTeamDirector(userId: number, teamId: number): Promise<boolean> {
