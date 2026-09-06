@@ -562,9 +562,16 @@ export function interviewNoteFieldsFromGuide(guide: InterviewGuide | null): stri
   return (guide.caseStudy?.discussionPoints ?? []).map((p) => p.trim()).filter(Boolean);
 }
 
-/** Behavioral questions shown as notes-only prompts during Part 2. */
+/**
+ * Behavioral questions shown as notes-only prompts during Part 2.
+ * Only when a separate behavioral rubric is scored — otherwise the questions
+ * themselves are the scored fields (with notes) via interviewScoreFieldGroups,
+ * and repeating them as notes-only duplicates the UI.
+ */
 export function interviewBehavioralNoteFieldsFromGuide(guide: InterviewGuide | null): string[] {
   if (!guide || guide.format !== 'case_and_behavioral') return [];
+  const behavioralRubric = normalizeInterviewRubric(guide.behavioralRubric);
+  if (!behavioralRubric || behavioralRubric.criteria.length === 0) return [];
   return (guide.questions ?? []).map((q) => q.trim()).filter(Boolean);
 }
 
