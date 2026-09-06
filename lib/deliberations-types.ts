@@ -54,6 +54,22 @@ export interface DeliberationsFlag {
   createdAt: number;
 }
 
+/** Soft-matched coffee chat notes for deliberations (no FK — email/name match). */
+export interface DeliberationsCoffeeChat {
+  id: number;
+  chatDate: string;
+  submitterName: string;
+  applicantName: string;
+  applicantEmail: string | null;
+  applicantGradeLevel: string | null;
+  teamsInterested: string[];
+  vibes: string | null;
+  greenFlags: string | null;
+  redFlags: string | null;
+  otherComments: string | null;
+  conflictOfInterest: string | null;
+}
+
 export interface DeliberationsCandidateDetail {
   applicationId: number;
   rowIndex: number;
@@ -70,6 +86,9 @@ export interface DeliberationsCandidateDetail {
   applicationReviews: DeliberationsScoreEntry[];
   firstRoundReviews: DeliberationsScoreEntry[];
   finalRoundReviews: DeliberationsScoreEntry[];
+  coffeeChats: DeliberationsCoffeeChat[];
+  /** Human labels for score keys (e.g. app-q1::criterion-… → Why UMA · Growth Potential). */
+  scoreFieldLabels: Record<string, string>;
   flags: DeliberationsFlag[];
 }
 

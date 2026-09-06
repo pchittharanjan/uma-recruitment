@@ -17,7 +17,7 @@ import {
   ApplicantCompareBar,
   ApplicantCompareDialog,
 } from '@/components/applicant-compare';
-import { DeliberationsCandidateDetailPanel, prefetchDeliberationsDetail } from '@/components/deliberations-candidate-detail';
+import { prefetchDeliberationsDetail } from '@/components/deliberations-candidate-detail';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
 import LoadingButton from '@/components/loading-button';
@@ -45,14 +45,11 @@ import {
   KanbanOverlay,
   type KanbanMoveEvent,
 } from '@/components/ui/kanban';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useOptionalWorkspace } from '@/components/workspace-provider';
+import { deliberationsApplicantHref } from '@/lib/deliberations-paths';
+import { useRouter } from 'next/navigation';
+
 import { displayApplicantId } from '@/lib/applicant-id';
 import {
   DELIBERATIONS_SORT_METRICS,
@@ -675,6 +672,7 @@ export function DeliberationsKanban({
   autosave = false,
   resolveDetailUrl,
   resolveBatchDetailsUrl,
+  resolveApplicantPageHref,
   onFinalized,
 }: {
   teamId: number;
@@ -706,9 +704,13 @@ export function DeliberationsKanban({
   resolveDetailUrl?: (applicationId: number) => string;
   /** Batch details GET URL builder for compare. */
   resolveBatchDetailsUrl?: (applicationIds: number[]) => string;
+  /** Full-page applicant view (opens as an in-app workspace tab). */
+  resolveApplicantPageHref?: (applicationId: number, name?: string) => string;
   /** Called after a successful finalize so the parent can refresh. */
   onFinalized?: () => void;
 }) {
+  const router = useRouter();
+  const workspace = useOptionalWorkspace();
   const boardSaveUrl = saveUrl ?? `/api/admin/teams/${teamId}/deliberations`;
   const boardFinalizeUrl =
     finalizeUrl ?? `/api/admin/teams/${teamId}/deliberations/finalize`;
@@ -729,6 +731,10 @@ export function DeliberationsKanban({
     resolveBatchDetailsUrl ??
     ((applicationIds: number[]) =>
       `/api/admin/teams/${teamId}/deliberations/details?ids=${applicationIds.join(',')}`);
+  const applicantPageHref =
+    resolveApplicantPageHref ??
+    ((applicationId: number, name?: string) =>
+      deliberationsApplicantHref(teamId, applicationId, 'admin', { name }));
   const [columns, setColumns] =
     useState<Record<DeliberationsColumnId, DeliberationsCandidate[]>>(initialColumns);
   // Baseline for dirty checks: last DB layout, or the applied columns on first load.
@@ -742,7 +748,6 @@ export function DeliberationsKanban({
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [locked, setLocked] = useState(selectionComplete);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
   /** null = manual column order (set after a drag). */
@@ -775,11 +780,6 @@ export function DeliberationsKanban({
   const isDirty = !layoutsEqual(currentLayout, savedLayout);
 
   const compareIdSet = useMemo(() => new Set(compareIds), [compareIds]);
-
-  const selectedCandidate = useMemo(() => {
-    if (!selectedId) return null;
-    return allCandidates.find((candidate) => candidate.id === selectedId) ?? null;
-  }, [allCandidates, selectedId]);
 
   const compareCandidates = useMemo(
     () =>
@@ -1169,7 +1169,17 @@ export function DeliberationsKanban({
                   setOverCapExtra(extra);
                 }}
                 compareIds={compareIdSet}
-                onOpenCandidate={(candidate) => setSelectedId(candidate.id)}
+                onOpenCandidate={(candidate) => {
+                  const href = applicantPageHref(
+                    candidate.applicationId,
+                    candidate.name,
+                  );
+                  if (workspace) {
+                    workspace.openTab(href);
+                    return;
+                  }
+                  router.push(href);
+                }}
                 onPrefetchCandidate={(candidate) =>
                   prefetchDeliberationsDetail(detailUrl(candidate.applicationId))
                 }
@@ -1205,61 +1215,6 @@ export function DeliberationsKanban({
             }}
           </KanbanOverlay>
         </Kanban>
-
-        <Sheet
-          open={selectedCandidate != null}
-          onOpenChange={(open) => {
-            if (!open) setSelectedId(null);
-          }}
-        >
-          <SheetContent side="right" size="lg" className="overflow-y-auto">
-            {selectedCandidate ? (
-              <>
-                <SheetHeader>
-                  <SheetTitle>{selectedCandidate.name}</SheetTitle>
-                  <SheetDescription className="sr-only">
-                    Applicant detail for {selectedCandidate.name}, row{' '}
-                    {displayApplicantId(selectedCandidate.rowIndex)}, {teamName}
-                    {selectedCandidate.rejected ? ', rejected' : ''}
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="flex flex-wrap gap-2 px-4">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const already = compareIdSet.has(selectedCandidate.id)
-                      if (!already && compareIds.length >= COMPARE_MAX) {
-                        toast.error(`Compare is limited to ${COMPARE_MAX} applicants.`)
-                        return
-                      }
-                      toggleCompare(selectedCandidate.id)
-                      toast.success(
-                        already
-                          ? `Removed ${selectedCandidate.name} from compare`
-                          : `Added ${selectedCandidate.name} to compare`,
-                      )
-                    }}
-                  >
-                    <Columns2Icon className="size-3.5" />
-                    {compareIdSet.has(selectedCandidate.id)
-                      ? 'Remove from compare'
-                      : 'Add to compare'}
-                  </Button>
-                </div>
-                <DeliberationsCandidateDetailPanel
-                  teamId={teamId}
-                  teamName={teamName}
-                  applicationId={selectedCandidate.applicationId}
-                  rejected={selectedCandidate.rejected}
-                  onToggleRejected={() => toggleRejected(selectedCandidate.id)}
-                  detailUrl={detailUrl(selectedCandidate.applicationId)}
-                />
-              </>
-            ) : null}
-          </SheetContent>
-        </Sheet>
       </div>
 
       <ApplicantCompareDialog

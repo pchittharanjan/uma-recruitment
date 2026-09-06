@@ -32,7 +32,10 @@ export async function GET(
     const detail = await buildDeliberationsCandidateDetail(teamId, round.id, applicationId);
     if (!detail) return notFound('Application not found on this team’s deliberations board.');
 
-    return NextResponse.json({ detail });
+    return NextResponse.json({
+      detail,
+      team: { id: team.id, name: team.name },
+    });
   } catch (e) {
     console.error('GET /api/admin/teams/[teamId]/deliberations/[applicationId] failed:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

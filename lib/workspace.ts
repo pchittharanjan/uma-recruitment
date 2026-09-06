@@ -82,6 +82,9 @@ export function workspaceTabMatches(storedHref: string, currentHref: string): bo
   // Deliberations mutates ?tabs/?active via replaceState — one outer tab.
   if (storedPath === '/admin/deliberations') return true;
 
+  // Applicant detail may include ?name= for the tab label only.
+  if (/\/deliberations\/\d+$/.test(storedPath)) return true;
+
   // Dashboard phase hub: ?view= swaps content on the same tab.
   if (storedPath === '/admin/dashboard') return true;
 
@@ -188,6 +191,15 @@ export function workspaceTitle(
     const teamId = adminTeam[1]!;
     const rest = adminTeam[2] ?? '';
     if (!rest) return resolveTeamName(teamId, context);
+    const delibsApplicant = rest.match(/^deliberations\/\d+$/);
+    if (delibsApplicant) {
+      const name = new URLSearchParams(
+        search.startsWith('?') ? search.slice(1) : search,
+      )
+        .get('name')
+        ?.trim();
+      return teamTabTitle(teamId, name || 'Applicant', context);
+    }
     return teamTabTitle(teamId, adminTeamPageLabel(rest), context);
   }
 
@@ -196,6 +208,15 @@ export function workspaceTitle(
     const teamId = teamPath[1]!;
     const rest = teamPath[2] ?? '';
     if (!rest) return resolveTeamName(teamId, context);
+    const delibsApplicant = rest.match(/^deliberations\/\d+$/);
+    if (delibsApplicant) {
+      const name = new URLSearchParams(
+        search.startsWith('?') ? search.slice(1) : search,
+      )
+        .get('name')
+        ?.trim();
+      return teamTabTitle(teamId, name || 'Applicant', context);
+    }
     return teamTabTitle(teamId, teamPortalPageLabel(rest), context);
   }
 

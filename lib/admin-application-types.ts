@@ -14,6 +14,7 @@ export interface AdminApplicationRow {
   finalScore: number | null;
   rank: number | null;
   adminNote: string | null;
+  /** Completed / total assignments for the same stage as Score (not all pipeline stages). */
   graderCompleted: number;
   graderTotal: number;
 }

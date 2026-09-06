@@ -1,4 +1,5 @@
 import { ResponseText } from '@/components/response-text';
+import { prepareApplicationFieldsForDisplay } from '@/lib/application-fields-display';
 import { restAfterFirstUrl } from '@/lib/link-preview';
 
 function isHttpUrl(value: string): boolean {
@@ -40,9 +41,11 @@ export function ApplicationFieldsList({
   /** Accepted for callers that still pass it; Open in Drive is always shown. */
   blind?: boolean;
 }) {
+  const entries = prepareApplicationFieldsForDisplay(fields);
+
   return (
     <div className={className ?? 'space-y-3'}>
-      {Object.entries(fields).map(([key, value]) => (
+      {entries.map(({ key, value }) => (
         <div
           key={key}
           className="display-panel min-w-0 p-4"

@@ -63,7 +63,7 @@ export function suggestTeamColumn(headers: string[]): string | undefined {
   return undefined;
 }
 
-function isTruthyValue(value: string): boolean {
+export function isTruthyValue(value: string): boolean {
   const v = value.trim().toLowerCase();
   if (FALSY.has(v)) return false;
   if (TRUTHY.has(v)) return true;

@@ -1,6 +1,14 @@
 import { isPlaceholderCandidateEmail, resolveApplicantEmail } from '@/lib/candidates';
-import { getDb, getTeams, type ApplicationStage, type RejectedFromStage, type Team } from '@/lib/db';
+import {
+  getDb,
+  getTeams,
+  type ApplicationStage,
+  type AssignmentStage,
+  type RejectedFromStage,
+  type Team,
+} from '@/lib/db';
 import type { AdminApplicationDetail, AdminApplicationRow } from '@/lib/admin-application-types';
+import { assignmentProgressStage } from '@/lib/stages';
 
 export type { AdminApplicationDetail, AdminApplicationRow } from '@/lib/admin-application-types';
 
@@ -121,21 +129,23 @@ export async function listAdminApplications(
   });
 
   const appIds = result.rows.map((r) => r.id as number);
-  const progressByApp = new Map<number, { completed: number; total: number }>();
+  // Per application + assignment stage — list UI scopes to the same stage as Score.
+  const progressByAppStage = new Map<string, { completed: number; total: number }>();
 
   if (appIds.length > 0) {
     const placeholders = appIds.map(() => '?').join(',');
     const progress = await db.execute({
-      sql: `SELECT application_id,
+      sql: `SELECT application_id, stage,
                    COUNT(*) AS total,
                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
             FROM assignments
             WHERE application_id IN (${placeholders})
-            GROUP BY application_id`,
+            GROUP BY application_id, stage`,
       args: appIds,
     });
     for (const row of progress.rows) {
-      progressByApp.set(row.application_id as number, {
+      const key = `${row.application_id as number}:${row.stage as string}`;
+      progressByAppStage.set(key, {
         total: (row.total as number) ?? 0,
         completed: (row.completed as number) ?? 0,
       });
@@ -144,7 +154,13 @@ export async function listAdminApplications(
 
   const applications: AdminApplicationRow[] = result.rows.map((row) => {
     const id = row.id as number;
-    const prog = progressByApp.get(id) ?? { completed: 0, total: 0 };
+    const stage = row.stage as ApplicationStage;
+    const rejectedFromStage = (row.rejected_from_stage as RejectedFromStage | null) ?? null;
+    const progressStage = assignmentProgressStage(stage, rejectedFromStage);
+    const prog = progressByAppStage.get(`${id}:${progressStage}`) ?? {
+      completed: 0,
+      total: 0,
+    };
     const candidateEmailRaw = (row.candidate_email as string | null) ?? '';
     const fields = row.fields != null ? parseApplicationFields(row.fields) : {};
     const candidateEmail =
@@ -154,8 +170,8 @@ export async function listAdminApplications(
     return {
       id,
       rowIndex: (row.row_index as number | null) ?? 0,
-      stage: row.stage as ApplicationStage,
-      rejectedFromStage: (row.rejected_from_stage as RejectedFromStage | null) ?? null,
+      stage,
+      rejectedFromStage,
       teamId: row.team_id as number,
       teamName: row.team_name as string,
       roundId: row.round_id as number,
@@ -203,18 +219,21 @@ export async function getAdminApplication(
   const id = row.id as number;
   const fields = parseApplicationFields(row.fields);
 
+  const stage = row.stage as ApplicationStage;
+  const rejectedFromStage = (row.rejected_from_stage as RejectedFromStage | null) ?? null;
+  const progressStage: AssignmentStage = assignmentProgressStage(stage, rejectedFromStage);
   const progress = await db.execute({
     sql: `SELECT COUNT(*) AS total,
                  SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
-          FROM assignments WHERE application_id = ?`,
-    args: [id],
+          FROM assignments WHERE application_id = ? AND stage = ?`,
+    args: [id, progressStage],
   });
 
   return {
     id,
     rowIndex: (row.row_index as number | null) ?? 0,
-    stage: row.stage as ApplicationStage,
-    rejectedFromStage: (row.rejected_from_stage as RejectedFromStage | null) ?? null,
+    stage,
+    rejectedFromStage,
     teamId: row.team_id as number,
     teamName: row.team_name as string,
     roundId: row.round_id as number,

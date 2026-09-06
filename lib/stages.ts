@@ -448,3 +448,61 @@ export function applicationPipelineStatusLabel(
   }
   return applicationStageLabel(stage);
 }
+
+/**
+ * Which ranking wrote `applications.final_score` / `rank`.
+ * That field is overwritten each advancement cut — Application first, then First Round.
+ * Deliberations does not rewrite it.
+ */
+export function finalScoreSourceStage(
+  stage: ApplicationStage,
+  rejectedFromStage: RejectedFromStage | null | undefined,
+): 'application' | 'first_round' | null {
+  if (stage === 'application') return null;
+  if (stage === 'rejected') {
+    if (rejectedFromStage === 'application') return 'application';
+    if (
+      rejectedFromStage === 'first_round' ||
+      rejectedFromStage === 'final_round' ||
+      rejectedFromStage === 'deliberations'
+    ) {
+      return 'first_round';
+    }
+    return null;
+  }
+  if (stage === 'first_round') return 'application';
+  return 'first_round';
+}
+
+/** Short label for the stage that produced `final_score` (e.g. "First Round"). */
+export function finalScoreSourceLabel(
+  stage: ApplicationStage,
+  rejectedFromStage: RejectedFromStage | null | undefined,
+): string | null {
+  const source = finalScoreSourceStage(stage, rejectedFromStage);
+  if (source === 'application') return 'Application';
+  if (source === 'first_round') return 'First Round';
+  return null;
+}
+
+/**
+ * Which `assignments.stage` the Applications list Reviews count should use.
+ * Matches the score source when one exists; otherwise Application (still being graded).
+ */
+export function assignmentProgressStage(
+  stage: ApplicationStage,
+  rejectedFromStage: RejectedFromStage | null | undefined,
+): AssignmentStage {
+  return finalScoreSourceStage(stage, rejectedFromStage) ?? 'application';
+}
+
+/** Short label for that assignment stage (same wording as score source). */
+export function assignmentProgressLabel(
+  stage: ApplicationStage,
+  rejectedFromStage: RejectedFromStage | null | undefined,
+): string {
+  const assignmentStage = assignmentProgressStage(stage, rejectedFromStage);
+  if (assignmentStage === 'application') return 'Application';
+  if (assignmentStage === 'first_round') return 'First Round';
+  return 'Final Round';
+}

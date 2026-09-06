@@ -28,7 +28,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import type { ApplicationStage } from '@/lib/db';
 import { displayApplicantId } from '@/lib/applicant-id';
-import { applicationPipelineStatusLabel } from '@/lib/stages';
+import {
+  applicationPipelineStatusLabel,
+  assignmentProgressLabel,
+  finalScoreSourceLabel,
+} from '@/lib/stages';
 import { cachedJsonFetch, peekCachedJson } from '@/lib/client-fetch-cache';
 import { teamBadgeClass } from '@/lib/team-colors';
 import type { RejectedFromStage } from '@/lib/db';
@@ -463,6 +467,12 @@ export function AdminApplicationsView({
   };
 
   const sheetApp = detail ?? selectedRow;
+  const sheetScoreSource = sheetApp
+    ? finalScoreSourceLabel(sheetApp.stage, sheetApp.rejectedFromStage)
+    : null;
+  const sheetReviewsLabel = sheetApp
+    ? assignmentProgressLabel(sheetApp.stage, sheetApp.rejectedFromStage)
+    : null;
 
   return (
     <PageContainer size="wide" className="space-y-6">
@@ -615,7 +625,7 @@ export function AdminApplicationsView({
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
-                        tooltip="Average score for this application on this team."
+                        tooltip="From the latest cut that saved a score: Application graders, or First Round interviewers. For someone rejected at First Round, this is their interview average — not their written app score."
                       />
                       <SortableHeader
                         label="Rank"
@@ -623,71 +633,112 @@ export function AdminApplicationsView({
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
-                        tooltip="Place on this team's scored list. 1 is the highest score."
+                        tooltip="Place in the same cut as Score (1 = highest on that team for that stage). For First Round rejects, this is their First Round interview rank — not Application rank."
                       />
                       <SortableHeader
-                        label="Graders"
+                        label="Reviews"
                         sortKey="graders"
                         activeKey={sortKey}
                         dir={sortDir}
                         onSort={handleSort}
-                        tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
+                        tooltip="Completed / assigned for the same stage as Score (Application graders or First Round interviewers) — not every assignment across the whole pipeline."
                       />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
-                    {sortedApplications.map((app) => (
-                      <tr
-                        key={app.id}
-                        onClick={() => openDetail(app)}
-                        className={cn(
-                          'cursor-pointer',
-                          selectedId === app.id && 'bg-background',
-                        )}
-                      >
-                        <td className="overflow-hidden p-3 font-mono tabular-nums text-muted-foreground">
-                          {app.id}
-                        </td>
-                        <td className="overflow-hidden p-3 font-mono font-medium tabular-nums">
-                          #{displayApplicantId(app.rowIndex)}
-                        </td>
-                        <td className="min-w-0 overflow-hidden p-3">
-                          <div className="truncate font-medium">{app.candidateName}</div>
-                          {otherTeamsForApplicant(app, teamsByEmail).length > 0 && (
-                            <p className="truncate text-sm text-muted-foreground">
-                              Also on {otherTeamsForApplicant(app, teamsByEmail).join(', ')}
-                            </p>
+                    {sortedApplications.map((app) => {
+                      const scoreSource = finalScoreSourceLabel(
+                        app.stage,
+                        app.rejectedFromStage,
+                      );
+                      const reviewsLabel = assignmentProgressLabel(
+                        app.stage,
+                        app.rejectedFromStage,
+                      );
+                      return (
+                        <tr
+                          key={app.id}
+                          onClick={() => openDetail(app)}
+                          className={cn(
+                            'cursor-pointer',
+                            selectedId === app.id && 'bg-background',
                           )}
-                        </td>
-                        <td className="min-w-0 truncate p-3 text-muted-foreground">
-                          {app.candidateEmail}
-                        </td>
-                        <td className="min-w-0 overflow-hidden p-3">
-                          <Badge className={cn('border-0 font-medium', teamBadgeClass(app.teamName))}>
-                            {app.teamName}
-                          </Badge>
-                        </td>
-                        <td className="min-w-0 overflow-hidden p-3">
-                          <StageBadge
-                            label={applicationPipelineStatusLabel(
-                              app.stage,
-                              app.rejectedFromStage,
+                        >
+                          <td className="overflow-hidden p-3 font-mono tabular-nums text-muted-foreground">
+                            {app.id}
+                          </td>
+                          <td className="overflow-hidden p-3 font-mono font-medium tabular-nums">
+                            #{displayApplicantId(app.rowIndex)}
+                          </td>
+                          <td className="min-w-0 overflow-hidden p-3">
+                            <div className="truncate font-medium">{app.candidateName}</div>
+                            {otherTeamsForApplicant(app, teamsByEmail).length > 0 && (
+                              <p className="truncate text-sm text-muted-foreground">
+                                Also on {otherTeamsForApplicant(app, teamsByEmail).join(', ')}
+                              </p>
                             )}
-                            color={stageBadgeColor(app.stage)}
-                            size="compact"
-                          />
-                        </td>
-                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
-                          {app.finalScore != null ? app.finalScore.toFixed(2) : '-'}
-                        </td>
-                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
-                          {app.rank ?? '-'}
-                        </td>
-                        <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
-                          {app.graderCompleted}/{app.graderTotal}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="min-w-0 truncate p-3 text-muted-foreground">
+                            {app.candidateEmail}
+                          </td>
+                          <td className="min-w-0 overflow-hidden p-3">
+                            <Badge
+                              className={cn('border-0 font-medium', teamBadgeClass(app.teamName))}
+                            >
+                              {app.teamName}
+                            </Badge>
+                          </td>
+                          <td className="min-w-0 overflow-hidden p-3">
+                            <StageBadge
+                              label={applicationPipelineStatusLabel(
+                                app.stage,
+                                app.rejectedFromStage,
+                              )}
+                              color={stageBadgeColor(app.stage)}
+                              size="compact"
+                            />
+                          </td>
+                          <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
+                            {app.finalScore != null ? (
+                              <span className="block">
+                                <span>{app.finalScore.toFixed(2)}</span>
+                                {scoreSource && (
+                                  <span className="mt-0.5 block truncate text-xs font-normal normal-nums">
+                                    {scoreSource}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
+                            {app.rank != null ? (
+                              <span className="block">
+                                <span>{app.rank}</span>
+                                {scoreSource && (
+                                  <span className="mt-0.5 block truncate text-xs font-normal normal-nums">
+                                    {scoreSource}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="overflow-hidden p-3 tabular-nums text-muted-foreground">
+                            <span className="block">
+                              <span>
+                                {app.graderCompleted}/{app.graderTotal}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs font-normal normal-nums">
+                                {reviewsLabel}
+                              </span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -789,22 +840,22 @@ export function AdminApplicationsView({
                   />
                 </DetailStat>
                 <DetailStat
-                  label="Score"
-                  tooltip="Average score for this application on this team."
+                  label={sheetScoreSource ? `${sheetScoreSource} score` : 'Score'}
+                  tooltip="From the latest cut that saved a score: Application graders, or First Round interviewers. For someone rejected at First Round, this is their interview average — not their written app score."
                 >
                   <span className="tabular-nums">
                     {sheetApp.finalScore != null ? sheetApp.finalScore.toFixed(2) : '-'}
                   </span>
                 </DetailStat>
                 <DetailStat
-                  label="Rank"
-                  tooltip="Place on this team's scored list. 1 is the highest score."
+                  label={sheetScoreSource ? `${sheetScoreSource} rank` : 'Rank'}
+                  tooltip="Place in the same cut as Score (1 = highest on that team for that stage). For First Round rejects, this is their First Round interview rank — not Application rank."
                 >
                   <span className="tabular-nums">{sheetApp.rank ?? '-'}</span>
                 </DetailStat>
                 <DetailStat
-                  label="Graders"
-                  tooltip="How many people finished scoring this file, out of how many were assigned. Includes interviewers."
+                  label={sheetReviewsLabel ? `${sheetReviewsLabel} reviews` : 'Reviews'}
+                  tooltip="Completed / assigned for the same stage as Score (Application graders or First Round interviewers) — not every assignment across the whole pipeline."
                 >
                   <span className="tabular-nums">
                     {sheetApp.graderCompleted}/{sheetApp.graderTotal} completed

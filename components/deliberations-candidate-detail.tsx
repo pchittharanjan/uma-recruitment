@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ApplicationFieldsList } from '@/components/application-fields-list';
 import StageBadge from '@/components/stage-badge';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { displayApplicantId } from '@/lib/applicant-id';
 import { cachedJsonFetch } from '@/lib/client-fetch-cache';
 import type { DeliberationsCandidateDetail } from '@/lib/deliberations-types';
 import type { ApplicationStage } from '@/lib/db';
+import { displayLabelForScoreField, parseCriterionScoreKey } from '@/lib/grading-model';
 import { applicationStageLabel } from '@/lib/stages';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +18,7 @@ export function prefetchDeliberationsDetail(url: string): void {
   void cachedJsonFetch(url);
 }
 
-function formatScore(value: number | null): string {
+export function formatDeliberationsScore(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '-';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
@@ -38,36 +39,132 @@ function stageBadgeColor(stage: string): 'blue' | 'green' | 'gray' | 'yellow' | 
   }
 }
 
-function PhaseScoreChips({
+export type DeliberationsPhaseScoreKey = 'application' | 'firstRound' | 'finalRound';
+
+export function DeliberationsPhaseScoreChips({
   application,
   firstRound,
   finalRound,
+  onSelectPhase,
 }: {
   application: number | null;
   firstRound: number | null;
   finalRound: number | null;
+  onSelectPhase?: (phase: DeliberationsPhaseScoreKey) => void;
 }) {
+  const chipClassName = cn(
+    'inline-flex min-w-[7.5rem] items-center justify-between gap-3 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-semibold text-white',
+    onSelectPhase && 'cursor-pointer transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  );
+
+  const chips: Array<{ phase: DeliberationsPhaseScoreKey; label: string; value: number | null }> = [
+    { phase: 'application', label: 'Application', value: application },
+    { phase: 'firstRound', label: 'First', value: firstRound },
+    { phase: 'finalRound', label: 'Final', value: finalRound },
+  ];
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      <Badge className="rounded border border-zinc-800 bg-zinc-900 font-semibold tabular-nums text-white">
-        Application {formatScore(application)}
-      </Badge>
-      <Badge className="rounded border border-zinc-800 bg-zinc-900 font-semibold tabular-nums text-white">
-        First {formatScore(firstRound)}
-      </Badge>
-      <Badge className="rounded border border-zinc-800 bg-zinc-900 font-semibold tabular-nums text-white">
-        Final {formatScore(finalRound)}
-      </Badge>
+    <div className="flex flex-wrap gap-2">
+      {chips.map(({ phase, label, value }) => {
+        const content = (
+          <>
+            <span>{label}</span>
+            <span className="tabular-nums">{formatDeliberationsScore(value)}</span>
+          </>
+        );
+
+        if (onSelectPhase) {
+          return (
+            <button
+              key={phase}
+              type="button"
+              className={chipClassName}
+              onClick={() => onSelectPhase(phase)}
+            >
+              {content}
+            </button>
+          );
+        }
+
+        return (
+          <Badge key={phase} className={chipClassName}>
+            {content}
+          </Badge>
+        );
+      })}
     </div>
   );
 }
 
-function ReviewsSection({
+type ScoreGroup = {
+  id: string;
+  label: string;
+  criteria: Array<{ key: string; name: string }>;
+};
+
+/** Union of question → criteria across reviewers (labels once; scores looked up by key). */
+function buildScoreMatrixStructure(
+  reviews: DeliberationsCandidateDetail['applicationReviews'],
+  scoreFieldLabels: Record<string, string>,
+): ScoreGroup[] {
+  const groups = new Map<string, ScoreGroup>();
+  const order: string[] = [];
+  const seenCriteria = new Map<string, Set<string>>();
+
+  for (const review of reviews) {
+    for (const field of Object.keys(review.scores)) {
+      const fullLabel = displayLabelForScoreField(field, scoreFieldLabels);
+      const parsed = parseCriterionScoreKey(field);
+      const separator = fullLabel.indexOf(' · ');
+      const questionLabel =
+        separator > 0 ? fullLabel.slice(0, separator).trim() : parsed?.questionId ?? 'Scores';
+      const criterionName =
+        separator > 0 ? fullLabel.slice(separator + 3).trim() : fullLabel;
+      const groupId = parsed?.questionId ?? questionLabel;
+
+      let group = groups.get(groupId);
+      if (!group) {
+        group = { id: groupId, label: questionLabel, criteria: [] };
+        groups.set(groupId, group);
+        order.push(groupId);
+        seenCriteria.set(groupId, new Set());
+      }
+      const seen = seenCriteria.get(groupId)!;
+      if (seen.has(field)) continue;
+      seen.add(field);
+      group.criteria.push({ key: field, name: criterionName || fullLabel });
+    }
+  }
+
+  return order.map((id) => groups.get(id)!);
+}
+
+function shortReviewerName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return name.trim() || 'Reviewer';
+  return parts[0]!;
+}
+
+function noteMatchesGroup(noteLabel: string, group: ScoreGroup): boolean {
+  const normalizedGroup = group.label.replace(/\s*\(max\b[^)]*\)\s*$/i, '').trim();
+  const normalizedNote = noteLabel.replace(/\s*\(max\b[^)]*\)\s*$/i, '').trim();
+  return (
+    noteLabel === group.label ||
+    noteLabel === group.id ||
+    normalizedNote === normalizedGroup ||
+    normalizedNote.startsWith(normalizedGroup) ||
+    normalizedGroup.startsWith(normalizedNote)
+  );
+}
+
+export function DeliberationsReviewsSection({
   title,
   reviews,
+  scoreFieldLabels,
 }: {
   title: string;
   reviews: DeliberationsCandidateDetail['applicationReviews'];
+  scoreFieldLabels: Record<string, string>;
 }) {
   if (reviews.length === 0) {
     return (
@@ -80,56 +177,129 @@ function ReviewsSection({
     );
   }
 
+  const groups = buildScoreMatrixStructure(reviews, scoreFieldLabels);
+  const hasAnyScores = groups.some((group) => group.criteria.length > 0);
+  const hasNotesOrComments = reviews.some(
+    (review) =>
+      Boolean(review.comment?.trim()) ||
+      Object.values(review.notes ?? {}).some((note) => note.trim()),
+  );
+
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+    <div className="space-y-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
         {title}
       </p>
-      <div className="space-y-3">
-        {reviews.map((review, index) => (
-          <div
-            key={`${review.reviewerName}-${index}`}
-            className="display-panel px-3 py-3"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">
-                  {review.reviewerName}
-                </p>
-                <p className="text-sm capitalize text-foreground/70">{review.status}</p>
-              </div>
-              <p className="shrink-0 tabular-nums text-sm font-semibold text-foreground">
-                {formatScore(review.average)}
-              </p>
-            </div>
-            {Object.keys(review.scores).length > 0 && (
-              <div className="mt-2 divide-y divide-border rounded-md border border-border bg-background">
-                {Object.entries(review.scores).map(([field, score]) => (
-                  <div key={field} className="flex items-start gap-3 px-2.5 py-2">
-                    <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground/80">
-                      {field}
-                    </p>
-                    <p className="shrink-0 tabular-nums text-sm font-semibold text-foreground">
-                      {score}
-                    </p>
-                  </div>
+
+      {hasAnyScores ? (
+        <div className="overflow-x-auto rounded-md border border-border bg-background">
+          <table className="w-full min-w-[28rem] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Criterion
+                </th>
+                {reviews.map((review, index) => (
+                  <th
+                    key={`${review.reviewerName}-${index}`}
+                    className="px-2 py-2 text-center text-xs font-semibold text-foreground"
+                    title={`${review.reviewerName} · ${review.status}`}
+                  >
+                    <span className="block truncate">{shortReviewerName(review.reviewerName)}</span>
+                    <span className="mt-0.5 block tabular-nums text-foreground/70">
+                      {formatDeliberationsScore(review.average)}
+                    </span>
+                  </th>
                 ))}
-              </div>
-            )}
-            {review.comment?.trim() ? (
-              <p className="mt-2 whitespace-pre-wrap text-base text-foreground">{review.comment}</p>
-            ) : null}
-            {Object.entries(review.notes ?? {}).map(([label, note]) =>
-              note.trim() ? (
-                <div key={label} className="mt-2">
-                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
-                  <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{note}</p>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((group) => (
+                <Fragment key={group.id}>
+                  <tr className="border-b border-border bg-muted/25">
+                    <td
+                      colSpan={reviews.length + 1}
+                      className="px-3 py-2 text-sm font-semibold text-foreground"
+                    >
+                      {group.label}
+                    </td>
+                  </tr>
+                  {group.criteria.map((criterion) => (
+                    <tr
+                      key={criterion.key}
+                      className="border-b border-border/60 last:border-b-0"
+                    >
+                      <td className="px-3 py-2 text-foreground/80">{criterion.name}</td>
+                      {reviews.map((review, index) => {
+                        const score = review.scores[criterion.key];
+                        return (
+                          <td
+                            key={`${review.reviewerName}-${index}-${criterion.key}`}
+                            className="px-2 py-2 text-center tabular-nums font-semibold text-foreground"
+                          >
+                            {score != null && Number.isFinite(score) ? score : '—'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm italic text-muted-foreground">No criterion scores recorded.</p>
+      )}
+
+      {hasNotesOrComments ? (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
+            Comments & notes
+          </p>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {reviews.map((review, index) => {
+              const notes = Object.entries(review.notes ?? {}).filter(([, note]) =>
+                note.trim(),
+              );
+              const comment = review.comment?.trim() ?? '';
+              if (!comment && notes.length === 0) return null;
+
+              return (
+                <div
+                  key={`${review.reviewerName}-notes-${index}`}
+                  className="display-panel space-y-2 px-3 py-3"
+                >
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {review.reviewerName}
+                  </p>
+                  {comment ? (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Overall</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">
+                        {comment}
+                      </p>
+                    </div>
+                  ) : null}
+                  {notes.map(([label, note]) => {
+                    const group = groups.find((item) => noteMatchesGroup(label, item));
+                    return (
+                      <div key={label}>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {group?.label ?? label}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">
+                          {note}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : null,
-            )}
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -240,7 +410,7 @@ export function DeliberationsCandidateDetailPanel({
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
           Phase scores
         </p>
-        <PhaseScoreChips
+        <DeliberationsPhaseScoreChips
           application={detail.phaseAverages.application}
           firstRound={detail.phaseAverages.firstRound}
           finalRound={detail.phaseAverages.finalRound}
@@ -301,9 +471,21 @@ export function DeliberationsCandidateDetailPanel({
         </div>
       ) : null}
 
-      <ReviewsSection title="Application Scores" reviews={detail.applicationReviews} />
-      <ReviewsSection title="First Round Interviews" reviews={detail.firstRoundReviews} />
-      <ReviewsSection title="Final Round Interviews" reviews={detail.finalRoundReviews} />
+      <DeliberationsReviewsSection
+        title="Application Scores"
+        reviews={detail.applicationReviews}
+        scoreFieldLabels={detail.scoreFieldLabels ?? {}}
+      />
+      <DeliberationsReviewsSection
+        title="First Round Interviews"
+        reviews={detail.firstRoundReviews}
+        scoreFieldLabels={detail.scoreFieldLabels ?? {}}
+      />
+      <DeliberationsReviewsSection
+        title="Final Round Interviews"
+        reviews={detail.finalRoundReviews}
+        scoreFieldLabels={detail.scoreFieldLabels ?? {}}
+      />
 
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">

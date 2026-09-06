@@ -13,6 +13,7 @@ import {
   type DeliberationsCandidate,
   type DeliberationsColumnId,
 } from '@/lib/deliberations-types';
+import { deliberationsApplicantHref } from '@/lib/deliberations-paths';
 
 const DeliberationsKanban = dynamic(
   () =>
@@ -101,6 +102,11 @@ export function DeliberationsTeamBoard({
       return `/api/team/deliberations/details?teamId=${teamId}&ids=${applicationIds.join(',')}`;
     }
     return `/api/admin/teams/${teamId}/deliberations/details?ids=${applicationIds.join(',')}`;
+  };
+
+  const resolveApplicantPageHref = (applicationId: number, name?: string) => {
+    const audience = detailApiBase?.includes('/api/team/') ? 'team' : 'admin';
+    return deliberationsApplicantHref(teamId, applicationId, audience, { name });
   };
 
   const loadBoard = useCallback(() => {
@@ -215,6 +221,7 @@ export function DeliberationsTeamBoard({
         saveUrl={effectiveCanSave ? boardUrl : undefined}
         resolveDetailUrl={resolveDetailUrl}
         resolveBatchDetailsUrl={resolveBatchDetailsUrl}
+        resolveApplicantPageHref={resolveApplicantPageHref}
         onFinalized={() => setReloadKey((k) => k + 1)}
       />
     </div>

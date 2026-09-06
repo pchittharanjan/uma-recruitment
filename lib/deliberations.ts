@@ -5,6 +5,7 @@ import { resolveApplicantEmail } from '@/lib/candidates';
 import { getDb, getTeamById } from '@/lib/db';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
 import {
+  applicationCriterionLabels,
   primaryScoredQuestions,
   resolveGradingRubric,
   splitScoreRows,
@@ -15,11 +16,13 @@ import {
   deliberationsPendingStages,
   getTeamPipelineProfile,
 } from '@/lib/team-pipeline-profile';
+import { normalizeApplicantName } from '@/lib/coffee-chats';
 import type {
   DeliberationsBoardData,
   DeliberationsBoardLayout,
   DeliberationsCandidate,
   DeliberationsCandidateDetail,
+  DeliberationsCoffeeChat,
   DeliberationsFlag,
   DeliberationsScoreEntry,
 } from '@/lib/deliberations-types';
@@ -30,6 +33,7 @@ export type {
   DeliberationsBoardLayout,
   DeliberationsCandidate,
   DeliberationsCandidateDetail,
+  DeliberationsCoffeeChat,
   DeliberationsColumnId,
   DeliberationsFlag,
   DeliberationsScoreEntry,
@@ -453,6 +457,54 @@ function relabelQuestionNotes(
   return out;
 }
 
+function parseTeamsInterestedJson(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  } catch {
+    return [];
+  }
+}
+
+/** Soft-match coffee chats by applicant email (preferred) or unique normalized name. */
+async function loadCoffeeChatsForApplicant(
+  email: string,
+  name: string,
+): Promise<DeliberationsCoffeeChat[]> {
+  const db = getDb();
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedName = normalizeApplicantName(name);
+  if (!normalizedEmail && !normalizedName) return [];
+
+  const result = await db.execute({
+    sql: `SELECT id, chat_date, submitter_name, applicant_name, applicant_email,
+                 applicant_grade_level, teams_interested,
+                 vibes, green_flags, red_flags, other_comments, conflict_of_interest
+          FROM coffee_chats
+          WHERE (? != '' AND lower(trim(coalesce(applicant_email, ''))) = ?)
+             OR (? != '' AND applicant_name_normalized = ?)
+          ORDER BY chat_date DESC, id DESC`,
+    args: [normalizedEmail, normalizedEmail, normalizedName, normalizedName],
+  });
+
+  return result.rows.map((row) => ({
+    id: row.id as number,
+    chatDate: row.chat_date as string,
+    submitterName: (row.submitter_name as string) || 'Unknown',
+    applicantName: row.applicant_name as string,
+    applicantEmail: (row.applicant_email as string | null) ?? null,
+    applicantGradeLevel: (row.applicant_grade_level as string | null) ?? null,
+    teamsInterested: parseTeamsInterestedJson(row.teams_interested),
+    vibes: (row.vibes as string | null) ?? null,
+    greenFlags: (row.green_flags as string | null) ?? null,
+    redFlags: (row.red_flags as string | null) ?? null,
+    otherComments: (row.other_comments as string | null) ?? null,
+    conflictOfInterest: (row.conflict_of_interest as string | null) ?? null,
+  }));
+}
+
 /** Unified candidate view for deliberations — the allowed merge point. */
 export async function buildDeliberationsCandidateDetail(
   teamId: number,
@@ -495,28 +547,43 @@ export async function buildDeliberationsCandidateDetail(
     fields = {};
   }
 
-  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, reviewsByStage, flagsResult, settings] =
-    await Promise.all([
-      loadStageAverages([applicationId], 'application'),
-      loadStageAverages([applicationId], 'first_round'),
-      loadStageAverages([applicationId], 'final_round'),
-      loadAllStageReviews(applicationId, teamId),
-      db.execute({
-        sql: `SELECT f.color, f.note, f.created_at, u.name AS author_name
-              FROM flags f
-              JOIN users u ON u.id = f.author_id
-              WHERE f.application_id = ?
-              ORDER BY f.created_at DESC`,
-        args: [applicationId],
-      }),
-      getRoundSettings(roundId),
-    ]);
+  const name = (row.candidate_name as string) || `Applicant ${applicationId}`;
+  const email = resolveApplicantEmail(fields, (row.candidate_email as string | null) ?? '');
+
+  const [
+    applicationAvgs,
+    firstRoundAvgs,
+    finalRoundAvgs,
+    reviewsByStage,
+    flagsResult,
+    settings,
+    coffeeChats,
+  ] = await Promise.all([
+    loadStageAverages([applicationId], 'application'),
+    loadStageAverages([applicationId], 'first_round'),
+    loadStageAverages([applicationId], 'final_round'),
+    loadAllStageReviews(applicationId, teamId),
+    db.execute({
+      sql: `SELECT f.color, f.note, f.created_at, u.name AS author_name
+            FROM flags f
+            JOIN users u ON u.id = f.author_id
+            WHERE f.application_id = ?
+            ORDER BY f.created_at DESC`,
+      args: [applicationId],
+    }),
+    getRoundSettings(roundId),
+    loadCoffeeChatsForApplicant(email, name),
+  ]);
 
   const questionLabels = new Map<string, string>();
+  let scoreFieldLabels: Record<string, string> = {};
   if (settings) {
     const rubric = resolveGradingRubric(settings, teamName);
     for (const question of primaryScoredQuestions(rubric.applicationQuestions)) {
       questionLabels.set(question.id, question.label);
+    }
+    if (rubric.gradingModel) {
+      scoreFieldLabels = applicationCriterionLabels(rubric.gradingModel);
     }
   }
 
@@ -530,8 +597,8 @@ export async function buildDeliberationsCandidateDetail(
   return {
     applicationId,
     rowIndex: (row.row_index as number | null) ?? 0,
-    name: (row.candidate_name as string) || `Applicant ${applicationId}`,
-    email: resolveApplicantEmail(fields, (row.candidate_email as string | null) ?? ''),
+    name,
+    email,
     stage: row.stage as string,
     adminNote: (row.admin_note as string | null) ?? null,
     fields,
@@ -546,6 +613,8 @@ export async function buildDeliberationsCandidateDetail(
     })),
     firstRoundReviews: reviewsByStage.first_round,
     finalRoundReviews: reviewsByStage.final_round,
+    coffeeChats,
+    scoreFieldLabels,
     flags,
   };
 }
