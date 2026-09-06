@@ -28,7 +28,15 @@ export async function countTeamDirectors(teamId: number, excludeUserId?: number)
           WHERE team_id = ? AND is_director = 1 AND revoked_at IS NULL${excludeClause}`,
     args,
   });
-  return (result.rows[0]?.count as number) ?? 0;
+  // libSQL may return COUNT as a string; coerce so `existing + adding` never string-concats.
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+export class DirectorLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DirectorLimitError';
+  }
 }
 
 export async function validateDirectorTeamAssignments(
@@ -44,7 +52,7 @@ export async function validateDirectorTeamAssignments(
   for (const [teamId, adding] of directorsAddedByTeam) {
     const existing = await countTeamDirectors(teamId, excludeUserId);
     if (existing + adding > MAX_DIRECTORS_PER_TEAM) {
-      throw new Error(
+      throw new DirectorLimitError(
         `Each team can have at most ${MAX_DIRECTORS_PER_TEAM} Directors. This change would exceed that limit.`,
       );
     }

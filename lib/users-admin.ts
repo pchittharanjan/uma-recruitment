@@ -1,7 +1,7 @@
 import { getDb, getTeams, getUserByEmail, rowToUser, type User } from '@/lib/db';
 import { isBerkeleyEmail } from '@/lib/auth';
 import { isAdminCreatableRole, type AdminCreatableRole } from '@/lib/roles';
-import { validateDirectorTeamAssignments } from '@/lib/directors';
+import { DirectorLimitError, validateDirectorTeamAssignments } from '@/lib/directors';
 
 export type { AdminCreatableRole } from '@/lib/roles';
 export { isAdminCreatableRole } from '@/lib/roles';
@@ -89,7 +89,10 @@ export async function createUser(input: CreateUserInput): Promise<User> {
       teamId,
       isDirector: input.directorTeamIds.includes(teamId),
     })),
-  );
+  ).catch((e) => {
+    if (e instanceof DirectorLimitError) throw new UserAdminError(e.message);
+    throw e;
+  });
 
   const db = getDb();
   const result = await db.execute({
@@ -188,7 +191,10 @@ export async function updateUser(input: UpdateUserInput): Promise<User> {
       isDirector: input.directorTeamIds.includes(teamId),
     })),
     input.userId,
-  );
+  ).catch((e) => {
+    if (e instanceof DirectorLimitError) throw new UserAdminError(e.message);
+    throw e;
+  });
 
   await db.execute({
     sql: 'UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?',
