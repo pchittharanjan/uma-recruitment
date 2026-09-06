@@ -189,8 +189,11 @@ export function InterviewScoringPreview({
   const { layout, updateLayout } = useGroupInterviewLayout();
   const elapsedTimer = useElapsedTimer();
 
+  // Final-round behavioral can still open the case packet.
   const casePdfUrl =
-    isPhasedInterview && interviewPhase === 'behavioral' ? undefined : guide.casePdfUrl;
+    isPhasedInterview && interviewPhase === 'behavioral' && stage !== 'final_round'
+      ? undefined
+      : guide.casePdfUrl;
 
   const disabled = !interactive;
 
@@ -458,7 +461,9 @@ export function InterviewScoringPreview({
               value={interviewPhase}
               onValueChange={(next) => {
                 setInterviewPhase(next);
-                setCaseOpen(next === 'case');
+                if (stage !== 'final_round') {
+                  setCaseOpen(next === 'case');
+                }
               }}
             />
           </div>

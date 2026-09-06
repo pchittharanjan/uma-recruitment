@@ -258,8 +258,10 @@ export default function TeamInterviewScorePage({
   const isPhasedInterview =
     !isGroupInterview && isPhasedCaseAndBehavioralInterview(data?.interviewGuide ?? null);
   const scoreFieldList = data ? allScoreFields(data) : [];
+  // Final-round behavioral can still reference the case; hide it only on earlier
+  // phased interviews when scoring behavioral.
   const casePdfUrl =
-    isPhasedInterview && interviewPhase === 'behavioral'
+    isPhasedInterview && interviewPhase === 'behavioral' && stage !== 'final_round'
       ? undefined
       : data?.interviewGuide?.casePdfUrl;
   const activePhaseFields = isPhasedInterview
@@ -351,7 +353,11 @@ export default function TeamInterviewScorePage({
     if (next === interviewPhase) return;
     setSubmitError('');
     setInterviewPhase(next);
-    setCaseOpen(next === 'case');
+    // Final round: leave case open/closed as-is so interviewers can keep it
+    // while scoring behavioral. Other rounds still auto-close on behavioral.
+    if (stage !== 'final_round') {
+      setCaseOpen(next === 'case');
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
