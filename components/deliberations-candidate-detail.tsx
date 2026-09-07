@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { ApplicationFieldsList } from '@/components/application-fields-list';
+import { DeliberationsAlsoOnBadges } from '@/components/deliberations-also-on-badge';
 import StageBadge from '@/components/stage-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -385,7 +386,7 @@ export function DeliberationsCandidateDetailPanel({
   if (!detail) return null;
 
   const metaParts = [
-    `Row ${displayApplicantId(detail.rowIndex)}`,
+    `Applicant #${displayApplicantId(detail.rowIndex)}`,
     detail.email?.trim() || null,
     teamName,
   ].filter(Boolean);
@@ -393,7 +394,13 @@ export function DeliberationsCandidateDetailPanel({
   return (
     <div className="min-w-0 space-y-6 px-4 pb-6 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 text-sm text-foreground/80">{metaParts.join(' · ')}</p>
+        <div className="min-w-0 space-y-1.5">
+          <p className="min-w-0 text-sm text-foreground/80">{metaParts.join(' · ')}</p>
+          <DeliberationsAlsoOnBadges
+            placements={detail.otherTeams}
+            badgeClassName="text-[0.7rem]"
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <StageBadge
             label={applicationStageLabel(detail.stage as ApplicationStage)}

@@ -20,6 +20,9 @@ const GRADE_PATTERNS: RegExp[] = [
   /^graduation year$/,
 ];
 
+/** Match Google Form / CSV phone columns (same idea as rubric + application display hide rules). */
+const PHONE_PATTERNS: RegExp[] = [/^phone/, /phone number/];
+
 function findFieldByPatterns(
   fields: Record<string, string>,
   patterns: RegExp[],
@@ -97,6 +100,11 @@ export function resolveApplicantEmail(
 /** Extract class year / grade from application fields (e.g. "Year" → "Class of 2029"). */
 export function findGradeInFields(fields: Record<string, string>): string {
   return findFieldByPatterns(fields, GRADE_PATTERNS);
+}
+
+/** Extract phone from application fields (e.g. "Phone Number", "Phone"). */
+export function findPhoneInFields(fields: Record<string, string>): string {
+  return findFieldByPatterns(fields, PHONE_PATTERNS);
 }
 
 export function extractCandidateFromFields(

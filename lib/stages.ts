@@ -422,6 +422,29 @@ export function applicationStageLabel(stage: ApplicationStage): string {
   }
 }
 
+/**
+ * Compact stage name for cross-team “Also …” badges
+ * (e.g. “Also Final Round Strategy”).
+ */
+export function shortApplicationStageLabel(stage: ApplicationStage | string): string {
+  switch (stage) {
+    case 'application':
+      return 'Application';
+    case 'first_round':
+      return 'First Round';
+    case 'final_round':
+      return 'Final Round';
+    case 'deliberations':
+      return 'Deliberations';
+    case 'advanced':
+      return 'Advanced';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return String(stage);
+  }
+}
+
 /** Short label for the gate a candidate was cut at. */
 export function rejectedFromStageLabel(stage: RejectedFromStage): string {
   switch (stage) {

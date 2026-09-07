@@ -1,3 +1,5 @@
+import { shortApplicationStageLabel } from '@/lib/stages';
+
 export type DeliberationsColumnId = 'pool' | 'considering' | 'accept';
 
 export const DELIBERATIONS_COLUMN_IDS: DeliberationsColumnId[] = [
@@ -5,6 +7,19 @@ export const DELIBERATIONS_COLUMN_IDS: DeliberationsColumnId[] = [
   'considering',
   'accept',
 ];
+
+/** Minimal cross-team pointer — team + stage only (no scores/notes/flags/column). */
+export interface DeliberationsOtherTeamPlacement {
+  teamName: string;
+  stage: string;
+}
+
+/** Badge copy: “Also Final Round Strategy”. */
+export function deliberationsAlsoOnLabel(
+  placement: DeliberationsOtherTeamPlacement,
+): string {
+  return `Also ${shortApplicationStageLabel(placement.stage)} ${placement.teamName}`;
+}
 
 export interface DeliberationsCandidate {
   id: string;
@@ -20,6 +35,8 @@ export interface DeliberationsCandidate {
   finalRoundAverage: number | null;
   /** Rejected / “No” mark for deliberations (persisted with board layout). */
   rejected: boolean;
+  /** Same person on other teams this cycle (team + stage only). */
+  otherTeams: DeliberationsOtherTeamPlacement[];
 }
 
 /** Saved kanban positions for a team+round. applicationIds only — scores come from live data. */
@@ -90,6 +107,8 @@ export interface DeliberationsCandidateDetail {
   /** Human labels for score keys (e.g. app-q1::criterion-… → Why UMA · Growth Potential). */
   scoreFieldLabels: Record<string, string>;
   flags: DeliberationsFlag[];
+  /** Same person on other teams this cycle (team + stage only). */
+  otherTeams: DeliberationsOtherTeamPlacement[];
 }
 
 function emptyLayoutColumns(): Record<DeliberationsColumnId, number[]> {

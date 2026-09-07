@@ -9,7 +9,13 @@ export interface FinalSelectionOffer {
   applicationId: number;
   name: string;
   grade: string;
+  phone: string;
   teamName: string;
+}
+
+function displayOrDash(value: string | undefined | null): string {
+  const trimmed = value?.trim() ?? '';
+  return trimmed || '—';
 }
 
 
@@ -242,15 +248,17 @@ export function FinalSelectionOffers({
             }}
           >
             <colgroup>
-              <col style={{ width: '46%' }} />
-              <col style={{ width: '32%' }} />
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '18%' }} />
               <col style={{ width: '22%' }} />
+              <col style={{ width: '30%' }} />
             </colgroup>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(26,24,22,0.08)', color: '#6b6560' }}>
                 <th style={{ padding: '10px 24px', fontWeight: 700 }}>Name</th>
                 <th style={{ padding: '10px 24px', fontWeight: 700 }}>Grade</th>
                 <th style={{ padding: '10px 24px', fontWeight: 700 }}>Team</th>
+                <th style={{ padding: '10px 24px', fontWeight: 700 }}>Phone</th>
               </tr>
             </thead>
             <tbody>
@@ -301,7 +309,7 @@ export function FinalSelectionOffers({
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {member.grade || '-'}
+                      {displayOrDash(member.grade)}
                     </td>
                     <td style={{ padding: '12px 24px' }}>
                       <span
@@ -316,6 +324,17 @@ export function FinalSelectionOffers({
                       >
                         {member.teamName}
                       </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: '12px 24px',
+                        color: '#6b6560',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {displayOrDash(member.phone)}
                     </td>
                   </tr>
                 );

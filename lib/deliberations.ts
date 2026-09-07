@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { batchDeliberationsFinalSelectionComplete } from '@/lib/batch-team-stats';
-import { resolveApplicantEmail } from '@/lib/candidates';
+import { isPlaceholderCandidateEmail, resolveApplicantEmail } from '@/lib/candidates';
 import { getDb, getTeamById } from '@/lib/db';
 import { getTeamAdvancementCapState } from '@/lib/team-advancement-caps';
 import {
@@ -24,6 +24,7 @@ import type {
   DeliberationsCandidateDetail,
   DeliberationsCoffeeChat,
   DeliberationsFlag,
+  DeliberationsOtherTeamPlacement,
   DeliberationsScoreEntry,
 } from '@/lib/deliberations-types';
 import { parseDeliberationsBoardLayout } from '@/lib/deliberations-types';
@@ -36,16 +37,149 @@ export type {
   DeliberationsCoffeeChat,
   DeliberationsColumnId,
   DeliberationsFlag,
+  DeliberationsOtherTeamPlacement,
   DeliberationsScoreEntry,
 } from '@/lib/deliberations-types';
 export {
   applyDeliberationsLayout,
+  deliberationsAlsoOnLabel,
   initialDeliberationsColumns,
   parseDeliberationsBoardLayout,
   serializeDeliberationsLayout,
 } from '@/lib/deliberations-types';
 
 type ScoreStage = 'application' | 'first_round' | 'final_round';
+
+type ApplicantIdentity = {
+  applicationId: number;
+  candidateId: number | null;
+  email: string;
+};
+
+/**
+ * Other-team placements for the same person in this recruitment cycle.
+ * Returns only { teamName, stage } — never scores, notes, flags, or board column.
+ * Match via candidate_id (preferred) or real email; rounds share a cycle by label.
+ */
+async function loadOtherTeamPlacements(
+  teamId: number,
+  roundId: number,
+  applicants: ApplicantIdentity[],
+): Promise<Map<number, DeliberationsOtherTeamPlacement[]>> {
+  const byApplicationId = new Map<number, DeliberationsOtherTeamPlacement[]>();
+  if (applicants.length === 0) return byApplicationId;
+
+  const candidateIds = [
+    ...new Set(
+      applicants
+        .map((a) => a.candidateId)
+        .filter((id): id is number => id != null && Number.isFinite(id) && id > 0),
+    ),
+  ];
+  const emails = [
+    ...new Set(
+      applicants
+        .map((a) => a.email.trim().toLowerCase())
+        .filter((email) => email && !isPlaceholderCandidateEmail(email)),
+    ),
+  ];
+
+  if (candidateIds.length === 0 && emails.length === 0) return byApplicationId;
+
+  const db = getDb();
+  const identityClauses: string[] = [];
+  const args: Array<string | number> = [teamId, roundId];
+
+  if (candidateIds.length > 0) {
+    identityClauses.push(
+      `app.candidate_id IN (${candidateIds.map(() => '?').join(',')})`,
+    );
+    args.push(...candidateIds);
+  }
+  if (emails.length > 0) {
+    identityClauses.push(
+      `lower(trim(c.email)) IN (${emails.map(() => '?').join(',')})`,
+    );
+    args.push(...emails);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT app.candidate_id AS candidate_id,
+                 lower(trim(c.email)) AS email,
+                 t.name AS team_name,
+                 app.stage AS stage
+          FROM applications app
+          JOIN candidates c ON c.id = app.candidate_id
+          JOIN teams t ON t.id = app.team_id
+          JOIN rounds r ON r.id = app.round_id
+          WHERE app.team_id != ?
+            AND r.label = (SELECT label FROM rounds WHERE id = ?)
+            AND r.status != 'closed'
+            AND (${identityClauses.join(' OR ')})
+          ORDER BY t.name ASC`,
+    args,
+  });
+
+  const byCandidateId = new Map<number, DeliberationsOtherTeamPlacement[]>();
+  const byEmail = new Map<string, DeliberationsOtherTeamPlacement[]>();
+
+  const pushUnique = <K extends string | number>(
+    map: Map<K, DeliberationsOtherTeamPlacement[]>,
+    key: K,
+    placement: DeliberationsOtherTeamPlacement,
+  ) => {
+    const list = map.get(key) ?? [];
+    if (list.some((p) => p.teamName === placement.teamName && p.stage === placement.stage)) {
+      return;
+    }
+    list.push(placement);
+    map.set(key, list);
+  };
+
+  for (const row of result.rows) {
+    const teamName = (row.team_name as string) || '';
+    const stage = (row.stage as string) || '';
+    if (!teamName || !stage) continue;
+    const placement: DeliberationsOtherTeamPlacement = { teamName, stage };
+    const candidateId = Number(row.candidate_id);
+    if (Number.isFinite(candidateId) && candidateId > 0) {
+      pushUnique(byCandidateId, candidateId, placement);
+    }
+    const email = ((row.email as string) || '').trim().toLowerCase();
+    if (email && !isPlaceholderCandidateEmail(email)) {
+      pushUnique(byEmail, email, placement);
+    }
+  }
+
+  for (const applicant of applicants) {
+    const merged: DeliberationsOtherTeamPlacement[] = [];
+    const seen = new Set<string>();
+    const addAll = (list: DeliberationsOtherTeamPlacement[] | undefined) => {
+      if (!list) return;
+      for (const placement of list) {
+        const key = `${placement.teamName}::${placement.stage}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(placement);
+      }
+    };
+    if (applicant.candidateId != null) {
+      addAll(byCandidateId.get(applicant.candidateId));
+    }
+    const email = applicant.email.trim().toLowerCase();
+    if (email && !isPlaceholderCandidateEmail(email)) {
+      addAll(byEmail.get(email));
+    }
+    merged.sort((a, b) => {
+      const teamCmp = a.teamName.localeCompare(b.teamName);
+      if (teamCmp !== 0) return teamCmp;
+      return a.stage.localeCompare(b.stage);
+    });
+    byApplicationId.set(applicant.applicationId, merged);
+  }
+
+  return byApplicationId;
+}
 
 /**
  * Mean of all field scores on completed assignments for a stage.
@@ -245,7 +379,8 @@ export async function buildDeliberationsBoard(
   const { cap, overCapExtra } = await getTeamAdvancementCapState(teamId, 'deliberations');
 
   const appsResult = await db.execute({
-    sql: `SELECT app.id, app.row_index, app.stage, c.name AS candidate_name
+    sql: `SELECT app.id, app.row_index, app.stage, app.fields,
+                 c.id AS candidate_id, c.name AS candidate_name, c.email AS candidate_email
           FROM applications app
           JOIN candidates c ON c.id = app.candidate_id
           WHERE app.team_id = ? AND app.round_id = ?
@@ -255,12 +390,37 @@ export async function buildDeliberationsBoard(
   });
 
   const appIds = appsResult.rows.map((row) => Number(row.id)).filter(Number.isFinite);
-  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, layout] = await Promise.all([
-    loadStageAverages(appIds, 'application'),
-    loadStageAverages(appIds, 'first_round'),
-    loadStageAverages(appIds, 'final_round'),
-    getDeliberationsBoardLayout(teamId, roundId),
-  ]);
+  const identities: ApplicantIdentity[] = appsResult.rows.map((row) => {
+    const applicationId = Number(row.id);
+    let fields: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse((row.fields as string) || '{}') as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        fields = Object.fromEntries(
+          Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [
+            key,
+            value == null ? '' : String(value),
+          ]),
+        );
+      }
+    } catch {
+      fields = {};
+    }
+    return {
+      applicationId,
+      candidateId: (row.candidate_id as number | null) ?? null,
+      email: resolveApplicantEmail(fields, (row.candidate_email as string | null) ?? ''),
+    };
+  });
+
+  const [applicationAvgs, firstRoundAvgs, finalRoundAvgs, layout, otherTeamsByApp] =
+    await Promise.all([
+      loadStageAverages(appIds, 'application'),
+      loadStageAverages(appIds, 'first_round'),
+      loadStageAverages(appIds, 'final_round'),
+      getDeliberationsBoardLayout(teamId, roundId),
+      loadOtherTeamPlacements(teamId, roundId, identities),
+    ]);
 
   const candidates: DeliberationsCandidate[] = appsResult.rows.map((row) => {
     const applicationId = Number(row.id);
@@ -276,6 +436,7 @@ export async function buildDeliberationsBoard(
       firstRoundAverage: firstRoundAvgs.get(applicationId) ?? null,
       finalRoundAverage: finalRoundAvgs.get(applicationId) ?? null,
       rejected: false,
+      otherTeams: otherTeamsByApp.get(applicationId) ?? [],
     };
   });
 
@@ -580,6 +741,7 @@ export async function buildDeliberationsCandidateDetail(
     flagsResult,
     settings,
     coffeeChats,
+    otherTeamsByApp,
   ] = await Promise.all([
     loadStageAverages([applicationId], 'application'),
     loadStageAverages([applicationId], 'first_round'),
@@ -595,6 +757,9 @@ export async function buildDeliberationsCandidateDetail(
     }),
     getRoundSettings(roundId),
     loadCoffeeChatsForApplicant(candidateId, email, name),
+    loadOtherTeamPlacements(teamId, roundId, [
+      { applicationId, candidateId, email },
+    ]),
   ]);
 
   const questionLabels = new Map<string, string>();
@@ -638,6 +803,7 @@ export async function buildDeliberationsCandidateDetail(
     coffeeChats,
     scoreFieldLabels,
     flags,
+    otherTeams: otherTeamsByApp.get(applicationId) ?? [],
   };
 }
 

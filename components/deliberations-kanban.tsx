@@ -13,10 +13,8 @@ import {
   Settings2Icon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  ApplicantCompareBar,
-  ApplicantCompareDialog,
-} from '@/components/applicant-compare';
+import { ApplicantCompareBar, ApplicantCompareDialog } from '@/components/applicant-compare';
+import { DeliberationsAlsoOnBadges } from '@/components/deliberations-also-on-badge';
 import { prefetchDeliberationsDetail } from '@/components/deliberations-candidate-detail';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { GoOverCapDialog } from '@/components/go-over-cap-dialog';
@@ -398,8 +396,9 @@ function ApplicantCard({
               ) : null}
             </div>
             <p className="text-xs tabular-nums text-foreground/80">
-              Row {displayApplicantId(candidate.rowIndex)}
+              Applicant #{displayApplicantId(candidate.rowIndex)}
             </p>
+            <DeliberationsAlsoOnBadges placements={candidate.otherTeams} />
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {!isOverlay && (onToggleRejected || onToggleCompare) ? (

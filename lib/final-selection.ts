@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { findGradeInFields } from '@/lib/candidates';
+import { findGradeInFields, findPhoneInFields } from '@/lib/candidates';
 import { getDb, getTeams, type User } from '@/lib/db';
 import { isOrgFinalSelectionComplete } from '@/lib/org-final-selection-status';
 import {
@@ -14,6 +14,7 @@ export interface FinalSelectionMember {
   name: string;
   email: string;
   grade: string;
+  phone: string;
   teamId: number;
   teamName: string;
 }
@@ -88,6 +89,7 @@ export async function getFinalSelectionByTeam(
         name: (row.name as string) || `Applicant ${row.id}`,
         email: (row.email as string) || '',
         grade: findGradeInFields(fields),
+        phone: findPhoneInFields(fields),
         teamId: team.id,
         teamName: team.name,
       });

@@ -165,7 +165,7 @@ export function ApplicantCompareDialog({
                         {candidate.name}
                       </p>
                       <p className="text-xs tabular-nums text-muted-foreground">
-                        Row {displayApplicantId(candidate.rowIndex)}
+                        Applicant #{displayApplicantId(candidate.rowIndex)}
                       </p>
                     </div>
                     <div className="space-y-3 px-4 py-3">
@@ -191,7 +191,7 @@ export function ApplicantCompareDialog({
                           {candidate.name}
                         </p>
                         <p className="text-xs tabular-nums text-muted-foreground">
-                          Row {displayApplicantId(candidate.rowIndex)}
+                          Applicant #{displayApplicantId(candidate.rowIndex)}
                         </p>
                       </div>
                       <Button

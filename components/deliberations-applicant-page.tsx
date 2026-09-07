@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon } from 'lucide-react';
 import { ApplicationFieldsList } from '@/components/application-fields-list';
+import { DeliberationsAlsoOnBadges } from '@/components/deliberations-also-on-badge';
 import {
   DeliberationsReviewsSection,
   DeliberationsPhaseScoreChips,
@@ -178,18 +179,24 @@ export function DeliberationsApplicantPage({
           <PageHeader
             title={detail.name}
             description={[
-              `Row ${displayApplicantId(detail.rowIndex)}`,
+              `Applicant #${displayApplicantId(detail.rowIndex)}`,
               detail.email?.trim() || null,
               teamName || null,
             ]
               .filter(Boolean)
               .join(' · ')}
             actions={
-              <StageBadge
-                label={applicationStageLabel(detail.stage as ApplicationStage)}
-                color={stageBadgeColor(detail.stage)}
-                size="compact"
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <DeliberationsAlsoOnBadges
+                  placements={detail.otherTeams}
+                  badgeClassName="text-[0.7rem]"
+                />
+                <StageBadge
+                  label={applicationStageLabel(detail.stage as ApplicationStage)}
+                  color={stageBadgeColor(detail.stage)}
+                  size="compact"
+                />
+              </div>
             }
           />
 
